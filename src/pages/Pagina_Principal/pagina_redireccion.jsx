@@ -230,11 +230,11 @@ const tramitesFila2 = [
 // Estadísticas
 const estadisticas = [
   { numero: '2,850+', label: 'Usuarios Activos', icon: <GroupsIcon />, color: colors.primary.main },
-  { numero: '5', label: 'Sistemas', icon: <DashboardIcon />, color: colors.accent.electricBlue },
+  { numero: '6', label: 'Sistemas', icon: <DashboardIcon />, color: colors.accent.electricBlue },
   { numero: '15.2K', label: 'Trámites', icon: <AssignmentIcon />, color: colors.secondary.main },
   { numero: '98%', label: 'Satisfacción', icon: <StarIcon />, color: colors.accent.purple },
   { numero: '24/7', label: 'Soporte', icon: <ShieldIcon />, color: colors.primary.main },
-  { numero: '6', label: 'Regiones', icon: <TimelineIcon />, color: colors.accent.electricBlue },
+  { numero: '32', label: 'Regiones', icon: <TimelineIcon />, color: colors.accent.electricBlue },
 ];
 
 const Inicio = () => {
@@ -277,12 +277,12 @@ const Inicio = () => {
 
 const [expandedIndex, setExpandedIndex] = useState(null);
 
-// 👇 REFERENCIAS PARA NAVEGACIÓN INTERNA
+//  REFERENCIAS PARA NAVEGACIÓN INTERNA
 const sistemasRef = useRef(null);
 const tramitesRef = useRef(null);
 const contactoRef = useRef(null);
 
-// 👇 FUNCIONES PARA SCROLL SUAVE
+//  FUNCIONES PARA SCROLL SUAVE
 const scrollToSistemas = () => {
   sistemasRef.current?.scrollIntoView({ 
     behavior: 'smooth',
@@ -595,17 +595,26 @@ const handlePoliticaClick = (index) => {
         {drawer}
       </Drawer>
 
-      {/* Hero Section */}
+      {/* Hero Section - CON IMAGEN PROFESIONALMENTE INTEGRADA */}
       <Box
         sx={{
           bgcolor: colors.primary.main,
-          borderBottom: `1px solid ${alpha(colors.secondary.main, 0.2)}`,
           position: 'relative',
           overflow: 'hidden',
           py: { xs: 6, md: 10 },
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            background: `radial-gradient(circle at 70% 50%, ${alpha(colors.secondary.main, 0.1)} 0%, transparent 50%)`,
+            zIndex: 0,
+          }
         }}
       >
-        <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 } }}>
+        <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 }, position: 'relative', zIndex: 1 }}>
           <Grid container spacing={6} alignItems="center">
             <Grid item xs={12} md={7}>
               <Zoom in timeout={1000}>
@@ -619,6 +628,7 @@ const handlePoliticaClick = (index) => {
                       mb: 3,
                       height: 32,
                       fontSize: '0.9rem',
+                      border: `1px solid ${alpha(colors.secondary.main, 0.3)}`,
                     }}
                   />
                   <Typography 
@@ -629,6 +639,7 @@ const handlePoliticaClick = (index) => {
                       lineHeight: 1.1,
                       mb: 2,
                       color: colors.white,
+                      textShadow: `0 2px 20px ${alpha(colors.black, 0.2)}`,
                     }}
                   >
                     Ventanilla Única de Gestión 
@@ -662,11 +673,13 @@ const handlePoliticaClick = (index) => {
                         fontWeight: 600,
                         color: colors.primary.dark,
                         borderRadius: sizes.borderRadius.medium,
-                        boxShadow: 'none',
+                        boxShadow: `0 8px 20px ${alpha(colors.secondary.main, 0.3)}`,
                         '&:hover': { 
                           bgcolor: colors.secondary.dark,
-                          boxShadow: `0 8px 16px ${alpha(colors.secondary.main, 0.3)}`,
+                          boxShadow: `0 12px 28px ${alpha(colors.secondary.main, 0.4)}`,
+                          transform: 'translateY(-2px)',
                         },
+                        transition: 'all 0.3s ease',
                       }}
                     >
                       Explorar Sistemas
@@ -683,10 +696,14 @@ const handlePoliticaClick = (index) => {
                         fontWeight: 600,
                         borderRadius: sizes.borderRadius.medium,
                         borderWidth: 2,
+                        backdropFilter: 'blur(10px)',
+                        backgroundColor: alpha(colors.white, 0.05),
                         '&:hover': { 
                           borderColor: colors.secondary.light,
-                          bgcolor: alpha(colors.secondary.main, 0.1),
+                          backgroundColor: alpha(colors.secondary.main, 0.1),
+                          transform: 'translateY(-2px)',
                         },
+                        transition: 'all 0.3s ease',
                       }}
                     >
                       Ver Demo
@@ -699,53 +716,137 @@ const handlePoliticaClick = (index) => {
               <Box sx={{ 
                 display: 'flex', 
                 justifyContent: 'center',
+                alignItems: 'center',
                 position: 'relative',
+                height: '100%',
+                minHeight: 450,
               }}>
+                {/* Capas de fondo para dar profundidad */}
                 <Box
                   sx={{
-                    width: 500,
-                    height: 500,
-                    borderRadius: '50%',
-                    background: `radial-gradient(circle, ${alpha(colors.secondary.main, 0.15)} 0%, ${alpha(colors.white, 0.02)} 100%)`,
                     position: 'absolute',
+                    width: 1000,
+                    height: 1000,
+                    borderRadius: '100%',
+                    background: `radial-gradient(circle, ${alpha(colors.secondary.main, 0.2)} 0%, transparent 70%)`,
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
                     zIndex: 0,
                   }}
                 />
-                <Stack spacing={3} sx={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 350 }}>
-                  {['T-MEC', 'CONSULT', 'CAAAREM'].map((logo, index) => {
-                    const textColors = [colors.secondary.main, colors.accent.electricBlue, colors.accent.purple];
-                    return (
-                      <Zoom in timeout={1500 + index * 200} key={logo}>
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 3,
-                            bgcolor: alpha(colors.white, 0.1),
-                            backdropFilter: 'blur(10px)',
-                            border: `1px solid ${alpha(colors.white, 0.15)}`,
-                            borderRadius: sizes.borderRadius.large,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.3s',
-                            '&:hover': {
-                              borderColor: textColors[index % textColors.length],
-                              bgcolor: alpha(colors.white, 0.15),
-                              transform: 'scale(1.05)',
-                            },
-                          }}
-                        >
-                          <Typography variant="h5" sx={{ fontWeight: 700, color: colors.white }}>
-                            {logo}
-                          </Typography>
-                        </Paper>
-                      </Zoom>
-                    );
-                  })}
-                </Stack>
+                
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: 450,
+                    height: 450,
+                    borderRadius: '50%',
+                    border: `2px solid ${alpha(colors.secondary.main, 0.15)}`,
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 1,
+                  }}
+                />
+
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: 380,
+                    height: 380,
+                    borderRadius: '50%',
+                    border: `1px solid ${alpha(colors.secondary.main, 0.3)}`,
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 2,
+                    boxShadow: `0 0 40px ${alpha(colors.secondary.main, 0.2)}`,
+                  }}
+                />
+                
+                {/* Elementos decorativos flotantes */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: 60,
+                    height: 60,
+                    borderRadius: '50%',
+                    background: alpha(colors.secondary.main, 0.1),
+                    top: '15%',
+                    right: '10%',
+                    zIndex: 3,
+                    filter: 'blur(8px)',
+                    animation: 'pulse 4s ease-in-out infinite',
+                  }}
+                />
+                
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: alpha(colors.accent.electricBlue, 0.1),
+                    bottom: '20%',
+                    left: '15%',
+                    zIndex: 3,
+                    filter: 'blur(6px)',
+                    animation: 'pulse 5s ease-in-out infinite',
+                  }}
+                />
+
+                {/* IMAGEN PRINCIPAL CON EFECTOS */}
+                <Zoom in timeout={1500}>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      zIndex: 4,
+                      filter: 'drop-shadow(0 20px 30px rgba(0, 0, 0, 0.3))',
+                      animation: 'float 6s ease-in-out infinite',
+                      '@keyframes float': {
+                        '0%': { transform: 'translateY(0px)' },
+                        '50%': { transform: 'translateY(-20px)' },
+                        '100%': { transform: 'translateY(0px)' },
+                      },
+                      '@keyframes pulse': {
+                        '0%': { opacity: 0.5, transform: 'scale(1)' },
+                        '50%': { opacity: 0.8, transform: 'scale(1.1)' },
+                        '100%': { opacity: 0.5, transform: 'scale(1)' },
+                      },
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      src="/assets/Imagen_2.png"
+                      alt="Ventanilla Única"
+                      sx={{
+                        width: '100%',
+                        maxWidth: 380,
+                        height: 'auto',
+                        objectFit: 'contain',
+                        position: 'relative',
+                        zIndex: 4,
+                        borderRadius: '20px',
+                      }}
+                    />
+                    
+                    {/* Capa de brillo adicional */}
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        borderRadius: '20px',
+                        background: `linear-gradient(135deg, ${alpha(colors.secondary.main, 0.1)} 0%, transparent 50%, ${alpha(colors.accent.purple, 0.1)} 100%)`,
+                        pointerEvents: 'none',
+                        zIndex: 5,
+                      }}
+                    />
+                  </Box>
+                </Zoom>
               </Box>
             </Grid>
           </Grid>
@@ -844,7 +945,14 @@ const handlePoliticaClick = (index) => {
           Nuestros Sistemas
         </Typography>
         
-        <Grid container spacing={3} sx={{ mb: sizes.sectionSpacing, pl: { xs: 2, sm: 3, md: 4 }, }}>
+        <Grid 
+          container 
+          spacing={3} 
+          sx={{ 
+            mb: sizes.sectionSpacing,
+            pl: { xs: 2, sm: 3, md: 4 },
+          }}
+        >
           {sistemas.map((sistema, index) => (
             <Grid item xs={12} sm={6} md={4} key={sistema.id}>
               <Fade in timeout={1000 + index * 200}>
