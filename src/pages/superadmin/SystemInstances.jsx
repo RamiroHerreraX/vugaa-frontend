@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -48,6 +48,7 @@ import {
 import CreateInstanceDialog from "../../components/Instancias/CreateInstanceDialog";
 import ViewInstanceDialog from "../../components/Instancias/ViewInstanceDialog";
 import EditInstanceDialog from "../../components/Instancias/EditInstanceDialog";
+import { getInstancias } from "../../services/Instancia";
 
 const SystemInstances = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,154 +61,54 @@ const SystemInstances = () => {
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState(null);
+  const [systemInstances, setSystemInstances] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Datos de las instancias del sistema
-  const systemInstances = [
-    {
-      id: 1,
-      name: "Área de Ingeniería",
-      code: "ENG-001",
-      description: "Sistema de certificaciones para la Facultad de Ingeniería",
-      status: "active",
-      users: 245,
-      certifications: 15,
-      courses: 8,
-      colors: {
-        primary: "#1b5e20",
-        secondary: "#4caf50",
-        accent: "#8bc34a",
-      },
-      created: "10/01/2024",
-      admin: "Dr. Carlos Méndez",
-      email: "carlos.mendez@institucion.edu",
-    },
-    {
-      id: 2,
-      name: "Área de Medicina",
-      code: "MED-001",
-      description: "Sistema para certificaciones médicas y especialidades",
-      status: "active",
-      users: 189,
-      certifications: 12,
-      courses: 6,
-      colors: {
-        primary: "#0d47a1",
-        secondary: "#2196f3",
-        accent: "#64b5f6",
-      },
-      created: "15/03/2024",
-      admin: "Dra. Ana López",
-      email: "ana.lopez@institucion.edu",
-    },
-    {
-      id: 3,
-      name: "Programa de Posgrado",
-      code: "POS-001",
-      description: "Gestión de certificaciones para programas de posgrado",
-      status: "maintenance",
-      users: 78,
-      certifications: 8,
-      courses: 4,
-      colors: {
-        primary: "#4a148c",
-        secondary: "#7b1fa2",
-        accent: "#ba68c8",
-      },
-      created: "20/06/2024",
-      admin: "Mtro. Roberto Díaz",
-      email: "roberto.diaz@institucion.edu",
-    },
-    {
-      id: 4,
-      name: "Área de Derecho",
-      code: "LAW-001",
-      description: "Certificaciones y colegiaturas para abogados",
-      status: "inactive",
-      users: 156,
-      certifications: 10,
-      courses: 5,
-      colors: {
-        primary: "#bf360c",
-        secondary: "#e64a19",
-        accent: "#ff8a65",
-      },
-      created: "05/09/2024",
-      admin: "Lic. Fernando Gómez",
-      email: "fernando.gomez@institucion.edu",
-    },
-    {
-      id: 5,
-      name: "Campus Virtual",
-      code: "VIR-001",
-      description: "Plataforma de certificaciones en línea",
-      status: "active",
-      users: 342,
-      certifications: 20,
-      courses: 15,
-      colors: {
-        primary: "#00695c",
-        secondary: "#009688",
-        accent: "#4db6ac",
-      },
-      created: "12/11/2024",
-      admin: "Ing. Sofía Ramírez",
-      email: "sofia.ramirez@institucion.edu",
-    },
-    {
-      id: 6,
-      name: "Departamento de Ciencias",
-      code: "SCI-001",
-      description: "Certificaciones para ciencias básicas y aplicadas",
-      status: "active",
-      users: 198,
-      certifications: 14,
-      courses: 9,
-      colors: {
-        primary: "#827717",
-        secondary: "#9e9d24",
-        accent: "#cddc39",
-      },
-      created: "22/02/2024",
-      admin: "Dr. Miguel Ángel Ruiz",
-      email: "miguel.ruiz@institucion.edu",
-    },
-    {
-      id: 7,
-      name: "Programa de Extensión",
-      code: "EXT-001",
-      description: "Certificaciones para cursos de extensión universitaria",
-      status: "draft",
-      users: 45,
-      certifications: 3,
-      courses: 2,
-      colors: {
-        primary: "#37474f",
-        secondary: "#546e7a",
-        accent: "#78909c",
-      },
-      created: "30/12/2024",
-      admin: "Lic. Patricia Castro",
-      email: "patricia.castro@institucion.edu",
-    },
-    {
-      id: 8,
-      name: "Área de Arquitectura",
-      code: "ARC-001",
-      description: "Sistema para colegiaturas y certificaciones profesionales",
-      status: "active",
-      users: 167,
-      certifications: 11,
-      courses: 7,
-      colors: {
-        primary: "#3e2723",
-        secondary: "#5d4037",
-        accent: "#8d6e63",
-      },
-      created: "18/07/2024",
-      admin: "Arq. Luis Fernando Morales",
-      email: "luis.morales@institucion.edu",
-    },
-  ];
+  const loadInstancias = async () => {
+    try {
+      setLoading(true);
+
+      const data = await getInstancias();
+
+      // convertir formato backend → frontend
+      const formatted = data.map((inst) => ({
+        id: inst.id,
+
+        // formato frontend (tabla)
+        name: inst.nombre,
+        code: inst.codigo,
+        description: inst.descripcion || "",
+        status: inst.estado || "draft",
+        users: inst.totalUsuarios || 0,
+        certifications: inst.totalCertificaciones || 0,
+        courses: inst.totalCursos || 0,
+        admin: inst.adminNombre || "Sin asignar",
+        email: inst.adminEmail || "",
+        created: inst.fechaCreacion
+          ? new Date(inst.fechaCreacion).toLocaleDateString()
+          : "",
+
+        colors: {
+          primary: inst.colorPrimario || "#1976d2",
+          secondary: inst.colorSecundario || "#ff9800",
+          accent: inst.colorAcento || "#4caf50",
+        },
+
+        // 👇 IMPORTANTE: guardar original backend
+        original: inst,
+      }));
+
+      setSystemInstances(formatted);
+    } catch (error) {
+      console.error("Error cargando instancias:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInstancias();
+  }, []);
 
   const statusOptions = [
     { value: "all", label: "Todos los estados" },
@@ -658,18 +559,20 @@ const SystemInstances = () => {
                                   size="small"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setSelectedInstance(instance);
+                                    setSelectedInstance(instance.original); // 👈 usar original
                                     setOpenViewDialog(true);
                                   }}
                                 >
                                   <VisibilityIcon fontSize="small" />
                                 </IconButton>
+                              </Tooltip>
 
+                              <Tooltip title="Editar instancia">
                                 <IconButton
                                   size="small"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setSelectedInstance(instance);
+                                    setSelectedInstance(instance.original); // 👈 usar original
                                     setOpenEditDialog(true);
                                   }}
                                 >
@@ -727,18 +630,27 @@ const SystemInstances = () => {
       {/* Diálogo de creación */}
       <CreateInstanceDialog
         open={openCreateDialog}
-        onClose={() => setOpenCreateDialog(false)}
+        onClose={() => {
+          setOpenCreateDialog(false);
+          loadInstancias(); // refrescar tabla
+        }}
       />
 
       <ViewInstanceDialog
         open={openViewDialog}
-        onClose={() => setOpenViewDialog(false)}
+        onClose={() => {
+          setOpenViewDialog(false);
+          setSelectedInstance(null);
+        }}
         instance={selectedInstance}
       />
 
       <EditInstanceDialog
         open={openEditDialog}
-        onClose={() => setOpenEditDialog(false)}
+        onClose={() => {
+          setOpenEditDialog(false);
+          setSelectedInstance(null);
+        }}
         instance={selectedInstance}
       />
     </Box>
