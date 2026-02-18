@@ -18,6 +18,7 @@ import Login from './pages/auth/Login';
 
 //Pagina de redirección
 import PaginaRedireccion from './pages/Pagina_Principal/pagina_redireccion';
+import PaginaLegalCompleta from './pages/Pagina_Principal/pagina_legal';
 
 // Páginas de Super Admin
 import SuperAdminDashboard from './pages/superadmin/Dashboard';
@@ -64,6 +65,7 @@ function App() {
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
             <Route path="/inicio" element={<PaginaRedireccion />} />
+            <Route path="/legal" element={<PaginaLegalCompleta />} />
 
 
             {/* Rutas protegidas - Super Admin */}

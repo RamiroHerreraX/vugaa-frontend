@@ -117,11 +117,11 @@ const colors = {
   black: '#000000',
 };
 
-// Tamaños estandarizados
+// Tamaños estandarizados - MEJORADOS PARA RESPONSIVE
 const sizes = {
-  headerHeight: 72,
-  sectionSpacing: 6,
-  cardPadding: 3,
+  headerHeight: { xs: 64, md: 72 },
+  sectionSpacing: { xs: 4, md: 6 },
+  cardPadding: { xs: 2, md: 3 },
   containerMaxWidth: '1400px',
   borderRadius: {
     small: 8,
@@ -130,10 +130,10 @@ const sizes = {
     xl: 24,
   },
   fontSize: {
-    h1: { xs: '2.5rem', md: '3.5rem' },
-    h2: { xs: '2rem', md: '2.5rem' },
-    h3: { xs: '1.5rem', md: '1.8rem' },
-    body: '1rem',
+    h1: { xs: '2rem', sm: '2.5rem', md: '3.5rem' },
+    h2: { xs: '1.75rem', md: '2.5rem' },
+    h3: { xs: '1.25rem', md: '1.8rem' },
+    body: { xs: '0.9rem', md: '1rem' },
     small: '0.875rem',
   },
 };
@@ -440,6 +440,7 @@ const handlePoliticaClick = (index) => {
       bgcolor: colors.background.default, 
       minHeight: '100vh',
       width: '100%',
+      overflowX: 'hidden', 
     }}>
       {/* Barra de navegación superior */}
       <AppBar 
@@ -471,8 +472,8 @@ const handlePoliticaClick = (index) => {
                   fontWeight: 700, 
                   color: colors.primary.main,
                   letterSpacing: '-0.5px',
-                  mr: 6,
-                  fontSize: '1.5rem',
+                  mr: { xs: 2, md: 6 },
+                  fontSize: { xs: '1.2rem', md: '1.5rem' },
                 }}
               >
                 VUGAA
@@ -528,7 +529,7 @@ const handlePoliticaClick = (index) => {
               </Box>
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 2 } }}>
               <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1.5, mr: 2 }}>
                 {['T-MEC', 'CONSULT', 'CAAAREM'].map((logo, index) => {
                   const colors_list = [colors.primary.main, colors.accent.electricBlue, colors.secondary.main];
@@ -565,10 +566,10 @@ const handlePoliticaClick = (index) => {
                 onClick={handleClick}
                 sx={{ 
                   bgcolor: colors.primary.main,
-                  px: 3,
-                  height: 40,
+                  px: { xs: 2, md: 3 },
+                  height: { xs: 36, md: 40 },
                   fontWeight: 600,
-                  fontSize: '0.9rem',
+                  fontSize: { xs: '0.8rem', md: '0.9rem' },
                   boxShadow: 'none',
                   '&:hover': { 
                     bgcolor: colors.primary.medium,
@@ -595,13 +596,13 @@ const handlePoliticaClick = (index) => {
         {drawer}
       </Drawer>
 
-      {/* Hero Section - CON IMAGEN PROFESIONALMENTE INTEGRADA */}
+      {/* Hero Section  */}
       <Box
         sx={{
           bgcolor: colors.primary.main,
           position: 'relative',
           overflow: 'hidden',
-          py: { xs: 6, md: 10 },
+          py: { xs: 4, md: 10 },
           '&::before': {
             content: '""',
             position: 'absolute',
@@ -615,7 +616,7 @@ const handlePoliticaClick = (index) => {
         }}
       >
         <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 }, position: 'relative', zIndex: 1 }}>
-          <Grid container spacing={6} alignItems="center">
+          <Grid container spacing={{ xs: 4, md: 6 }} alignItems="center">
             <Grid item xs={12} md={7}>
               <Zoom in timeout={1000}>
                 <Box>
@@ -626,8 +627,8 @@ const handlePoliticaClick = (index) => {
                       color: colors.secondary.main,
                       fontWeight: 600,
                       mb: 3,
-                      height: 32,
-                      fontSize: '0.9rem',
+                      height: { xs: 28, md: 32 },
+                      fontSize: { xs: '0.8rem', md: '0.9rem' },
                       border: `1px solid ${alpha(colors.secondary.main, 0.3)}`,
                     }}
                   />
@@ -654,22 +655,30 @@ const handlePoliticaClick = (index) => {
                       fontWeight: 400,
                       mb: 4,
                       maxWidth: '700px',
-                      fontSize: '1.25rem',
+                      fontSize: { xs: '1rem', md: '1.25rem' },
                       lineHeight: 1.6,
                     }}
                   >
                     Gestión integral, cumplimiento y autorregulación para el sector aduanal mexicano
                   </Typography>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <Stack 
+                    direction={{ xs: 'column', sm: 'row' }} 
+                    spacing={2}
+                    sx={{
+                      '& .MuiButton-root': {
+                        width: { xs: '100%', sm: 'auto' },
+                      }
+                    }}
+                  >
                     <Button 
                       variant="contained" 
                       size="large"
                       onClick={scrollToSistemas}
                       sx={{ 
                         bgcolor: colors.secondary.main,
-                        px: 5,
-                        py: 1.8,
-                        fontSize: '1rem',
+                        px: { xs: 3, md: 5 },
+                        py: { xs: 1.5, md: 1.8 },
+                        fontSize: { xs: '0.9rem', md: '1rem' },
                         fontWeight: 600,
                         color: colors.primary.dark,
                         borderRadius: sizes.borderRadius.medium,
@@ -690,9 +699,9 @@ const handlePoliticaClick = (index) => {
                       sx={{ 
                         borderColor: colors.secondary.main,
                         color: colors.white,
-                        px: 5,
-                        py: 1.8,
-                        fontSize: '1rem',
+                        px: { xs: 3, md: 5 },
+                        py: { xs: 1.5, md: 1.8 },
+                        fontSize: { xs: '0.9rem', md: '1rem' },
                         fontWeight: 600,
                         borderRadius: sizes.borderRadius.medium,
                         borderWidth: 2,
@@ -719,14 +728,14 @@ const handlePoliticaClick = (index) => {
                 alignItems: 'center',
                 position: 'relative',
                 height: '100%',
-                minHeight: 450,
+                minHeight: { xs: 300, sm: 400, md: 450 },
               }}>
-                {/* Capas de fondo para dar profundidad */}
+                {/* Capas de fondo para dar profundidad - RESPONSIVE */}
                 <Box
                   sx={{
                     position: 'absolute',
-                    width: 1000,
-                    height: 1000,
+                    width: { xs: 600, sm: 800, md: 1000 },
+                    height: { xs: 600, sm: 800, md: 1000 },
                     borderRadius: '100%',
                     background: `radial-gradient(circle, ${alpha(colors.secondary.main, 0.2)} 0%, transparent 70%)`,
                     top: '50%',
@@ -739,8 +748,8 @@ const handlePoliticaClick = (index) => {
                 <Box
                   sx={{
                     position: 'absolute',
-                    width: 450,
-                    height: 450,
+                    width: { xs: 300, sm: 380, md: 450 },
+                    height: { xs: 300, sm: 380, md: 450 },
                     borderRadius: '50%',
                     border: `2px solid ${alpha(colors.secondary.main, 0.15)}`,
                     top: '50%',
@@ -753,8 +762,8 @@ const handlePoliticaClick = (index) => {
                 <Box
                   sx={{
                     position: 'absolute',
-                    width: 380,
-                    height: 380,
+                    width: { xs: 250, sm: 320, md: 380 },
+                    height: { xs: 250, sm: 320, md: 380 },
                     borderRadius: '50%',
                     border: `1px solid ${alpha(colors.secondary.main, 0.3)}`,
                     top: '50%',
@@ -765,12 +774,12 @@ const handlePoliticaClick = (index) => {
                   }}
                 />
                 
-                {/* Elementos decorativos flotantes */}
+                {/* Elementos decorativos flotantes - RESPONSIVE */}
                 <Box
                   sx={{
                     position: 'absolute',
-                    width: 60,
-                    height: 60,
+                    width: { xs: 40, md: 60 },
+                    height: { xs: 40, md: 60 },
                     borderRadius: '50%',
                     background: alpha(colors.secondary.main, 0.1),
                     top: '15%',
@@ -784,8 +793,8 @@ const handlePoliticaClick = (index) => {
                 <Box
                   sx={{
                     position: 'absolute',
-                    width: 40,
-                    height: 40,
+                    width: { xs: 30, md: 40 },
+                    height: { xs: 30, md: 40 },
                     borderRadius: '50%',
                     background: alpha(colors.accent.electricBlue, 0.1),
                     bottom: '20%',
@@ -822,7 +831,7 @@ const handlePoliticaClick = (index) => {
                       alt="Ventanilla Única"
                       sx={{
                         width: '100%',
-                        maxWidth: 380,
+                        maxWidth: { xs: 280, sm: 320, md: 380 },
                         height: 'auto',
                         objectFit: 'contain',
                         position: 'relative',
@@ -854,7 +863,7 @@ const handlePoliticaClick = (index) => {
       </Box>
 
       {/* Contenido principal */}
-      <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 }, py: 8 }}>
+      <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 }, py: { xs: 4, md: 8 } }}>
         {/* Estadísticas */}
         <Box sx={{ 
           display: 'flex', 
@@ -863,7 +872,7 @@ const handlePoliticaClick = (index) => {
         }}>
           <Grid 
             container 
-            spacing={3} 
+            spacing={{ xs: 2, md: 3 }} 
             sx={{ 
               maxWidth: '1200px',
               mx: 'auto',
@@ -894,21 +903,20 @@ const handlePoliticaClick = (index) => {
                     }}
                   >
                     <Avatar 
-                    ref={sistemasRef}
                       sx={{ 
                         bgcolor: alpha(stat.color, 0.08), 
                         color: stat.color,
-                        width: 56,
-                        height: 56,
+                        width: { xs: 48, md: 56 },
+                        height: { xs: 48, md: 56 },
                         mb: 2,
                       }}
                     >
                       {stat.icon}
                     </Avatar>
-                    <Typography variant="h4" sx={{ color: colors.text.primary, fontWeight: 700, mb: 0.5, fontSize: '2rem' }}>
+                    <Typography variant="h4" sx={{ color: colors.text.primary, fontWeight: 700, mb: 0.5, fontSize: { xs: '1.5rem', md: '2rem' } }}>
                       {stat.numero}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: colors.text.tertiary, fontWeight: 500, fontSize: '0.85rem' }}>
+                    <Typography variant="body2" sx={{ color: colors.text.tertiary, fontWeight: 500, fontSize: { xs: '0.75rem', md: '0.85rem' } }}>
                       {stat.label}
                     </Typography>
                   </Paper>
@@ -920,7 +928,7 @@ const handlePoliticaClick = (index) => {
 
         {/* Sistemas */}
         <Typography 
-          
+          ref={sistemasRef}
           variant="h2" 
           sx={{ 
             fontSize: sizes.fontSize.h2,
@@ -935,7 +943,7 @@ const handlePoliticaClick = (index) => {
               bottom: -12,
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 80,
+              width: { xs: 60, md: 80 },
               height: 3,
               backgroundColor: colors.secondary.main,
               borderRadius: 1.5,
@@ -947,10 +955,10 @@ const handlePoliticaClick = (index) => {
         
         <Grid 
           container 
-          spacing={3} 
+          spacing={{ xs: 2, md: 3 }} 
           sx={{ 
             mb: sizes.sectionSpacing,
-            pl: { xs: 2, sm: 3, md: 4 },
+            pl: { xs: 1, sm: 2, md: 4 },
           }}
         >
           {sistemas.map((sistema, index) => (
@@ -981,12 +989,11 @@ const handlePoliticaClick = (index) => {
                   <CardContent sx={{ p: sizes.cardPadding }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <Avatar 
-                      ref={tramitesRef} 
                         sx={{ 
                           bgcolor: alpha(sistema.color, 0.08),
                           color: sistema.color,
-                          width: 56,
-                          height: 56,
+                          width: { xs: 48, md: 56 },
+                          height: { xs: 48, md: 56 },
                           mr: 2,
                         }}
                       >
@@ -994,7 +1001,7 @@ const handlePoliticaClick = (index) => {
                       </Avatar>
                       
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1.3rem', color: colors.text.primary }}>
+                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '1.1rem', md: '1.3rem' }, color: colors.text.primary }}>
                           {sistema.nombre}
                         </Typography>
                         <Chip
@@ -1010,7 +1017,7 @@ const handlePoliticaClick = (index) => {
                         />
                       </Box>
                     </Box>
-                    <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 2, fontSize: '0.9rem', lineHeight: 1.5 }}>
+                    <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 2, fontSize: { xs: '0.85rem', md: '0.9rem' }, lineHeight: 1.5 }}>
                       {sistema.descripcionCorta}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
@@ -1018,7 +1025,7 @@ const handlePoliticaClick = (index) => {
                         <Typography variant="caption" sx={{ color: colors.text.tertiary, fontSize: '0.7rem', display: 'block' }}>
                           Usuarios
                         </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: colors.text.primary, fontSize: '1rem' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: colors.text.primary, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                           {sistema.usuarios.toLocaleString()}
                         </Typography>
                       </Box>
@@ -1026,7 +1033,7 @@ const handlePoliticaClick = (index) => {
                         <Typography variant="caption" sx={{ color: colors.text.tertiary, fontSize: '0.7rem', display: 'block' }}>
                           Certificaciones
                         </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: colors.text.primary, fontSize: '1rem' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: colors.text.primary, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                           {sistema.certificaciones.toLocaleString()}
                         </Typography>
                       </Box>
@@ -1043,7 +1050,7 @@ const handlePoliticaClick = (index) => {
 
         {/* Trámites */}
         <Typography
-          
+          ref={tramitesRef}
           variant="h2"
           sx={{
             fontSize: sizes.fontSize.h2,
@@ -1063,7 +1070,7 @@ const handlePoliticaClick = (index) => {
               sm: 'repeat(2, 1fr)',
               md: 'repeat(4, 1fr)',
             },
-            gap: 3,
+            gap: { xs: 2, md: 3 },
             width: '100%',
             maxWidth: '1200px',
             mx: 'auto',
@@ -1083,7 +1090,7 @@ const handlePoliticaClick = (index) => {
                   borderRadius: sizes.borderRadius.medium,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
-                  height: '80px',
+                  height: { xs: '70px', md: '80px' },
                   '&:hover': {
                     bgcolor: alpha(tramite.color, 0.02),
                     borderColor: tramite.color,
@@ -1097,14 +1104,14 @@ const handlePoliticaClick = (index) => {
                   sx={{
                     bgcolor: alpha(tramite.color, 0.08),
                     color: tramite.color,
-                    width: 44,
-                    height: 44,
+                    width: { xs: 36, md: 44 },
+                    height: { xs: 36, md: 44 },
                     mr: 1.5,
                   }}
                 >
                   {tramite.icon}
                 </Avatar>
-                <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.9rem', color: colors.text.primary }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, fontSize: { xs: '0.8rem', md: '0.9rem' }, color: colors.text.primary }}>
                   {tramite.nombre}
                 </Typography>
               </Paper>
@@ -1127,7 +1134,7 @@ const handlePoliticaClick = (index) => {
         </Typography>
 
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: sizes.sectionSpacing }}>
-          <Grid container spacing={4} justifyContent="center">
+          <Grid container spacing={{ xs: 3, md: 4 }} justifyContent="center">
             {[
               {
                 titulo: 'Misión',
@@ -1153,7 +1160,7 @@ const handlePoliticaClick = (index) => {
                   <Card
                     elevation={0}
                     sx={{
-                      width: 360,
+                      width: { xs: 320, sm: 340, md: 360 },
                       bgcolor: colors.background.paper,
                       border: `1px solid ${colors.border.light}`,
                       borderRadius: sizes.borderRadius.large,
@@ -1166,13 +1173,13 @@ const handlePoliticaClick = (index) => {
                       },
                     }}
                   >
-                    <CardContent sx={{ p: 4 }}>
+                    <CardContent sx={{ p: { xs: 3, md: 4 } }}>
                       <Avatar
                         sx={{
                           bgcolor: alpha(item.color, 0.08),
                           color: item.color,
-                          width: 80,
-                          height: 80,
+                          width: { xs: 70, md: 80 },
+                          height: { xs: 70, md: 80 },
                           mx: 'auto',
                           mb: 3,
                         }}
@@ -1185,7 +1192,7 @@ const handlePoliticaClick = (index) => {
                           fontWeight: 600,
                           color: item.color,
                           mb: 2,
-                          fontSize: '1.8rem',
+                          fontSize: { xs: '1.5rem', md: '1.8rem' },
                         }}
                       >
                         {item.titulo}
@@ -1195,7 +1202,7 @@ const handlePoliticaClick = (index) => {
                         sx={{
                           color: colors.text.secondary,
                           lineHeight: 1.6,
-                          fontSize: '0.95rem',
+                          fontSize: { xs: '0.85rem', md: '0.95rem' },
                         }}
                       >
                         {item.descripcion}
@@ -1212,7 +1219,7 @@ const handlePoliticaClick = (index) => {
         <Paper
           elevation={0}
           sx={{
-            p: 5,
+            p: { xs: 3, md: 5 },
             mb: sizes.sectionSpacing,
             bgcolor: colors.primary.main,
             color: colors.white,
@@ -1256,8 +1263,8 @@ const handlePoliticaClick = (index) => {
                       borderBottomLeftRadius: expandedIndex === index ? 0 : sizes.borderRadius.medium,
                       borderBottomRightRadius: expandedIndex === index ? 0 : sizes.borderRadius.medium,
                       width: '100%',
-                      minWidth: '280px',
-                      maxWidth: '320px',
+                      minWidth: { xs: '250px', sm: '280px' },
+                      maxWidth: { xs: '280px', md: '320px' },
                       margin: '0 auto',
                     }}
                   >
@@ -1273,7 +1280,7 @@ const handlePoliticaClick = (index) => {
                       sx={{ 
                         color: colors.white, 
                         fontWeight: 500, 
-                        fontSize: '1rem',
+                        fontSize: { xs: '0.9rem', md: '1rem' },
                         wordWrap: 'break-word',
                         whiteSpace: 'normal',
                       }}
@@ -1292,15 +1299,15 @@ const handlePoliticaClick = (index) => {
                       borderTopLeftRadius: 0,
                       borderTopRightRadius: 0,
                       width: '100%',
-                      minWidth: '280px',
-                      maxWidth: '320px',
+                      minWidth: { xs: '250px', sm: '280px' },
+                      maxWidth: { xs: '280px', md: '320px' },
                       margin: '0 auto',
                     }}>
                       <Typography 
                         variant="body2" 
                         sx={{ 
                           color: alpha(colors.white, 0.9), 
-                          fontSize: '0.9rem',
+                          fontSize: { xs: '0.8rem', md: '0.9rem' },
                           lineHeight: 1.6,
                           wordWrap: 'break-word',
                           whiteSpace: 'normal',
@@ -1321,7 +1328,7 @@ const handlePoliticaClick = (index) => {
           <Paper
             elevation={0}
             sx={{
-              p: 5,
+              p: { xs: 3, md: 5 },
               bgcolor: colors.background.paper,
               border: `1px solid ${colors.border.light}`,
               borderRadius: sizes.borderRadius.xl,
@@ -1340,20 +1347,28 @@ const handlePoliticaClick = (index) => {
                 <Typography variant="body1" sx={{ 
                   color: colors.text.secondary, 
                   mb: 3, 
-                  fontSize: '1rem',
+                  fontSize: { xs: '0.9rem', md: '1rem' },
                   lineHeight: 1.6,
                 }}>
                   Contáctanos para recibir asesoría personalizada sobre nuestros sistemas y servicios.
                 </Typography>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <Stack 
+                  direction={{ xs: 'column', sm: 'row' }} 
+                  spacing={2}
+                  sx={{
+                    '& .MuiButton-root': {
+                      width: { xs: '100%', sm: 'auto' },
+                    }
+                  }}
+                >
                   <Button 
                     variant="contained" 
                     size="large"
                     sx={{ 
                       bgcolor: colors.primary.main,
-                      px: 4,
-                      py: 1.5,
-                      fontSize: '0.95rem',
+                      px: { xs: 3, md: 4 },
+                      py: { xs: 1.2, md: 1.5 },
+                      fontSize: { xs: '0.85rem', md: '0.95rem' },
                       fontWeight: 600,
                       borderRadius: sizes.borderRadius.medium,
                       boxShadow: 'none',
@@ -1372,9 +1387,9 @@ const handlePoliticaClick = (index) => {
                     sx={{ 
                       borderColor: colors.secondary.main,
                       color: colors.secondary.main,
-                      px: 4,
-                      py: 1.5,
-                      fontSize: '0.95rem',
+                      px: { xs: 3, md: 4 },
+                      py: { xs: 1.2, md: 1.5 },
+                      fontSize: { xs: '0.85rem', md: '0.95rem' },
                       fontWeight: 600,
                       borderRadius: sizes.borderRadius.medium,
                       borderWidth: 1.5,
@@ -1391,7 +1406,7 @@ const handlePoliticaClick = (index) => {
               </Grid>
               <Grid item xs={12} md={5}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" sx={{ color: colors.text.primary, fontWeight: 600, mb: 3, fontSize: '1.2rem' }}>
+                  <Typography variant="h5" sx={{ color: colors.text.primary, fontWeight: 600, mb: 3, fontSize: { xs: '1rem', md: '1.2rem' } }}>
                     Síguenos en redes
                   </Typography>
                   <Stack direction="row" spacing={2} justifyContent="center">
@@ -1407,8 +1422,8 @@ const handlePoliticaClick = (index) => {
                         sx={{
                           bgcolor: alpha(social.color, 0.05),
                           color: social.color,
-                          width: 48,
-                          height: 48,
+                          width: { xs: 40, md: 48 },
+                          height: { xs: 40, md: 48 },
                           transition: 'all 0.3s',
                           '&:hover': {
                             bgcolor: social.color,
@@ -1432,63 +1447,68 @@ const handlePoliticaClick = (index) => {
       <Box sx={{ 
         bgcolor: colors.background.dark, 
         borderTop: `3px solid ${colors.secondary.main}`,
-        py: 5,
+        py: { xs: 4, md: 5 },
         mt: 4,
       }}>
         <Container maxWidth={false} sx={{ px: { xs: 2, md: 4 } }}>
           <Grid container spacing={4}>
             <Grid item xs={12} md={4}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.white, mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.white, mb: 2, fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
                 Sistema Integral Aduanal
               </Typography>
-              <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7), lineHeight: 1.7 }}>
+              <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7), lineHeight: 1.7, fontSize: { xs: '0.85rem', md: '0.95rem' } }}>
                 Transformando la gestión aduanal a través de la tecnología y la innovación.
               </Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.white, mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.white, mb: 2, fontSize: { xs: '1rem', md: '1.1rem' } }}>
                 Enlaces rápidos
               </Typography>
-              <Stack spacing={1.5}>
-                {['Términos y condiciones', 'Aviso de privacidad', 'Política de cookies'].map((item, idx) => (
-                  <Button
-                    key={item}
-                    color="inherit"
-                    sx={{
-                      justifyContent: 'flex-start',
-                      p: 0,
-                      color: alpha(colors.white, 0.7),
-                      fontSize: '0.95rem',
-                      textTransform: 'none',
-                      '&:hover': { 
-                        color: colors.white,
-                      },
-                    }}
-                  >
-                    {item}
-                  </Button>
-                ))}
-              </Stack>
+             <Stack spacing={1.5}>
+  {[
+    { nombre: 'Términos y condiciones', ruta: '/legal?tab=0' },
+    { nombre: 'Aviso de privacidad', ruta: '/legal?tab=1' },
+    { nombre: 'Política de cookies', ruta: '/legal?tab=2' }
+  ].map((item, idx) => (
+    <Button
+      key={item.nombre}
+      color="inherit"
+      onClick={() => navigate(item.ruta)}
+      sx={{
+        justifyContent: 'flex-start',
+        p: 0,
+        color: alpha(colors.white, 0.7),
+        fontSize: { xs: '0.8rem', md: '0.95rem' },
+        textTransform: 'none',
+        '&:hover': { 
+          color: colors.white,
+        },
+      }}
+    >
+      {item.nombre}
+    </Button>
+  ))}
+</Stack>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.white, mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.white, mb: 2, fontSize: { xs: '1rem', md: '1.1rem' } }}>
                 Contacto
               </Typography>
               <Stack spacing={1.5}>
-                <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7) }}>
+                <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7), fontSize: { xs: '0.8rem', md: '0.95rem' } }}>
                   contacto@sistemas-aduanales.mx
                 </Typography>
-                <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7) }}>
+                <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7), fontSize: { xs: '0.8rem', md: '0.95rem' } }}>
                   (55) 1234-5678
                 </Typography>
-                <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7) }}>
+                <Typography variant="body1" sx={{ color: alpha(colors.white, 0.7), fontSize: { xs: '0.8rem', md: '0.95rem' } }}>
                   Cd. de México, México
                 </Typography>
               </Stack>
             </Grid>
           </Grid>
           <Divider sx={{ my: 4, borderColor: alpha(colors.white, 0.1) }} />
-          <Typography variant="body1" align="center" sx={{ color: alpha(colors.white, 0.6) }}>
+          <Typography variant="body1" align="center" sx={{ color: alpha(colors.white, 0.6), fontSize: { xs: '0.75rem', md: '0.9rem' } }}>
             © {new Date().getFullYear()} Sistema Integral Aduanal. Todos los derechos reservados.
           </Typography>
         </Container>
@@ -1504,14 +1524,14 @@ const handlePoliticaClick = (index) => {
           width: { xs: '90%', sm: 500 },
           bgcolor: colors.background.paper,
           boxShadow: `0 24px 48px -12px ${alpha(colors.primary.main, 0.25)}`,
-          p: 4,
+          p: { xs: 3, md: 4 },
           borderRadius: sizes.borderRadius.large,
         }}>
           <Typography variant="h4" sx={{ 
             color: colors.primary.main, 
             fontWeight: 600, 
             mb: 3,
-            fontSize: '1.5rem',
+            fontSize: { xs: '1.3rem', md: '1.5rem' },
           }}>
             {modalTipo === 'contacto' ? 'Contacto' : 'Centro de ayuda'}
           </Typography>
@@ -1564,7 +1584,7 @@ const handlePoliticaClick = (index) => {
                   bgcolor: colors.primary.main,
                   py: 1.2,
                   borderRadius: sizes.borderRadius.medium,
-                  fontSize: '0.95rem',
+                  fontSize: { xs: '0.85rem', md: '0.95rem' },
                   fontWeight: 600,
                   boxShadow: 'none',
                   '&:hover': { bgcolor: colors.primary.medium },
@@ -1575,7 +1595,7 @@ const handlePoliticaClick = (index) => {
             </form>
           ) : (
             <Box>
-              <Typography variant="body1" sx={{ color: colors.text.secondary, mb: 3, fontSize: '1rem' }}>
+              <Typography variant="body1" sx={{ color: colors.text.secondary, mb: 3, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                 ¿En qué podemos ayudarte? Selecciona una opción:
               </Typography>
               <List>
@@ -1596,7 +1616,7 @@ const handlePoliticaClick = (index) => {
                     >
                       <ListItemText 
                         primary={item} 
-                        primaryTypographyProps={{ fontWeight: 500, fontSize: '0.95rem', color: colors.text.primary }}
+                        primaryTypographyProps={{ fontWeight: 500, fontSize: { xs: '0.85rem', md: '0.95rem' }, color: colors.text.primary }}
                       />
                     </ListItem>
                   );
@@ -1627,26 +1647,26 @@ const handlePoliticaClick = (index) => {
           <ListItemIcon>
             <DashboardIcon fontSize="small" sx={{ color: colors.primary.main }} />
           </ListItemIcon>
-          <ListItemText primary="Acceder al sistema" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500, color: colors.text.primary }} />
+          <ListItemText primary="Acceder al sistema" primaryTypographyProps={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, fontWeight: 500, color: colors.text.primary }} />
         </MenuItem>
         <MenuItem onClick={handleMenuClose} sx={{ py: 1.2, '&:hover': { bgcolor: alpha(colors.accent.electricBlue, 0.04) } }}>
           <ListItemIcon>
             <DescriptionIcon fontSize="small" sx={{ color: colors.accent.electricBlue }} />
           </ListItemIcon>
-          <ListItemText primary="Ver documentación" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500, color: colors.text.primary }} />
+          <ListItemText primary="Ver documentación" primaryTypographyProps={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, fontWeight: 500, color: colors.text.primary }} />
         </MenuItem>
         <MenuItem onClick={handleMenuClose} sx={{ py: 1.2, '&:hover': { bgcolor: alpha(colors.secondary.main, 0.04) } }}>
           <ListItemIcon>
             <HelpIcon fontSize="small" sx={{ color: colors.secondary.main }} />
           </ListItemIcon>
-          <ListItemText primary="Ayuda del sistema" primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500, color: colors.text.primary }} />
+          <ListItemText primary="Ayuda del sistema" primaryTypographyProps={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, fontWeight: 500, color: colors.text.primary }} />
         </MenuItem>
         <Divider sx={{ borderColor: colors.border.light }} />
         <MenuItem onClick={handleMenuClose} sx={{ py: 1.2, '&:hover': { bgcolor: alpha(colors.accent.purple, 0.04) } }}>
           <ListItemIcon>
             <InfoIcon fontSize="small" sx={{ color: colors.accent.purple }} />
           </ListItemIcon>
-          <ListItemText primary={`Acerca de ${selectedSistema?.nombre || 'VUGAA'}`} primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500, color: colors.text.primary }} />
+          <ListItemText primary={`Acerca de ${selectedSistema?.nombre || 'VUGAA'}`} primaryTypographyProps={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, fontWeight: 500, color: colors.text.primary }} />
         </MenuItem>
       </Menu>
     </Box>
