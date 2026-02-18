@@ -133,8 +133,8 @@ function App() {
             </Route>
 
             {/* Ruta por defecto */}
-            <Route path="/" element={<Navigate to="/login" />} />
-            <Route path="*" element={<Navigate to="/login" />} />
+            <Route path="/" element={<Navigate to="/inicio" />} />
+            <Route path="*" element={<Navigate to="/inicio" />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
