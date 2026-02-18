@@ -1,5 +1,4 @@
-// src/pages/superadmin/SystemInstances.jsx
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Paper,
@@ -7,184 +6,292 @@ import {
   TextField,
   Button,
   Grid,
-  Card,
-  CardContent,
   Chip,
   Stack,
   IconButton,
   Tooltip,
+  MenuItem,
   InputAdornment,
   FormControl,
   InputLabel,
   Select,
-  MenuItem,
-  Switch,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Avatar,
+  Tab,
+  Tabs,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Checkbox,
   TablePagination,
-  Alert,
-  LinearProgress,
-} from '@mui/material';
+  Toolbar,
+  alpha,
+} from "@mui/material";
 import {
   Search as SearchIcon,
   Add as AddIcon,
-  ContentCopy as DuplicateIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as VisibilityIcon,
+  PlayArrow as EnableIcon,
+  Pause as DisableIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
   Domain as DomainIcon,
-  People as PeopleIcon,
-  Storage as StorageIcon,
+  Person as PersonIcon,
   CalendarToday as CalendarIcon,
-  Business as BusinessIcon,
-} from '@mui/icons-material';
+  Book as BookIcon,
+} from "@mui/icons-material";
+import CreateInstanceDialog from "../../components/Instancias/CreateInstanceDialog";
+import ViewInstanceDialog from "../../components/Instancias/ViewInstanceDialog";
+import EditInstanceDialog from "../../components/Instancias/EditInstanceDialog";
 
 const SystemInstances = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openDuplicateDialog, setOpenDuplicateDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState(null);
 
-  // Datos de ejemplo de instancias
+  // Datos de las instancias del sistema
   const systemInstances = [
     {
       id: 1,
-      name: 'CAAAREM - Principal',
-      code: 'caaarem',
-      description: 'Confederación de Agentes Aduanales de la República Mexicana',
-      status: 'active',
-      users: 1250,
-      certifications: 45,
-      storageUsed: '15.2 GB',
-      lastBackup: '2026-02-17 03:00',
-      created: '2024-01-10',
-      admin: 'Dr. Carlos Méndez',
-      email: 'carlos.mendez@caaarem.org',
-      region: 'Nacional',
+      name: "Área de Ingeniería",
+      code: "ENG-001",
+      description: "Sistema de certificaciones para la Facultad de Ingeniería",
+      status: "active",
+      users: 245,
+      certifications: 15,
+      courses: 8,
+      colors: {
+        primary: "#1b5e20",
+        secondary: "#4caf50",
+        accent: "#8bc34a",
+      },
+      created: "10/01/2024",
+      admin: "Dr. Carlos Méndez",
+      email: "carlos.mendez@institucion.edu",
     },
     {
       id: 2,
-      name: 'Instancia de Pruebas',
-      code: 'test',
-      description: 'Ambiente de pruebas para desarrollo y validación',
-      status: 'active',
-      users: 45,
+      name: "Área de Medicina",
+      code: "MED-001",
+      description: "Sistema para certificaciones médicas y especialidades",
+      status: "active",
+      users: 189,
       certifications: 12,
-      storageUsed: '2.3 GB',
-      lastBackup: '2026-02-17 03:00',
-      created: '2024-06-15',
-      admin: 'Ing. Roberto Sánchez',
-      email: 'roberto.sanchez@test.org',
-      region: 'Centro',
+      courses: 6,
+      colors: {
+        primary: "#0d47a1",
+        secondary: "#2196f3",
+        accent: "#64b5f6",
+      },
+      created: "15/03/2024",
+      admin: "Dra. Ana López",
+      email: "ana.lopez@institucion.edu",
     },
     {
       id: 3,
-      name: 'Facultad de Ingeniería',
-      code: 'ingenieria',
-      description: 'Sistema de certificaciones para la Facultad de Ingeniería',
-      status: 'active',
-      users: 345,
-      certifications: 18,
-      storageUsed: '4.8 GB',
-      lastBackup: '2026-02-16 03:00',
-      created: '2024-09-20',
-      admin: 'Dra. Ana López',
-      email: 'ana.lopez@ingenieria.edu',
-      region: 'Norte',
+      name: "Programa de Posgrado",
+      code: "POS-001",
+      description: "Gestión de certificaciones para programas de posgrado",
+      status: "maintenance",
+      users: 78,
+      certifications: 8,
+      courses: 4,
+      colors: {
+        primary: "#4a148c",
+        secondary: "#7b1fa2",
+        accent: "#ba68c8",
+      },
+      created: "20/06/2024",
+      admin: "Mtro. Roberto Díaz",
+      email: "roberto.diaz@institucion.edu",
     },
     {
       id: 4,
-      name: 'Facultad de Medicina',
-      code: 'medicina',
-      description: 'Certificaciones médicas y especialidades',
-      status: 'maintenance',
-      users: 289,
-      certifications: 24,
-      storageUsed: '6.1 GB',
-      lastBackup: '2026-02-15 03:00',
-      created: '2024-11-05',
-      admin: 'Dr. Miguel Ángel Ruiz',
-      email: 'miguel.ruiz@medicina.edu',
-      region: 'Sur',
+      name: "Área de Derecho",
+      code: "LAW-001",
+      description: "Certificaciones y colegiaturas para abogados",
+      status: "inactive",
+      users: 156,
+      certifications: 10,
+      courses: 5,
+      colors: {
+        primary: "#bf360c",
+        secondary: "#e64a19",
+        accent: "#ff8a65",
+      },
+      created: "05/09/2024",
+      admin: "Lic. Fernando Gómez",
+      email: "fernando.gomez@institucion.edu",
     },
     {
       id: 5,
-      name: 'Asociación de Agentes del Norte',
-      code: 'asoc-norte',
-      description: 'Asociación regional de agentes aduanales del norte',
-      status: 'inactive',
-      users: 156,
-      certifications: 9,
-      storageUsed: '1.8 GB',
-      lastBackup: '2026-02-10 03:00',
-      created: '2025-01-15',
-      admin: 'Lic. Fernando Gómez',
-      email: 'fernando.gomez@asoc-norte.org',
-      region: 'Norte',
+      name: "Campus Virtual",
+      code: "VIR-001",
+      description: "Plataforma de certificaciones en línea",
+      status: "active",
+      users: 342,
+      certifications: 20,
+      courses: 15,
+      colors: {
+        primary: "#00695c",
+        secondary: "#009688",
+        accent: "#4db6ac",
+      },
+      created: "12/11/2024",
+      admin: "Ing. Sofía Ramírez",
+      email: "sofia.ramirez@institucion.edu",
+    },
+    {
+      id: 6,
+      name: "Departamento de Ciencias",
+      code: "SCI-001",
+      description: "Certificaciones para ciencias básicas y aplicadas",
+      status: "active",
+      users: 198,
+      certifications: 14,
+      courses: 9,
+      colors: {
+        primary: "#827717",
+        secondary: "#9e9d24",
+        accent: "#cddc39",
+      },
+      created: "22/02/2024",
+      admin: "Dr. Miguel Ángel Ruiz",
+      email: "miguel.ruiz@institucion.edu",
+    },
+    {
+      id: 7,
+      name: "Programa de Extensión",
+      code: "EXT-001",
+      description: "Certificaciones para cursos de extensión universitaria",
+      status: "draft",
+      users: 45,
+      certifications: 3,
+      courses: 2,
+      colors: {
+        primary: "#37474f",
+        secondary: "#546e7a",
+        accent: "#78909c",
+      },
+      created: "30/12/2024",
+      admin: "Lic. Patricia Castro",
+      email: "patricia.castro@institucion.edu",
+    },
+    {
+      id: 8,
+      name: "Área de Arquitectura",
+      code: "ARC-001",
+      description: "Sistema para colegiaturas y certificaciones profesionales",
+      status: "active",
+      users: 167,
+      certifications: 11,
+      courses: 7,
+      colors: {
+        primary: "#3e2723",
+        secondary: "#5d4037",
+        accent: "#8d6e63",
+      },
+      created: "18/07/2024",
+      admin: "Arq. Luis Fernando Morales",
+      email: "luis.morales@institucion.edu",
     },
   ];
 
   const statusOptions = [
-    { value: 'all', label: 'Todos los estados' },
-    { value: 'active', label: 'Activas', color: '#4caf50' },
-    { value: 'inactive', label: 'Inactivas', color: '#f44336' },
-    { value: 'maintenance', label: 'En mantenimiento', color: '#ff9800' },
+    { value: "all", label: "Todos los estados" },
+    { value: "active", label: "Activas", color: "#4caf50" },
+    { value: "inactive", label: "Inactivas", color: "#f44336" },
+    { value: "maintenance", label: "En mantenimiento", color: "#ff9800" },
+    { value: "draft", label: "Borrador", color: "#9e9e9e" },
   ];
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'active': return '#4caf50';
-      case 'inactive': return '#f44336';
-      case 'maintenance': return '#ff9800';
-      default: return '#757575';
+    switch (status) {
+      case "active":
+        return "#4caf50";
+      case "inactive":
+        return "#f44336";
+      case "maintenance":
+        return "#ff9800";
+      case "draft":
+        return "#9e9e9e";
+      default:
+        return "#757575";
     }
   };
 
   const getStatusIcon = (status) => {
-    switch(status) {
-      case 'active': return <CheckCircleIcon fontSize="small" />;
-      case 'inactive': return <ErrorIcon fontSize="small" />;
-      case 'maintenance': return <WarningIcon fontSize="small" />;
-      default: return null;
+    switch (status) {
+      case "active":
+        return <CheckCircleIcon fontSize="small" />;
+      case "inactive":
+        return <ErrorIcon fontSize="small" />;
+      case "maintenance":
+        return <WarningIcon fontSize="small" />;
+      case "draft":
+        return <EditIcon fontSize="small" />;
+      default:
+        return null;
     }
   };
 
-  const getStatusText = (status) => {
-    switch(status) {
-      case 'active': return 'Activa';
-      case 'inactive': return 'Inactiva';
-      case 'maintenance': return 'Mantenimiento';
-      default: return status;
-    }
-  };
-
-  const filteredInstances = systemInstances.filter(instance => {
-    const matchesSearch = 
+  const filteredInstances = systemInstances.filter((instance) => {
+    const matchesSearch =
       instance.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instance.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instance.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instance.admin.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = 
-      filterStatus === 'all' ? true : instance.status === filterStatus;
-    
+
+    const matchesStatus =
+      filterStatus === "all" ? true : instance.status === filterStatus;
+
     return matchesSearch && matchesStatus;
   });
+
+  const handleCreateInstance = () => {
+    setOpenCreateDialog(true);
+  };
+
+  const handleSelectAllClick = (event) => {
+    if (event.target.checked) {
+      const newSelected = filteredInstances.map((n) => n.id);
+      setSelectedRows(newSelected);
+      return;
+    }
+    setSelectedRows([]);
+  };
+
+  const handleClick = (event, id) => {
+    const selectedIndex = selectedRows.indexOf(id);
+    let newSelected = [];
+
+    if (selectedIndex === -1) {
+      newSelected = newSelected.concat(selectedRows, id);
+    } else if (selectedIndex === 0) {
+      newSelected = newSelected.concat(selectedRows.slice(1));
+    } else if (selectedIndex === selectedRows.length - 1) {
+      newSelected = newSelected.concat(selectedRows.slice(0, -1));
+    } else if (selectedIndex > 0) {
+      newSelected = newSelected.concat(
+        selectedRows.slice(0, selectedIndex),
+        selectedRows.slice(selectedIndex + 1),
+      );
+    }
+
+    setSelectedRows(newSelected);
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -195,122 +302,58 @@ const SystemInstances = () => {
     setPage(0);
   };
 
-  const handleCreateInstance = () => {
-    setOpenCreateDialog(true);
-  };
-
-  const handleDuplicateInstance = (instance) => {
-    setSelectedInstance(instance);
-    setOpenDuplicateDialog(true);
-  };
-
-  // Calcular estadísticas
-  const totalInstancias = systemInstances.length;
-  const activas = systemInstances.filter(i => i.status === 'active').length;
-  const totalUsuarios = systemInstances.reduce((acc, curr) => acc + curr.users, 0);
-  const totalCertificaciones = systemInstances.reduce((acc, curr) => acc + curr.certifications, 0);
+  const isSelected = (id) => selectedRows.indexOf(id) !== -1;
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            mb: 2,
+          }}
+        >
           <Box>
-            <Typography variant="h4" sx={{ color: '#133B6B', fontWeight: 'bold', mb: 0.5 }}>
-              Instancias del Sistema
+            <Typography
+              variant="h5"
+              sx={{ color: "#2c3e50", fontWeight: "bold", mb: 0.5 }}
+            >
+              Super Administración - Instancias del Sistema
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Gestión de múltiples instancias multi-tenant
+            <Typography variant="body2" sx={{ color: "#7f8c8d" }}>
+              Gestión de múltiples áreas, programas y entidades independientes
             </Typography>
           </Box>
-          
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreateInstance}
-            sx={{ bgcolor: '#133B6B', '&:hover': { bgcolor: '#0D2A4D' } }}
-          >
-            Nueva Instancia
-          </Button>
+
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              size="small"
+              onClick={handleCreateInstance}
+            >
+              Nueva Instancia
+            </Button>
+          </Stack>
         </Box>
 
-        {/* Tarjetas de estadísticas */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography color="text.secondary" gutterBottom>
-                      Total Instancias
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {totalInstancias}
-                    </Typography>
-                  </Box>
-                  <DomainIcon sx={{ fontSize: 40, color: '#133B6B', opacity: 0.3 }} />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
+        {/* Tabs */}
+        <Paper sx={{ mb: 2 }}>
+          <Tabs
+            value={selectedTab}
+            onChange={(e, newValue) => setSelectedTab(newValue)}
+            variant="scrollable"
+            scrollButtons="auto"
+          >
+            <Tab icon={<DomainIcon />} label="Todas las Instancias" />
+          </Tabs>
+        </Paper>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography color="text.secondary" gutterBottom>
-                      Instancias Activas
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold" color="#4caf50">
-                      {activas}
-                    </Typography>
-                  </Box>
-                  <CheckCircleIcon sx={{ fontSize: 40, color: '#4caf50', opacity: 0.3 }} />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography color="text.secondary" gutterBottom>
-                      Usuarios Totales
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {totalUsuarios.toLocaleString()}
-                    </Typography>
-                  </Box>
-                  <PeopleIcon sx={{ fontSize: 40, color: '#00C2D1', opacity: 0.3 }} />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography color="text.secondary" gutterBottom>
-                      Certificaciones
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {totalCertificaciones}
-                    </Typography>
-                  </Box>
-                  <StorageIcon sx={{ fontSize: 40, color: '#9b59b6', opacity: 0.3 }} />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Filtros */}
-        <Paper sx={{ p: 2 }}>
+        {/* Filtros y búsqueda */}
+        <Paper elevation={0} sx={{ p: 2, bgcolor: "#f8f9fa" }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>
               <TextField
@@ -322,13 +365,13 @@ const SystemInstances = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon />
+                      <SearchIcon fontSize="small" />
                     </InputAdornment>
                   ),
                 }}
               />
             </Grid>
-            
+
             <Grid item xs={12} md={4}>
               <FormControl fullWidth size="small">
                 <InputLabel>Estado</InputLabel>
@@ -337,11 +380,20 @@ const SystemInstances = () => {
                   label="Estado"
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
-                  {statusOptions.map(option => (
+                  {statusOptions.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
                         {option.color && (
-                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: option.color }} />
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              bgcolor: option.color,
+                            }}
+                          />
                         )}
                         {option.label}
                       </Box>
@@ -350,290 +402,345 @@ const SystemInstances = () => {
                 </Select>
               </FormControl>
             </Grid>
-            
+
             <Grid item xs={12} md={2}>
               <Button
                 fullWidth
                 variant="outlined"
+                size="small"
                 onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('all');
+                  setSearchTerm("");
+                  setFilterStatus("all");
+                  setSelectedRows([]);
                 }}
               >
-                Limpiar
+                Limpiar Filtros
               </Button>
             </Grid>
           </Grid>
         </Paper>
       </Box>
 
-      {/* Tabla de instancias */}
-      <Paper sx={{ width: '100%', overflow: 'hidden', flex: 1 }}>
-        <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)' }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Instancia</TableCell>
-                <TableCell>Código</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell align="center">Usuarios</TableCell>
-                <TableCell align="center">Certificaciones</TableCell>
-                <TableCell>Administrador</TableCell>
-                <TableCell>Región</TableCell>
-                <TableCell align="center">Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredInstances
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((instance) => (
-                  <TableRow key={instance.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar sx={{ bgcolor: '#133B6B' }}>
-                          {instance.name.charAt(0)}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" fontWeight="bold">
-                            {instance.name}
+      {/* Contenido principal */}
+      {selectedTab === 0 && (
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {/* Tabla de instancias */}
+          <Paper
+            sx={{
+              width: "100%",
+              overflow: "hidden",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <Toolbar
+              sx={{
+                pl: { sm: 2 },
+                pr: { xs: 1, sm: 1 },
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.05),
+              }}
+            >
+              <Box sx={{ flex: "1 1 100%" }}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  Instancias del Sistema
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {filteredInstances.length} instancias encontradas
+                </Typography>
+              </Box>
+
+              {selectedRows.length > 0 && (
+                <Stack direction="row" spacing={1}>
+                  <Typography
+                    variant="body2"
+                    color="primary"
+                    sx={{ display: "flex", alignItems: "center" }}
+                  >
+                    {selectedRows.length} seleccionados
+                  </Typography>
+                  <IconButton size="small">
+                    <EnableIcon />
+                  </IconButton>
+                  <IconButton size="small">
+                    <DisableIcon />
+                  </IconButton>
+                  <IconButton size="small">
+                    <DeleteIcon />
+                  </IconButton>
+                </Stack>
+              )}
+            </Toolbar>
+
+            <TableContainer sx={{ flex: 1 }}>
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={
+                          selectedRows.length > 0 &&
+                          selectedRows.length < filteredInstances.length
+                        }
+                        checked={
+                          filteredInstances.length > 0 &&
+                          selectedRows.length === filteredInstances.length
+                        }
+                        onChange={handleSelectAllClick}
+                      />
+                    </TableCell>
+                    <TableCell>Instancia</TableCell>
+                    <TableCell>Estado</TableCell>
+                    <TableCell align="center">Usuarios</TableCell>
+                    <TableCell align="center">Certificaciones</TableCell>
+                    <TableCell>Administrador</TableCell>
+                    <TableCell align="center">Acciones</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredInstances
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((instance) => {
+                      const isItemSelected = isSelected(instance.id);
+
+                      return (
+                        <TableRow
+                          hover
+                          key={instance.id}
+                          selected={isItemSelected}
+                          onClick={(event) => handleClick(event, instance.id)}
+                          sx={{ cursor: "pointer" }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox checked={isItemSelected} />
+                          </TableCell>
+
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                              }}
+                            >
+                              <Avatar
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  bgcolor: instance.colors.primary,
+                                  fontSize: "1rem",
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                {instance.name.charAt(0)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {instance.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {instance.code} • {instance.description}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  display="block"
+                                >
+                                  <CalendarIcon
+                                    sx={{
+                                      fontSize: "0.8rem",
+                                      verticalAlign: "middle",
+                                      mr: 0.5,
+                                    }}
+                                  />
+                                  Creada: {instance.created}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={
+                                instance.status === "active"
+                                  ? "Activa"
+                                  : instance.status === "inactive"
+                                    ? "Inactiva"
+                                    : instance.status === "maintenance"
+                                      ? "Mantenimiento"
+                                      : "Borrador"
+                              }
+                              icon={getStatusIcon(instance.status)}
+                              sx={{
+                                bgcolor: `${getStatusColor(instance.status)}15`,
+                                color: getStatusColor(instance.status),
+                                fontWeight: "medium",
+                                minWidth: 100,
+                              }}
+                            />
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <PersonIcon fontSize="small" color="action" />
+                              <Typography variant="body2" fontWeight="bold">
+                                {instance.users}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <BookIcon fontSize="small" color="action" />
+                              <Typography variant="body2" fontWeight="bold">
+                                {instance.certifications}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <Avatar
+                                sx={{
+                                  width: 28,
+                                  height: 28,
+                                  fontSize: "0.8rem",
+                                }}
+                              >
+                                {instance.admin.charAt(0)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2">
+                                  {instance.admin}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {instance.email}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              justifyContent="center"
+                            >
+                              <Tooltip title="Ver detalles">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedInstance(instance);
+                                    setOpenViewDialog(true);
+                                  }}
+                                >
+                                  <VisibilityIcon fontSize="small" />
+                                </IconButton>
+
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedInstance(instance);
+                                    setOpenEditDialog(true);
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+
+                  {filteredInstances.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Box sx={{ textAlign: "center" }}>
+                          <DomainIcon
+                            sx={{ fontSize: 60, color: "#e0e0e0", mb: 2 }}
+                          />
+                          <Typography
+                            variant="body1"
+                            color="text.secondary"
+                            gutterBottom
+                          >
+                            No se encontraron instancias
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {instance.description.substring(0, 50)}...
+                          <Typography variant="body2" color="text.secondary">
+                            Intenta con otros términos de búsqueda o filtros
                           </Typography>
                         </Box>
-                      </Box>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Chip
-                        label={instance.code}
-                        size="small"
-                        sx={{ bgcolor: '#f0f0f0', fontWeight: 'medium' }}
-                      />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={getStatusText(instance.status)}
-                        icon={getStatusIcon(instance.status)}
-                        sx={{
-                          bgcolor: `${getStatusColor(instance.status)}15`,
-                          color: getStatusColor(instance.status),
-                          fontWeight: 600,
-                        }}
-                      />
-                    </TableCell>
-                    
-                    <TableCell align="center">
-                      <Typography variant="body2" fontWeight="bold">
-                        {instance.users}
-                      </Typography>
-                    </TableCell>
-                    
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        {instance.certifications}
-                      </Typography>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {instance.admin}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {instance.email}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Chip
-                        label={instance.region}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    
-                    <TableCell align="center">
-                      <Stack direction="row" spacing={0.5} justifyContent="center">
-                        <Tooltip title="Ver detalles">
-                          <IconButton size="small" color="primary">
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Editar">
-                          <IconButton size="small" color="warning">
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Duplicar">
-                          <IconButton 
-                            size="small" 
-                            color="info"
-                            onClick={() => handleDuplicateInstance(instance)}
-                          >
-                            <DuplicateIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              
-              {filteredInstances.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    <DomainIcon sx={{ fontSize: 48, color: '#ccc', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary">
-                      No se encontraron instancias
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={filteredInstances.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          labelRowsPerPage="Filas por página:"
-        />
-      </Paper>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-      {/* Diálogo para crear instancia */}
-      <Dialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AddIcon color="primary" />
-            <Typography variant="h6">Crear Nueva Instancia</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Nombre de la Instancia"
-                placeholder="Ej: Facultad de Derecho"
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Código Único"
-                placeholder="Ej: derecho-001"
-                size="small"
-                helperText="Identificador único para la instancia (sin espacios)"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Descripción"
-                multiline
-                rows={3}
-                placeholder="Descripción del propósito de esta instancia..."
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Región</InputLabel>
-                <Select label="Región" defaultValue="">
-                  <MenuItem value="nacional">Nacional</MenuItem>
-                  <MenuItem value="norte">Norte</MenuItem>
-                  <MenuItem value="centro">Centro</MenuItem>
-                  <MenuItem value="sur">Sur</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Administrador Principal"
-                placeholder="Nombre del administrador"
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Email del Administrador"
-                type="email"
-                placeholder="admin@instancia.org"
-                size="small"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenCreateDialog(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={() => setOpenCreateDialog(false)}>
-            Crear Instancia
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={filteredInstances.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              labelRowsPerPage="Filas por página:"
+              labelDisplayedRows={({ from, to, count }) =>
+                `${from}-${to} de ${count}`
+              }
+            />
+          </Paper>
+        </Box>
+      )}
 
-      {/* Diálogo para duplicar instancia */}
-      <Dialog open={openDuplicateDialog} onClose={() => setOpenDuplicateDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DuplicateIcon color="primary" />
-            <Typography variant="h6">Duplicar Instancia</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {selectedInstance && (
-            <>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Se duplicará la configuración de: <strong>{selectedInstance.name}</strong>
-              </Alert>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Nuevo Nombre"
-                    defaultValue={`${selectedInstance.name} - Copia`}
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Nuevo Código"
-                    defaultValue={`${selectedInstance.code}-copy`}
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Mantener administrador</InputLabel>
-                    <Select label="Mantener administrador" defaultValue="yes">
-                      <MenuItem value="yes">Sí, mantener el mismo</MenuItem>
-                      <MenuItem value="no">No, asignar nuevo</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDuplicateDialog(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={() => setOpenDuplicateDialog(false)}>
-            Duplicar
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Diálogo de creación */}
+      <CreateInstanceDialog
+        open={openCreateDialog}
+        onClose={() => setOpenCreateDialog(false)}
+      />
+
+      <ViewInstanceDialog
+        open={openViewDialog}
+        onClose={() => setOpenViewDialog(false)}
+        instance={selectedInstance}
+      />
+
+      <EditInstanceDialog
+        open={openEditDialog}
+        onClose={() => setOpenEditDialog(false)}
+        instance={selectedInstance}
+      />
     </Box>
   );
 };

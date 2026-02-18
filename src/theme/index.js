@@ -24,6 +24,7 @@ export const palette = {
   },
 };
 
+
 export const roleThemes = {
   superadmin: {
     primary: '#133B6B',
@@ -66,6 +67,7 @@ export const roleThemes = {
     icon: '#2874A6',
   },
 };
+
 
 export const layoutConstants = {
   drawerWidth: 280,

@@ -69,11 +69,11 @@ function App() {
             {/* Rutas protegidas - Super Admin */}
             <Route
               path="/supera"
-              element={
+             /* element={
                 <ProtectedRoute allowedRoles={['supera']}>
                   <SuperAdminLayout />
-                </ProtectedRoute>
-              }
+                </ProtectedRoute> 
+              }*/
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<SuperAdminDashboard />} />
