@@ -1,5 +1,7 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import API from '../services/api';
+import { login as loginService } from '../services/auth';
 
 const AuthContext = createContext({});
 
@@ -10,33 +12,59 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Aquí podrías verificar el token con el backend
-      // Por ahora solo simulamos
-      setUser({ token });
-    }
-    setLoading(false);
+    const loadUser = () => {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      
+      if (token && userStr) {
+        try {
+          const userData = JSON.parse(userStr);
+          setUser(userData);
+        } catch (error) {
+          console.error('Error parsing user data', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+      setLoading(false);
+    };
+
+    loadUser();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, tenant) => {
     try {
-      const response = await API.post('/auth/login', { email, password });
-      const { token, id, email: userEmail, nombre, rol } = response.data;
+      const response = await loginService(email, password, tenant);
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({ id, email: userEmail, nombre, rol }));
-      
-      setUser({ id, email: userEmail, nombre, rol });
-      
-      return { 
-        success: true, 
-        user: { id, email: userEmail, nombre, rol: rol.toLowerCase() } 
-      };
+      if (response.token) {
+        const userData = {
+          id: response.id,
+          email: response.email,
+          nombre: response.nombre,
+          rol: response.rol.toLowerCase(),
+          instanciaId: response.instanciaId,
+          instanciaNombre: response.instanciaNombre
+        };
+        
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        setUser(userData);
+        
+        return { 
+          success: true, 
+          user: userData 
+        };
+      } else {
+        return { 
+          success: false, 
+          error: response.mensaje || 'Error al iniciar sesión' 
+        };
+      }
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.mensaje || 'Error al iniciar sesión' 
+        error: error.mensaje || 'Error de conexión' 
       };
     }
   };

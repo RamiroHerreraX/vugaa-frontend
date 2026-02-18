@@ -1,10 +1,10 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/constants';
 
 const API = axios.create({
-  baseURL: 'http://localhost:8081/api/v1'
+  baseURL: API_BASE_URL
 });
-
-// Interceptor para añadir el token
+// Interceptor para añadir el token de autenticación a cada solicitud
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
