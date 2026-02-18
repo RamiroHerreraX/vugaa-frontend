@@ -16,6 +16,9 @@ import UserLayout from './components/layout/UserLayout';
 // Páginas de autenticación
 import Login from './pages/auth/Login';
 
+//Pagina de redirección
+import PaginaRedireccion from './pages/Pagina_Principal/pagina_redireccion';
+
 // Páginas de Super Admin
 import SuperAdminDashboard from './pages/superadmin/Dashboard';
 import SystemInstances from './pages/superadmin/SystemInstances';
@@ -60,6 +63,8 @@ function App() {
           <Routes>
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
+            <Route path="/inicio" element={<PaginaRedireccion />} />
+
 
             {/* Rutas protegidas - Super Admin */}
             <Route
