@@ -225,8 +225,9 @@ const handleCreated = useCallback((newInstance) => {
     return [newInstance, ...prev];
   });
 
-  setCreateOpen(false);
+  // ❌ NO cerrar modal aquí tampoco
 }, []);
+
 
 
   /* ---------- UPDATE ---------- */

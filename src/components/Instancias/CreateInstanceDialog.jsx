@@ -40,28 +40,31 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
 
   const handleChange = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+  
   const handleCrear = async () => {
-    if (loading) return;
+  if (loading) return;
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const newInstance = await crearInstancia(form);
+  try {
+    const newInstance = await crearInstancia(form);
 
-      if (onCreated) {
-        onCreated(newInstance);
-      }
-
-      setForm(defaultForm);
-
-      // cerrar inmediatamente SIN timeout
-      onClose();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+    if (onCreated) {
+      onCreated(newInstance);
     }
-  };
+
+    // limpiar formulario
+    setForm(defaultForm);
+
+    // ❌ NO cerrar modal
+    // onClose();
+
+  } catch (error) {
+    console.error(error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
