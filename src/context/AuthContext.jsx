@@ -73,14 +73,29 @@ export const AuthProvider = ({ children }) => {
       );
       
       if (response.data.token) {
+        console.log('Rol del backend:', response.data.rol);
+        
+        // Mapeo de roles del backend a frontend
+        const roleMap = {
+          'SUPERADMIN': 'supera',
+          'ADMIN': 'admin',
+          'COMITE': 'comite',
+          'ASOCIACION': 'asociacion',
+          'AGENTE': 'agente',
+          'PROFESIONISTA': 'profesionista',
+          'EMPRESARIO': 'empresario'
+        };
+
         const userData = {
           id: response.data.id,
           email: response.data.email,
           nombre: response.data.nombre,
-          rol: response.data.rol.toLowerCase(),
+          rol: roleMap[response.data.rol] || response.data.rol.toLowerCase(),
           instanciaId: response.data.instanciaId,
           instanciaNombre: response.data.instanciaNombre
         };
+        
+        console.log('Rol mapeado:', userData.rol);
         
         // Calcular expiración (24 horas por defecto)
         const expiration = Date.now() + (response.data.expiresIn || 86400000);

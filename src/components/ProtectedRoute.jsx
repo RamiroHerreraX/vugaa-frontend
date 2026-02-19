@@ -31,6 +31,11 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.rol)) {
+
+    console.log('=== DEBUG PROTECTED ROUTE ===');
+  console.log('Rol del usuario:', user.rol);
+  console.log('Roles permitidos:', allowedRoles);
+  console.log('¿Está incluido?', allowedRoles.includes(user.rol));
     // Redirigir al dashboard correspondiente según el rol
     const roleRoutes = {
       supera: '/supera/dashboard',
