@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Box,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -9,118 +10,63 @@ import {
   TextField,
   Typography,
   Stack,
+  Avatar,
+  Divider,
+  CircularProgress,
   FormControl,
   Select,
   MenuItem,
-  Avatar,
-  Divider,
-  Box,
-  CircularProgress,
 } from "@mui/material";
-
 import { FiberNew as NewIcon } from "@mui/icons-material";
+import { crearInstancia } from "../../services/Instancia";
 
-import { crearInstancia } from "../../services/Instancia"; 
-
+const defaultForm = {
+  nombre: "",
+  codigo: "",
+  descripcion: "",
+  estado: "ACTIVE",
+  activa: true,
+  colorPrimario: "#1976d2",
+  colorSecundario: "#ff9800",
+  colorAcento: "#4caf50",
+  adminNombre: "",
+  adminEmail: "",
+};
 
 const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
-
-  // ==========================================
-  // STATE
-  // ==========================================
-
+  const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
+  // Para mensaje temporal
 
-  const [form, setForm] = useState({
-    nombre: "",
-    codigo: "",
-    descripcion: "",
-    estado: "ACTIVE",
-    activa: true,
-    colorPrimario: "#1976d2",
-    colorSecundario: "#ff9800",
-    colorAcento: "#4caf50",
-    adminNombre: "",
-    adminEmail: "",
-  });
-
-
-  // ==========================================
-  // HANDLE CHANGE
-  // ==========================================
-
-  const handleChange = (field, value) => {
-    setForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-
-  // ==========================================
-  // CREAR INSTANCIA
-  // ==========================================
-
+  const handleChange = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
   const handleCrear = async () => {
+    if (loading) return;
+
+    setLoading(true);
 
     try {
+      const newInstance = await crearInstancia(form);
 
-      setLoading(true);
+      if (onCreated) {
+        onCreated(newInstance);
+      }
 
-      await crearInstancia(form);
+      setForm(defaultForm);
 
-      // callback para recargar lista
-      if (onCreated) onCreated();
-
-      // limpiar
-      setForm({
-        nombre: "",
-        codigo: "",
-        descripcion: "",
-        estado: "ACTIVE",
-        activa: true,
-        colorPrimario: "#1976d2",
-        colorSecundario: "#ff9800",
-        colorAcento: "#4caf50",
-        adminNombre: "",
-        adminEmail: "",
-      });
-
+      // cerrar inmediatamente SIN timeout
       onClose();
-
     } catch (error) {
-
       console.error(error);
-
-      alert(
-        error.response?.data?.message ||
-        "Error creando instancia"
-      );
-
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
-
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 3 },
-      }}
-    >
-
-      {/* HEADER */}
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ pb: 1 }}>
         <Stack direction="row" spacing={2} alignItems="center">
-
           <Avatar
             sx={{
               bgcolor: "primary.light",
@@ -131,34 +77,25 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
           >
             <NewIcon />
           </Avatar>
-
           <Box>
             <Typography variant="h6" fontWeight={700}>
               Crear Nueva Instancia
             </Typography>
-
             <Typography variant="body2" color="text.secondary">
               Complete la información para registrar una nueva instancia
             </Typography>
-
           </Box>
-
         </Stack>
       </DialogTitle>
 
       <Divider />
 
-
       <DialogContent sx={{ py: 4 }}>
-
-        <Grid container spacing={3}>
-
-          {/* Nombre */}
+        <Grid container spacing={3} sx={{ mt: 1 }}>
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+            <Typography variant="subtitle2" fontWeight={600}>
               Nombre *
             </Typography>
-
             <TextField
               fullWidth
               size="small"
@@ -166,14 +103,10 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("nombre", e.target.value)}
             />
           </Grid>
-
-
-          {/* Código */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+            <Typography variant="subtitle2" fontWeight={600}>
               Código *
             </Typography>
-
             <TextField
               fullWidth
               size="small"
@@ -181,14 +114,10 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("codigo", e.target.value)}
             />
           </Grid>
-
-
-          {/* Estado */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+            <Typography variant="subtitle2" fontWeight={600}>
               Estado
             </Typography>
-
             <FormControl fullWidth size="small">
               <Select
                 value={form.estado}
@@ -200,14 +129,8 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               </Select>
             </FormControl>
           </Grid>
-
-
-          {/* Color Primario */}
           <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Color Primario
-            </Typography>
-
+            <Typography variant="subtitle2">Color Primario</Typography>
             <TextField
               type="color"
               fullWidth
@@ -216,14 +139,8 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("colorPrimario", e.target.value)}
             />
           </Grid>
-
-
-          {/* Color Secundario */}
           <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Color Secundario
-            </Typography>
-
+            <Typography variant="subtitle2">Color Secundario</Typography>
             <TextField
               type="color"
               fullWidth
@@ -232,14 +149,8 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("colorSecundario", e.target.value)}
             />
           </Grid>
-
-
-          {/* Color Acento */}
           <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Color Acento
-            </Typography>
-
+            <Typography variant="subtitle2">Color Acento</Typography>
             <TextField
               type="color"
               fullWidth
@@ -248,14 +159,10 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("colorAcento", e.target.value)}
             />
           </Grid>
-
-
-          {/* Admin Nombre */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+            <Typography variant="subtitle2">
               Nombre del Administrador
             </Typography>
-
             <TextField
               fullWidth
               size="small"
@@ -263,14 +170,8 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("adminNombre", e.target.value)}
             />
           </Grid>
-
-
-          {/* Admin Email */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Email del Administrador
-            </Typography>
-
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2">Email del Administrador</Typography>
             <TextField
               fullWidth
               size="small"
@@ -279,14 +180,8 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("adminEmail", e.target.value)}
             />
           </Grid>
-
-
-          {/* Descripción */}
           <Grid item xs={12}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Descripción
-            </Typography>
-
+            <Typography variant="subtitle2">Descripción</Typography>
             <TextField
               fullWidth
               multiline
@@ -296,37 +191,27 @@ const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
               onChange={(e) => handleChange("descripcion", e.target.value)}
             />
           </Grid>
-
         </Grid>
-
       </DialogContent>
-
 
       <Divider />
 
-
       <DialogActions sx={{ px: 3, py: 2 }}>
-
-        <Button onClick={onClose}>
-          Cancelar
-        </Button>
-
+        <Button onClick={onClose}>Cancelar</Button>
 
         <Button
+          type="button"
           variant="contained"
           onClick={handleCrear}
           disabled={loading}
         >
-
-          {loading
-            ? <CircularProgress size={20} color="inherit" />
-            : "Crear Instancia"
-          }
-
+          {loading ? (
+            <CircularProgress size={20} color="inherit" />
+          ) : (
+            "Crear Instancia"
+          )}
         </Button>
-
       </DialogActions>
-
     </Dialog>
   );
 };
