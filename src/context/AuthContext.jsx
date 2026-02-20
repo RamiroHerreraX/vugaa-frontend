@@ -140,32 +140,49 @@ export const AuthProvider = ({ children }) => {
   };
 
   const recuperarPassword = async (email) => {
-    try {
-      const response = await API.post('/auth/recuperar-password', { email });
-      return response.data;
-    } catch (error) {
-      return { 
-        success: false, 
-        mensaje: error.response?.data?.mensaje || 'Error de conexión' 
-      };
-    }
-  };
+  setLoading(true);
+  try {
+    const response = await API.post('/auth/recuperar-password', { email });
+    // El backend siempre devuelve success true por seguridad
+    return { 
+      success: true, 
+      mensaje: response.data.mensaje || 'Si el email existe, recibirás instrucciones' 
+    };
+  } catch (error) {
+    console.error('Error en recuperar password:', error);
+    // Por seguridad, siempre devolvemos success true aunque haya error
+    return { 
+      success: true, 
+      mensaje: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña' 
+    };
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const restablecerPassword = async (token, nuevaPassword, confirmarPassword) => {
-    try {
-      const response = await API.post('/auth/restablecer-password', {
-        token,
-        nuevaPassword,
-        confirmarPassword
-      });
-      return response.data;
-    } catch (error) {
-      return { 
-        success: false, 
-        mensaje: error.response?.data?.mensaje || 'Error de conexión' 
-      };
-    }
-  };
+// Mejora la función restablecerPassword
+const restablecerPassword = async (token, nuevaPassword, confirmarPassword) => {
+  setLoading(true);
+  try {
+    const response = await API.post('/auth/restablecer-password', {
+      token,
+      nuevaPassword,
+      confirmarPassword
+    });
+    return { 
+      success: true, 
+      mensaje: response.data.mensaje || 'Contraseña actualizada exitosamente' 
+    };
+  } catch (error) {
+    console.error('Error en restablecer password:', error);
+    return { 
+      success: false, 
+      mensaje: error.response?.data?.mensaje || 'Error al restablecer la contraseña' 
+    };
+  } finally {
+    setLoading(false);
+  }
+};
 
   const refreshToken = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
