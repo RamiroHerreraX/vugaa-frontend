@@ -24,11 +24,6 @@ export const editarInstancia = async (codigo, data) => {
 
 export const cambiarEstadoInstancia = async (codigo, activa) => {
   const response = await API.patch(
-    `${ENDPOINT}/${codigo}/estado`,
-    null,
-    {
-      params: { activa }
-    }
-  );
+    `${ENDPOINT}/${codigo}/estado/estado?activa=${activa}`);
   return response.data;
 };
