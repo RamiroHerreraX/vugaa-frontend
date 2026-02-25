@@ -2074,7 +2074,7 @@ const PaginaLegalCompleta = () => {
 </Paper>
 
 
-   {/* Sección 3 - Finalidades del Tratamiento - DOS COLUMNAS PERFECTAS */}
+ {/* Sección 3 - Finalidades del Tratamiento - ALTURA IDÉNTICA EN AMBAS COLUMNAS */}
 <Paper
   elevation={0}
   sx={{
@@ -2134,140 +2134,349 @@ const PaginaLegalCompleta = () => {
       Tus datos serán utilizados exclusivamente para las siguientes finalidades, necesarias para la operación aduanal:
     </Typography>
 
-    {/* Contenedor de dos columnas perfectas */}
-    <Grid container spacing={3}>
-      {/* Columna 1 - Primeras 4 finalidades */}
-      <Grid item xs={12} md={6}>
-        <Stack spacing={2}>
-          {[
-            {
-              titulo: 'Gestión de operaciones de comercio exterior',
-              descripcion: 'Procesamiento de trámites, validaciones y seguimiento de operaciones aduanales',
-              icon: <LocalShippingIcon />,
-            },
-            {
-              titulo: 'Validación de identidad y habilitaciones profesionales',
-              descripcion: 'Verificación de credenciales, patentes y autorizaciones ante la ANAM',
-              icon: <VerifiedUserIcon />,
-            },
-            {
-              titulo: 'Cumplimiento de obligaciones fiscales y aduaneras',
-              descripcion: 'Generación de reportes y declaraciones requeridas por las autoridades',
-              icon: <AccountBalanceIcon />,
-            },
-            {
-              titulo: 'Generación de reportes para autoridades',
-              descripcion: 'SAT, ANAM y otras entidades fiscalizadoras en el marco de sus atribuciones',
-              icon: <DescriptionIcon />,
-            },
-          ].map((finalidad, idx) => (
-            <Paper
-              key={idx}
-              sx={{
-                p: 2,
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                bgcolor: alpha(colors.accent.electricBlue, 0.02),
-                borderRadius: 2,
-                border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
-                transition: 'all 0.2s ease',
-                '&:hover': {
-                  transform: 'translateX(4px)',
-                  borderColor: colors.accent.electricBlue,
-                  bgcolor: alpha(colors.accent.electricBlue, 0.04),
-                },
-              }}
-            >
-              <Avatar
-                sx={{
-                  width: 40,
-                  height: 40,
-                  bgcolor: alpha(colors.accent.electricBlue, 0.1),
-                  color: colors.accent.electricBlue,
-                }}
-              >
-                {finalidad.icon}
-              </Avatar>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
-                  {finalidad.titulo}
-                </Typography>
-                <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
-                  {finalidad.descripcion}
-                </Typography>
-              </Box>
-            </Paper>
-          ))}
-        </Stack>
-      </Grid>
+    {/* CSS Grid con 2 columnas y 4 filas - TODAS LAS TARJETAS CON LA MISMA ALTURA */}
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr', // 1 columna en móvil
+          md: '1fr 1fr' // 2 columnas en desktop
+        },
+        gap: 3,
+      }}
+    >
+      {/* Fila 1 - Tarjetas 1 y 5 */}
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px', // Altura mínima uniforme
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <LocalShippingIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Gestión de operaciones de comercio exterior
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Procesamiento de trámites, validaciones y seguimiento de operaciones aduanales
+          </Typography>
+        </Box>
+      </Paper>
 
-      {/* Columna 2 - Últimas 4 finalidades */}
-      <Grid item xs={12} md={6}>
-        <Stack spacing={2}>
-          {[
-            {
-              titulo: 'Prevención de fraudes y operaciones ilícitas',
-              descripcion: 'Monitoreo y detección de actividades irregulares en el proceso aduanal',
-              icon: <SecurityIcon />,
-            },
-            {
-              titulo: 'Auditorías de cumplimiento y autorregulación',
-              descripcion: 'Revisiones periódicas para garantizar la integridad de las operaciones',
-              icon: <GavelIcon />,
-            },
-            {
-              titulo: 'Mejora continua de los servicios',
-              descripcion: 'Análisis de uso y optimización de la plataforma VUGAA',
-              icon: <SettingsIcon />,
-            },
-            {
-              titulo: 'Atención de requerimientos de autoridades',
-              descripcion: 'Respuesta a solicitudes de información de entidades gubernamentales',
-              icon: <ContactSupportIcon />,
-            },
-          ].map((finalidad, idx) => (
-            <Paper
-              key={idx}
-              sx={{
-                p: 2,
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                bgcolor: alpha(colors.accent.electricBlue, 0.02),
-                borderRadius: 2,
-                border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
-                transition: 'all 0.2s ease',
-                '&:hover': {
-                  transform: 'translateX(4px)',
-                  borderColor: colors.accent.electricBlue,
-                  bgcolor: alpha(colors.accent.electricBlue, 0.04),
-                },
-              }}
-            >
-              <Avatar
-                sx={{
-                  width: 40,
-                  height: 40,
-                  bgcolor: alpha(colors.accent.electricBlue, 0.1),
-                  color: colors.accent.electricBlue,
-                }}
-              >
-                {finalidad.icon}
-              </Avatar>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
-                  {finalidad.titulo}
-                </Typography>
-                <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
-                  {finalidad.descripcion}
-                </Typography>
-              </Box>
-            </Paper>
-          ))}
-        </Stack>
-      </Grid>
-    </Grid>
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <SecurityIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Prevención de fraudes y operaciones ilícitas
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Monitoreo y detección de actividades irregulares en el proceso aduanal
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* Fila 2 - Tarjetas 2 y 6 */}
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <VerifiedUserIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Validación de identidad y habilitaciones profesionales
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Verificación de credenciales, patentes y autorizaciones ante la ANAM
+          </Typography>
+        </Box>
+      </Paper>
+
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <GavelIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Auditorías de cumplimiento y autorregulación
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Revisiones periódicas para garantizar la integridad de las operaciones
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* Fila 3 - Tarjetas 3 y 7 */}
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <AccountBalanceIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Cumplimiento de obligaciones fiscales y aduaneras
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Generación de reportes y declaraciones requeridas por las autoridades
+          </Typography>
+        </Box>
+      </Paper>
+
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <SettingsIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Mejora continua de los servicios
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Análisis de uso y optimización de la plataforma VUGAA
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* Fila 4 - Tarjetas 4 y 8 */}
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <DescriptionIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Generación de reportes para autoridades
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            SAT, ANAM y otras entidades fiscalizadoras en el marco de sus atribuciones
+          </Typography>
+        </Box>
+      </Paper>
+
+      <Paper
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+          bgcolor: alpha(colors.accent.electricBlue, 0.02),
+          borderRadius: 2,
+          border: `1px solid ${alpha(colors.accent.electricBlue, 0.15)}`,
+          transition: 'all 0.2s ease',
+          width: '100%',
+          height: '80%',
+          minHeight: '100px',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            borderColor: colors.accent.electricBlue,
+            boxShadow: `0 8px 16px -8px ${alpha(colors.accent.electricBlue, 0.2)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: alpha(colors.accent.electricBlue, 0.1),
+            color: colors.accent.electricBlue,
+            flexShrink: 0,
+          }}
+        >
+          <ContactSupportIcon />
+        </Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+            Atención de requerimientos de autoridades
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.tertiary, display: 'block' }}>
+            Respuesta a solicitudes de información de entidades gubernamentales
+          </Typography>
+        </Box>
+      </Paper>
+    </Box>
 
     {/* Nota importante */}
     <Box

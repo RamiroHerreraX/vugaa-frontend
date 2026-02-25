@@ -21,10 +21,19 @@ import Login from './pages/auth/Login';
 //Pagina de redirección
 import PaginaRedireccion from './pages/Pagina_Principal/pagina_redireccion';
 import PaginaLegalCompleta from './pages/Pagina_Principal/pagina_legal';
+import SiteMap from "./pages/Pagina_Principal/SiteMap";
 
 // Páginas de Super Admin
 import SuperAdminDashboard from './pages/superadmin/Dashboard';
 import SystemInstances from './pages/superadmin/SystemInstances';
+import SuperASystemInstances from './pages/superadmin/SuperASystemInstances';
+import SuperAAdminDashboard from "./pages/superadmin/SuperAAdminDashboard";
+import SuperAUserManagement from "./pages/superadmin/SuperAUserManagement";
+//import SuperAAuditLog from "./pages/superadmin/SuperAAuditLog";
+import SuperAExpedienteConfig from "./pages/superadmin/SuperAConfigExpediente";
+//import SuperAReports from "./pages/superadmin/SuperAReports";
+import SuperAProfile from "./pages/superadmin/SuperAProfile";
+import SuperAAlerts from "./pages/superadmin/SuperAAlerts";
 
 // Páginas de Admin
 import AdminDashboard from './pages/admin/Dashboard';
@@ -38,6 +47,16 @@ import UserDashboard from './pages/user/Dashboard';
 
 // Componente protegido
 import ProtectedRoute from './components/ProtectedRoute';
+
+
+// Association 
+import AssociationDashboard from "./pages/association/AssociationDashboard";
+import ControlAsociados from "./pages/association/ControlAsociados";
+
+import AssociationProfile from "./pages/association/AssociationProfile"; 
+import ExpedienteAssociation from "./pages/association/ExpedienteAsociados";
+
+
 
 // Crear tema de MUI
 const theme = createTheme({
@@ -70,7 +89,7 @@ function App() {
             <Route path="/restablecer-password" element={<RestablecerPassword />} />
             <Route path="/inicio" element={<PaginaRedireccion />} />
             <Route path="/legal" element={<PaginaLegalCompleta />} />
-            
+            <Route path="/sitemap" element={<SiteMap />} />
 
 
             {/* Rutas protegidas - Super Admin */}
@@ -83,8 +102,15 @@ function App() {
               }
             >
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<SuperAdminDashboard />} />
               <Route path="instancias" element={<SystemInstances />} />
+              <Route path="dashboard" element={<SuperAAdminDashboard />} />
+              <Route path="instanciasñ" element={<SuperASystemInstances />} />
+              <Route path="users" element={<SuperAUserManagement />} />
+          
+              <Route path="expediente-config"element={<SuperAExpedienteConfig />}/>
+              
+              <Route path="profile" element={<SuperAProfile />} />
+               <Route path="alerts" element={<SuperAAlerts />} />
             </Route>
 
             {/* Rutas protegidas - Admin */}
@@ -124,7 +150,12 @@ function App() {
               }
             >
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<AdminDashboard />} /> {/* Temporalmente usamos AdminDashboard */}
+              <Route path="dashboard" element={<AssociationDashboard />} />
+   
+              <Route path="control-asociados" element={<ControlAsociados />} />
+              <Route path="expediente" element={<ExpedienteAssociation />} />
+              <Route path="profile" element={<AssociationProfile />} />
+            
             </Route>
 
             {/* Rutas protegidas - Usuario (Agente, Profesionista, Empresario) */}
