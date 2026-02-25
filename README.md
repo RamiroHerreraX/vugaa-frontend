@@ -1,70 +1,118 @@
-# Getting Started with Create React App
+# VUGAA Frontend
+Frontend del sistema VUGAA - Ventanilla Única de Gestión de Agentes Aduanales
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## 🚀 Tecnologías
+- React 18+
+- Material-UI (MUI) v5
+- React Router v6
+- Axios para peticiones HTTP
+- Context API para estado global
 
-## Available Scripts
+## 📋 Requisitos previos
+- Node.js 18+
+- npm 9+ o yarn 1.22+
 
-In the project directory, you can run:
+## 🔧 Instalación
 
-### `npm start`
+```bash
+# Clonar el repositorio
+git clone [tu-repo]
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+# Entrar al directorio
+cd vugaa-frontend
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+# Instalar dependencias
+npm install
+```
 
-### `npm test`
+## ⚙️ Configuración del entorno
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Crear archivo `.env` en la raíz:
 
-### `npm run build`
+```env
+REACT_APP_API_URL=http://localhost:8081/api/v1
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🚀 Ejecución
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Modo desarrollo
+```bash
+npm start
+# o
+yarn start
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+La aplicación estará disponible en `http://localhost:3000`
 
-### `npm run eject`
+### Construir para producción
+```bash
+npm run build
+# o
+yarn build
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🧪 Datos de prueba
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Credenciales de acceso
+Todos los usuarios tienen contraseña: **`123456`**
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+| Rol | Email | Dashboard |
+|-----|-------|-----------|
+| Super Admin | superadmin@vugaa.com | `/supera/dashboard` |
+| Admin | admin@caaarem.com | `/admin/dashboard` |
+| Comité | comite@caaarem.com | `/committee/dashboard` |
+| Agente | agente@caaarem.com | `/dashboard` |
+| Profesionista | profesionista@caaarem.com | `/dashboard` |
+| Empresario | empresario@caaarem.com | `/dashboard` |
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Instancias disponibles
+- `caaarem` - Instancia principal
 
-## Learn More
+## 📁 Estructura del proyecto
+```
+src/
+├── components/          # Componentes reutilizables
+│   ├── common/         # Componentes comunes
+│   ├── layout/         # Layouts por rol
+│   └── Instancias/     # Gestión de instancias
+├── context/            # Contextos (AuthContext)
+├── pages/              # Páginas de la aplicación
+│   ├── auth/           # Login, recuperación
+│   ├── superadmin/     # Paneles Super Admin
+│   ├── admin/          # Paneles Admin
+│   ├── committee/      # Paneles Comité
+│   └── user/           # Paneles Usuario
+├── services/           # Servicios API
+├── theme/              # Configuración de tema MUI
+└── utils/              # Utilidades
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 🔐 Funcionalidades implementadas
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Sprint 1 - Autenticación y Seguridad ✅
+- [x] Login con JWT
+- [x] Multi-tenancy (header X-Tenant-ID)
+- [x] Control de intentos fallidos
+- [x] Recuperación de contraseña
+- [x] Roles y permisos
+- [x] Auditoría de acciones
 
-### Code Splitting
+## 📝 Notas importantes
+- El header `X-Tenant-ID` es obligatorio para todas las peticiones
+- El token JWT se almacena en localStorage
+- La sesión expira después de 24 horas
+- Los dashboards son específicos por rol
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 🛠️ Scripts disponibles
+- `npm start` - Inicia el servidor de desarrollo
+- `npm build` - Construye la app para producción
+- `npm test` - Ejecuta los tests
+- `npm eject` - Expone la configuración de react-scripts
 
-### Analyzing the Bundle Size
+## 🤝 Contribuir
+1. Crear una rama desde `develop`
+2. Hacer cambios
+3. Crear Pull Request a `develop`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## 📄 Licencia
+[Tu licencia aquí]

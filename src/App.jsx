@@ -5,6 +5,8 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { palette } from './theme';
+import RecuperarPassword from './pages/auth/RecuperarPassword';
+import RestablecerPassword from './pages/auth/RestablecerPassword';
 
 // Layouts
 import SuperAdminLayout from './components/layout/SuperAdminLayout';
@@ -64,18 +66,21 @@ function App() {
           <Routes>
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
+            <Route path="/recuperar-password" element={<RecuperarPassword />} />
+            <Route path="/restablecer-password" element={<RestablecerPassword />} />
             <Route path="/inicio" element={<PaginaRedireccion />} />
             <Route path="/legal" element={<PaginaLegalCompleta />} />
+            
 
 
             {/* Rutas protegidas - Super Admin */}
             <Route
               path="/supera"
-             /* element={
+              element={
                 <ProtectedRoute allowedRoles={['supera']}>
                   <SuperAdminLayout />
                 </ProtectedRoute> 
-              }*/
+              }
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<SuperAdminDashboard />} />

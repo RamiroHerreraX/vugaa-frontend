@@ -1,7 +1,6 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import API from '../services/api';
-import { login as loginService } from '../services/auth';
 
 const AuthContext = createContext({});
 
@@ -10,46 +9,104 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tokenExpiration, setTokenExpiration] = useState(null);
 
+  // Verificar token periódicamente
   useEffect(() => {
-    const loadUser = () => {
+    const checkToken = async () => {
       const token = localStorage.getItem('token');
-      const userStr = localStorage.getItem('user');
-      
-      if (token && userStr) {
+      if (!token) return;
+
+      try {
+        const response = await API.get('/auth/verificar-token');
+        if (!response.data.valid) {
+          logout();
+        }
+      } catch (error) {
+        logout();
+      }
+    };
+
+    // Verificar cada 5 minutos
+    const interval = setInterval(checkToken, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadUser = useCallback(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    const expiration = localStorage.getItem('tokenExpiration');
+    
+    if (token && userStr && expiration) {
+      // Verificar si el token ha expirado
+      if (Date.now() > parseInt(expiration)) {
+        logout();
+      } else {
         try {
           const userData = JSON.parse(userStr);
           setUser(userData);
+          setTokenExpiration(parseInt(expiration));
         } catch (error) {
           console.error('Error parsing user data', error);
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          localStorage.removeItem('tokenExpiration');
         }
       }
-      setLoading(false);
-    };
-
-    loadUser();
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
 
   const login = async (email, password, tenant) => {
     try {
-      const response = await loginService(email, password, tenant);
+      const response = await API.post('/auth/login', 
+        { email, password },
+        { 
+          headers: {
+            'X-Tenant-ID': tenant
+          } 
+        }
+      );
       
-      if (response.token) {
+      if (response.data.token) {
+        console.log('Rol del backend:', response.data.rol);
+        
+        // Mapeo de roles del backend a frontend
+        const roleMap = {
+          'SUPERADMIN': 'supera',
+          'ADMIN': 'admin',
+          'COMITE': 'comite',
+          'ASOCIACION': 'asociacion',
+          'AGENTE': 'agente',
+          'PROFESIONISTA': 'profesionista',
+          'EMPRESARIO': 'empresario'
+        };
+
         const userData = {
-          id: response.id,
-          email: response.email,
-          nombre: response.nombre,
-          rol: response.rol.toLowerCase(),
-          instanciaId: response.instanciaId,
-          instanciaNombre: response.instanciaNombre
+          id: response.data.id,
+          email: response.data.email,
+          nombre: response.data.nombre,
+          rol: roleMap[response.data.rol] || response.data.rol.toLowerCase(),
+          instanciaId: response.data.instanciaId,
+          instanciaNombre: response.data.instanciaNombre
         };
         
-        localStorage.setItem('token', response.token);
+        console.log('Rol mapeado:', userData.rol);
+        
+        // Calcular expiración (24 horas por defecto)
+        const expiration = Date.now() + (response.data.expiresIn || 86400000);
+        
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('refreshToken', response.data.refreshToken || '');
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('tokenExpiration', expiration.toString());
         
         setUser(userData);
+        setTokenExpiration(expiration);
         
         return { 
           success: true, 
@@ -58,21 +115,94 @@ export const AuthProvider = ({ children }) => {
       } else {
         return { 
           success: false, 
-          error: response.mensaje || 'Error al iniciar sesión' 
+          error: response.data.mensaje || 'Error al iniciar sesión' 
         };
       }
     } catch (error) {
+      const errorMsg = error.response?.data?.mensaje || 'Error de conexión';
       return { 
         success: false, 
-        error: error.mensaje || 'Error de conexión' 
+        error: errorMsg 
       };
     }
   };
 
   const logout = () => {
+    // Llamar al endpoint de logout (opcional)
+    API.post('/auth/logout').catch(console.error);
+    
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('tokenExpiration');
     setUser(null);
+    setTokenExpiration(null);
+  };
+
+  const recuperarPassword = async (email) => {
+  setLoading(true);
+  try {
+    const response = await API.post('/auth/recuperar-password', { email });
+    // El backend siempre devuelve success true por seguridad
+    return { 
+      success: true, 
+      mensaje: response.data.mensaje || 'Si el email existe, recibirás instrucciones' 
+    };
+  } catch (error) {
+    console.error('Error en recuperar password:', error);
+    // Por seguridad, siempre devolvemos success true aunque haya error
+    return { 
+      success: true, 
+      mensaje: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña' 
+    };
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Mejora la función restablecerPassword
+const restablecerPassword = async (token, nuevaPassword, confirmarPassword) => {
+  setLoading(true);
+  try {
+    const response = await API.post('/auth/restablecer-password', {
+      token,
+      nuevaPassword,
+      confirmarPassword
+    });
+    return { 
+      success: true, 
+      mensaje: response.data.mensaje || 'Contraseña actualizada exitosamente' 
+    };
+  } catch (error) {
+    console.error('Error en restablecer password:', error);
+    return { 
+      success: false, 
+      mensaje: error.response?.data?.mensaje || 'Error al restablecer la contraseña' 
+    };
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const refreshToken = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return false;
+
+    try {
+      // Endpoint para refrescar token (implementar si es necesario)
+      const response = await API.post('/auth/refresh-token', { refreshToken });
+      
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        const expiration = Date.now() + (response.data.expiresIn || 86400000);
+        localStorage.setItem('tokenExpiration', expiration.toString());
+        setTokenExpiration(expiration);
+        return true;
+      }
+    } catch (error) {
+      logout();
+    }
+    return false;
   };
 
   return (
@@ -80,8 +210,12 @@ export const AuthProvider = ({ children }) => {
       user,
       login,
       logout,
+      recuperarPassword,
+      restablecerPassword,
+      refreshToken,
       loading,
-      isAuthenticated: !!user
+      isAuthenticated: !!user,
+      tokenExpiration
     }}>
       {children}
     </AuthContext.Provider>
