@@ -448,214 +448,210 @@ const Certifications = () => {
   // Modal de autorización de la asociación
   const AssociationDialog = () => (
     <Dialog 
-      open={associationDialog} 
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: { 
-          borderRadius: 2,
-          maxHeight: '90vh'
-        }
-      }}
-    >
-      <DialogTitle sx={{ 
-        bgcolor: colors.primary.dark, 
-        color: 'white',
-        py: 2
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <SecurityIcon sx={{ fontSize: 28 }} />
-          <Box>
-            <Typography variant="h6" fontWeight="bold">
-              Autorización para Asociación de Agentes Aduanales
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
-              Decisión importante para la gestión de tus certificaciones
+  open={associationDialog} 
+  maxWidth="lg"
+  fullWidth
+  PaperProps={{
+    sx: { 
+      borderRadius: 2,
+      maxHeight: '90vh'
+    }
+  }}
+>
+  <DialogTitle sx={{ 
+    bgcolor: colors.primary.dark, 
+    color: 'white',
+    py: 2
+  }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <SecurityIcon sx={{ fontSize: 28 }} />
+      <Box>
+        <Typography variant="h6" fontWeight="bold">
+          Autorización para Asociación de Agentes Aduanales
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
+          Decisión importante para la gestión de tus certificaciones
+        </Typography>
+      </Box>
+    </Box>
+  </DialogTitle>
+  
+  <DialogContent dividers sx={{ py: 3, px: 3 }}>
+
+    {/* Información de la asociación */}
+    <Alert severity="info" sx={{ mb: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <GroupIcon />
+        <Typography variant="subtitle2" fontWeight="bold">
+          {associationDetails.name}
+        </Typography>
+      </Box>
+      <Typography variant="body2">
+        Esta asociación funciona como entidad auxiliar dentro del sistema, permitiendo centralizar información común y documentación compartida, sin sustituir tu responsabilidad individual.
+      </Typography>
+    </Alert>
+
+    {/* COMPARACIÓN LADO A LADO */}
+    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+
+      {/* COLUMNA IZQUIERDA - ACEPTAR */}
+      <Box sx={{ flex: 1 }}>
+        <Paper 
+          elevation={3}
+          sx={{ 
+            border: `2px solid ${colors.status.success}`,
+            borderRadius: 2,
+            overflow: 'hidden',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          <Box sx={{ bgcolor: colors.status.success, p: 2, textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+              <CheckIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              SI ACEPTAS LA AUTORIZACIÓN
             </Typography>
           </Box>
-        </Box>
-      </DialogTitle>
-      
-      <DialogContent dividers sx={{ py: 3, px: 3 }}>
-        {/* Información de la asociación */}
-        <Alert severity="info" sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <GroupIcon />
-            <Typography variant="subtitle2" fontWeight="bold">
-              {associationDetails.name}
+          <Box sx={{ p: 2, flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.status.success, mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <ArrowForwardIcon sx={{ mr: 1, fontSize: 18 }} />
+              Tu asociación PODRÁ:
             </Typography>
-          </Box>
-          <Typography variant="body2">
-            Esta asociación funciona como entidad auxiliar dentro del sistema, permitiendo centralizar información común y documentación compartida, sin sustituir tu responsabilidad individual.
-          </Typography>
-        </Alert>
-
-        {/* COMPARACIÓN LADO A LADO */}
-        <Grid container spacing={3} sx={{ mb: 2 }}>
-          {/* COLUMNA IZQUIERDA - ACEPTAR */}
-          <Grid item xs={12} md={6}>
-            <Paper 
-              elevation={3}
-              sx={{ 
-                border: `2px solid ${colors.status.success}`,
-                borderRadius: 2,
-                overflow: 'hidden',
-                height: '100%'
-              }}
-            >
-              <Box sx={{ 
-                bgcolor: colors.status.success, 
-                p: 2,
-                textAlign: 'center'
-              }}>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <CheckIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  SI ACEPTAS LA AUTORIZACIÓN
-                </Typography>
-              </Box>
-
-              <Box sx={{ p: 2.5 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.status.success, mb: 1.5, display: 'flex', alignItems: 'center' }}>
-                  <ArrowForwardIcon sx={{ mr: 1, fontSize: 18 }} />
-                  Tu asociación PODRÁ:
-                </Typography>
-                <Box sx={{ pl: 1 }}>
-                  {associationDetails.permissions.map((permission, index) => (
-                    <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
-                      <CheckCircleIcon sx={{ color: colors.status.success, mr: 1.5, mt: 0.2, fontSize: 16 }} />
-                      <Typography variant="body2" color={colors.text.primary}>
-                        {permission}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-
-                <Alert severity="success" sx={{ mt: 2 }}>
-                  <Typography variant="body2" fontWeight="bold">
-                    Ventaja clave: Reduce carga administrativa y centraliza evidencias comunes
+            <Box sx={{ pl: 1 }}>
+              {associationDetails.permissions.map((permission, index) => (
+                <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
+                  <CheckCircleIcon sx={{ color: colors.status.success, mr: 1.5, mt: 0.2, fontSize: 16 }} />
+                  <Typography variant="body2" color={colors.text.primary}>
+                    {permission}
                   </Typography>
-                </Alert>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* COLUMNA DERECHA - RECHAZAR */}
-          <Grid item xs={12} md={6}>
-            <Paper 
-              elevation={3}
-              sx={{ 
-                border: `2px solid ${colors.status.error}`,
-                borderRadius: 2,
-                overflow: 'hidden',
-                height: '100%'
-              }}
-            >
-              <Box sx={{ 
-                bgcolor: colors.status.error, 
-                p: 2,
-                textAlign: 'center'
-              }}>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <CloseIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  SI RECHAZAS LA AUTORIZACIÓN
-                </Typography>
-              </Box>
-
-              <Box sx={{ p: 2.5 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.status.error, mb: 1.5, display: 'flex', alignItems: 'center' }}>
-                  <ArrowForwardIcon sx={{ mr: 1, fontSize: 18 }} />
-                  Tu asociación NO PODRÁ:
-                </Typography>
-                <Box sx={{ pl: 1 }}>
-                  {associationDetails.restrictions.map((restriction, index) => (
-                    <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
-                      <CancelIcon sx={{ color: colors.status.error, mr: 1.5, mt: 0.2, fontSize: 16 }} />
-                      <Typography variant="body2" color={colors.text.primary}>
-                        {restriction}
-                      </Typography>
-                    </Box>
-                  ))}
                 </Box>
-
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  <Typography variant="body2" fontWeight="bold">
-                    Consideración clave: Gestión completamente individual de toda la documentación
-                  </Typography>
-                </Alert>
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
-
-        {/* Nota importante */}
-        <Paper elevation={0} sx={{ p: 2, bgcolor: '#e8f4fd', border: '1px solid #90caf9', borderRadius: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-            <InfoIcon sx={{ color: colors.primary.main }} />
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: colors.primary.main, fontWeight: 'bold', mb: 0.5 }}>
-                Nota importante sobre responsabilidades
-              </Typography>
-              <Typography variant="body2" color={colors.text.secondary}>
-                Independientemente de tu decisión, <strong>eres el único responsable</strong> del cumplimiento de tus obligaciones como agente aduanal.
-                La asociación funciona como entidad auxiliar y <strong>NO sustituye tu responsabilidad individual</strong>.
-                Esta autorización puede ser modificada en cualquier momento desde la sección de configuración de tu cuenta.
-              </Typography>
+              ))}
             </Box>
+            <Alert severity="success" sx={{ mt: 2 }}>
+              <Typography variant="body2" fontWeight="bold">
+                Ventaja clave: Reduce carga administrativa y centraliza evidencias comunes
+              </Typography>
+            </Alert>
           </Box>
         </Paper>
-      </DialogContent>
+      </Box>
 
-      {/* Acciones del diálogo */}
-      <DialogActions sx={{ 
-        justifyContent: 'space-between', 
-        p: 2.5,
-        bgcolor: '#f8f9fa',
-        borderTop: `1px solid ${colors.primary.main}20`
-      }}>
-        <Button 
-          onClick={() => handleAssociationConsent(false)}
-          variant="contained"
-          startIcon={<CloseIcon />}
+      {/* COLUMNA DERECHA - RECHAZAR */}
+      <Box sx={{ flex: 1 }}>
+        <Paper 
+          elevation={3}
           sx={{ 
-            px: 3,
-            fontWeight: 'bold',
-            minWidth: 140,
-            bgcolor: colors.status.error,
-            '&:hover': { bgcolor: colors.primary.dark }
+            border: `2px solid ${colors.status.error}`,
+            borderRadius: 2,
+            overflow: 'hidden',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
           }}
         >
-          No Autorizar
-        </Button>
-        
-        <Button 
-          onClick={() => setAssociationDialog(false)}
-          variant="outlined"
-          sx={{ 
-            px: 3,
-            fontWeight: 'bold',
-            color: colors.primary.main,
-            borderColor: colors.primary.main
-          }}
-        >
-          Decidir después
-        </Button>
-        
-        <Button 
-          onClick={() => handleAssociationConsent(true)}
-          variant="contained"
-          startIcon={<CheckIcon />}
-          sx={{ 
-            px: 3,
-            fontWeight: 'bold',
-            minWidth: 140,
-            bgcolor: colors.status.success,
-            '&:hover': { bgcolor: colors.primary.dark }
-          }}
-        >
-          Autorizar
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <Box sx={{ bgcolor: colors.status.error, p: 2, textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+              <CloseIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              SI RECHAZAS LA AUTORIZACIÓN
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2, flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.status.error, mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <ArrowForwardIcon sx={{ mr: 1, fontSize: 18 }} />
+              Tu asociación NO PODRÁ:
+            </Typography>
+            <Box sx={{ pl: 1 }}>
+              {associationDetails.restrictions.map((restriction, index) => (
+                <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
+                  <CancelIcon sx={{ color: colors.status.error, mr: 1.5, mt: 0.2, fontSize: 16 }} />
+                  <Typography variant="body2" color={colors.text.primary}>
+                    {restriction}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Typography variant="body2" fontWeight="bold">
+                Consideración clave: Gestión completamente individual de toda la documentación
+              </Typography>
+            </Alert>
+          </Box>
+        </Paper>
+      </Box>
+
+    </Box>
+
+    {/* Nota importante */}
+    <Paper elevation={0} sx={{ p: 2, bgcolor: '#e8f4fd', border: '1px solid #90caf9', borderRadius: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+        <InfoIcon sx={{ color: colors.primary.main }} />
+        <Box>
+          <Typography variant="subtitle2" sx={{ color: colors.primary.main, fontWeight: 'bold', mb: 0.5 }}>
+            Nota importante sobre responsabilidades
+          </Typography>
+          <Typography variant="body2" color={colors.text.secondary}>
+            Independientemente de tu decisión, <strong>eres el único responsable</strong> del cumplimiento de tus obligaciones como agente aduanal.
+            La asociación funciona como entidad auxiliar y <strong>NO sustituye tu responsabilidad individual</strong>.
+            Esta autorización puede ser modificada en cualquier momento desde la sección de configuración de tu cuenta.
+          </Typography>
+        </Box>
+      </Box>
+    </Paper>
+
+  </DialogContent>
+
+  {/* Acciones del diálogo */}
+  <DialogActions sx={{ 
+    justifyContent: 'space-between', 
+    p: 2.5,
+    bgcolor: '#f8f9fa',
+    borderTop: `1px solid ${colors.primary.main}20`
+  }}>
+    <Button 
+      onClick={() => handleAssociationConsent(false)}
+      variant="contained"
+      startIcon={<CloseIcon />}
+      sx={{ 
+        px: 3,
+        fontWeight: 'bold',
+        minWidth: 140,
+        bgcolor: colors.status.error,
+        '&:hover': { bgcolor: colors.primary.dark }
+      }}
+    >
+      No Autorizar
+    </Button>
+    
+    <Button 
+      onClick={() => setAssociationDialog(false)}
+      variant="outlined"
+      sx={{ 
+        px: 3,
+        fontWeight: 'bold',
+        color: colors.primary.main,
+        borderColor: colors.primary.main
+      }}
+    >
+      Decidir después
+    </Button>
+    
+    <Button 
+      onClick={() => handleAssociationConsent(true)}
+      variant="contained"
+      startIcon={<CheckIcon />}
+      sx={{ 
+        px: 3,
+        fontWeight: 'bold',
+        minWidth: 140,
+        bgcolor: colors.status.success,
+        '&:hover': { bgcolor: colors.primary.dark }
+      }}
+    >
+      Autorizar
+    </Button>
+  </DialogActions>
+</Dialog>
   );
 
   // Modal para agregar nueva certificación
@@ -1520,109 +1516,68 @@ const Certifications = () => {
         </Stack>
       </Box>
 
-      {/* Estadísticas */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={7}>
-          <Grid container spacing={2}>
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ borderLeft: `4px solid ${colors.primary.main}`, height: '100%' }}>
-                <CardContent>
-                  <Typography variant="h3" sx={{ color: colors.primary.main, fontWeight: 'bold', mb: 0.5 }}>
-                    {stats.total}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                    Total Certificaciones
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ borderLeft: `4px solid ${colors.status.success}`, height: '100%' }}>
-                <CardContent>
-                  <Typography variant="h3" sx={{ color: colors.status.success, fontWeight: 'bold', mb: 0.5 }}>
-                    {stats.valid}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                    Vigentes
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
+      {/* Estadísticas + Filtros en la misma fila */}
+<Box sx={{ display: 'flex', gap: 2, mb: 4, alignItems: 'stretch' }}>
 
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ borderLeft: `4px solid ${colors.status.warning}`, height: '100%' }}>
-                <CardContent>
-                  <Typography variant="h3" sx={{ color: colors.status.warning, fontWeight: 'bold', mb: 0.5 }}>
-                    {stats.expiring}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                    Por Vencer
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
+  {/* Estadísticas */}
+  <Box sx={{ display: 'flex', gap: 2, flex: 1 }}>
+    {[
+      { value: stats.total, label: 'Total', color: colors.primary.main },
+      { value: stats.valid, label: 'Vigentes', color: colors.status.success },
+      { value: stats.expiring, label: 'Por Vencer', color: colors.status.warning },
+      { value: stats.review, label: 'En Revisión', color: colors.status.error }
+    ].map((stat) => (
+      <Card key={stat.label} sx={{ borderLeft: `4px solid ${stat.color}`, flex: 1 }}>
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Typography variant="h4" sx={{ color: stat.color, fontWeight: 'bold', mb: 0.5 }}>
+            {stat.value}
+          </Typography>
+          <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+            {stat.label}
+          </Typography>
+        </CardContent>
+      </Card>
+    ))}
+  </Box>
 
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ borderLeft: `4px solid ${colors.status.error}`, height: '100%' }}>
-                <CardContent>
-                  <Typography variant="h3" sx={{ color: colors.status.error, fontWeight: 'bold', mb: 0.5 }}>
-                    {stats.review}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                    En Revisión
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Grid>
+  {/* Filtros */}
+  <Paper elevation={1} sx={{ p: 2, display: 'flex', flexDirection: 'row', gap: 1.5, minWidth: 420, alignItems: 'center' }}>
+    <TextField
+      fullWidth
+      size="small"
+      placeholder="Buscar por tipo o número..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <SearchIcon sx={{ color: colors.primary.main }} />
+          </InputAdornment>
+        ),
+      }}
+    />
+    <TextField
+      fullWidth
+      size="small"
+      select
+      label="Filtrar por estado"
+      value={filter}
+      onChange={(e) => setFilter(e.target.value)}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <FilterIcon sx={{ color: colors.primary.main }} />
+          </InputAdornment>
+        ),
+      }}
+    >
+      <MenuItem value="all">Todos los estados</MenuItem>
+      <MenuItem value="Aceptados">Vigentes</MenuItem>
+      <MenuItem value="En revisión">En Revisión</MenuItem>
+    </TextField>
+  </Paper>
 
-        {/* Búsqueda y filtros */}
-        <Grid item xs={12} md={5}>
-          <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', alignItems: 'center' }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Buscar por tipo o número..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ color: colors.primary.main }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  select
-                  label="Filtrar por estado"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <FilterIcon sx={{ color: colors.primary.main }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                >
-                  <MenuItem value="all">Todos los estados</MenuItem>
-                  <MenuItem value="Aceptados">Vigentes</MenuItem>
-                  <MenuItem value="En revisión">En Revisión</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
-      </Grid>
+</Box>
 
       {/* Tabla de certificaciones */}
       <Paper elevation={1}>

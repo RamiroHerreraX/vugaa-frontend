@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Box,
@@ -53,7 +53,12 @@ import {
   School as SchoolIcon,
   Update as UpdateIcon,
   Info as InfoIcon,
-  FilePresent as FilePresentIcon
+  FilePresent as FilePresentIcon,
+  VideoCall as VideoCallIcon,
+  FiberManualRecord as FiberManualRecordIcon,
+  Stop as StopIcon,
+  Replay as ReplayIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 
 // Paleta corporativa del UserManagement
@@ -85,6 +90,543 @@ const colors = {
   }
 };
 
+
+const PruebaVidaRecorder = ({ onVideoCaptured, videoFile, setVideoFile, setSnackbar }) => {
+  const [recording, setRecording] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [mediaStream, setMediaStream] = useState(null);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [countdown, setCountdown] = useState(null);
+  const [tiempoGrabado, setTiempoGrabado] = useState(0);
+  const [grabacionTimer, setGrabacionTimer] = useState(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    if (cameraActive && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraActive]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        audio: true
+      });
+      streamRef.current = stream;
+      setMediaStream(stream);
+      setCameraActive(true);
+    } catch (err) {
+      console.error("Error al acceder a la cámara:", err);
+      alert("No se pudo acceder a la cámara o micrófono. Asegúrate de tener permisos concedidos.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setMediaStream(null);
+    setCameraActive(false);
+  };
+
+  const startRecording = () => {
+    if (!streamRef.current) return;
+
+    setCountdown(3);
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          setCountdown(null);
+
+          const recorder = new MediaRecorder(streamRef.current, { mimeType: 'video/webm' });
+          const chunks = [];
+
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+          };
+
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            setPreviewUrl(url);
+            const file = new File([blob], `prueba_vida_${Date.now()}.webm`, { type: 'video/webm' });
+            onVideoCaptured(file);
+          };
+
+          recorder.start();
+          setMediaRecorder(recorder);
+          setRecording(true);
+
+          let segundos = 0;
+          setTiempoGrabado(0);
+          const timer = setInterval(() => {
+            segundos += 1;
+            setTiempoGrabado(segundos);
+          }, 1000);
+          setGrabacionTimer(timer);
+
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      setRecording(false);
+      stopCamera();
+      if (grabacionTimer) {
+        clearInterval(grabacionTimer);
+        setGrabacionTimer(null);
+      }
+    }
+  };
+
+  const resetRecording = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setVideoFile(null);
+    setTiempoGrabado(0);
+    setEnviado(false);
+    startCamera();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (grabacionTimer) clearInterval(grabacionTimer);
+    };
+  }, []);
+
+  const requisitosVideo = [
+    {
+      categoria: 'Identificación Física',
+      icono: <PersonIcon sx={{ fontSize: '1rem' }} />,
+      color: colors.primary.main,
+      items: [
+        'Presentar INE vigente frente a la cámara (ambos lados)',
+        'Presentar ID oficial de Agente Aduanal o patente',
+        'Rostro completamente visible, sin obstrucciones',
+        'Iluminación adecuada que permita lectura de documentos'
+      ]
+    },
+    {
+      categoria: 'Declaración Verbal Obligatoria',
+      icono: <SecurityIcon sx={{ fontSize: '1rem' }} />,
+      color: colors.accents.purple,
+      items: [
+        'Nombre completo tal como aparece en la patente',
+        'Número de patente aduanal vigente',
+        'Aduana(s) de adscripción actual',
+        'Estatus operativo actual (activo / en trámite / suspendido)',
+        'Fecha de la grabación en voz alta (día, mes y año)'
+      ]
+    },
+    {
+      categoria: 'Declaración de Capacidad Legal',
+      icono: <GavelIcon sx={{ fontSize: '1rem' }} />,
+      color: colors.status.warning,
+      items: [
+        'Declarar encontrarse en pleno uso de sus facultades',
+        'Confirmar que no existe impedimento legal para ejercer',
+        'Declarar que la información proporcionada es verídica',
+        'Mencionar que el video se graba de forma voluntaria'
+      ]
+    }
+  ];
+
+  return (
+    <Box sx={{ mt: 2, mb: 2 }}>
+
+      {/* Encabezado institucional */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3, mb: 3, borderRadius: 2,
+          background: `linear-gradient(135deg, ${colors.primary.dark} 0%, ${colors.primary.main} 60%, ${colors.primary.light} 100%)`,
+          color: 'white'
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+          <Box sx={{
+            p: 1.5, borderRadius: 2,
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <VerifiedIcon sx={{ fontSize: '2rem', color: 'white' }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: '700', color: 'white', mb: 0.5, letterSpacing: 0.5 }}>
+              VERIFICACIÓN DE EXISTENCIA Y CAPACIDAD LEGAL
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>
+              Este procedimiento tiene como finalidad acreditar de manera fehaciente que el Agente Aduanal
+              se encuentra en vida, en pleno ejercicio de sus facultades legales y en condiciones óptimas
+              para desempeñar las funciones propias de su patente aduanal conforme a la{' '}
+              <strong>Ley Aduanera vigente</strong> y las disposiciones del{' '}
+              <strong>Servicio de Administración Tributaria (SAT)</strong>.
+            </Typography>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
+
+        <Grid container spacing={2} justifyContent="center" sx={{ mt: 1 }}>
+          {[
+            { label: 'Base Legal', value: 'Art. 159 Ley Aduanera' },
+            { label: 'Autoridad Supervisora', value: 'SAT / AGA' },
+            { label: 'Validez del Registro', value: 'Anual' },
+            { label: 'Carácter', value: 'Obligatorio' }
+          ].map((dato) => (
+            <Grid item xs={6} sm={3} key={dato.label}>
+              <Box sx={{
+                p: 1.5, borderRadius: 1,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                textAlign: 'center'
+              }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', display: 'block', mb: 0.3 }}>
+                  {dato.label}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'white', fontWeight: '700', fontSize: '0.8rem' }}>
+                  {dato.value}
+                </Typography>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Paper>
+
+      {/* Alerta de requisitos previos */}
+      <Alert severity="warning" sx={{ mb: 3 }} icon={<WarningIcon />}>
+        <Typography variant="body2" sx={{ fontWeight: '700', mb: 1 }}>
+          ANTES DE INICIAR LA GRABACIÓN — Tenga a la mano los siguientes documentos:
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+          {['INE / IFE vigente', 'ID de Agente Aduanal'].map((doc) => (
+            <Chip
+              key={doc}
+              label={doc}
+              size="small"
+              icon={<DescriptionIcon />}
+              sx={{
+                backgroundColor: '#fff3e0',
+                color: '#e65100',
+                fontWeight: '600',
+                fontSize: '0.75rem',
+                border: '1px solid #ffcc80'
+              }}
+            />
+          ))}
+        </Box>
+      </Alert>
+
+      {/* Requisitos del video */}
+      <Typography variant="subtitle1" sx={{ fontWeight: '700', color: colors.primary.dark, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <CheckCircleIcon sx={{ color: colors.primary.main, fontSize: '1.2rem' }} />
+        CONTENIDO OBLIGATORIO DEL VIDEO
+      </Typography>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        {requisitosVideo.map((req) => (
+          <Paper
+            key={req.categoria}
+            variant="outlined"
+            sx={{
+              p: 2, borderRadius: 2, flex: 1,
+              border: `1px solid ${req.color}30`,
+              backgroundColor: `${req.color}05`
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Box sx={{
+                p: 0.7, borderRadius: 1,
+                backgroundColor: `${req.color}15`,
+                color: req.color, display: 'flex'
+              }}>
+                {req.icono}
+              </Box>
+              <Typography variant="caption" sx={{ fontWeight: '700', color: req.color, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {req.categoria}
+              </Typography>
+            </Box>
+            <Stack spacing={0.8}>
+              {req.items.map((item, i) => (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                  <Box sx={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    backgroundColor: `${req.color}15`, color: req.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, mt: 0.1
+                  }}>
+                    <Typography sx={{ fontSize: '0.6rem', fontWeight: '700' }}>{i + 1}</Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: colors.text.secondary, lineHeight: 1.5 }}>
+                    {item}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          </Paper>
+        ))}
+      </Box>
+
+      {/* CÁMARA (izquierda) + GUIÓN (derecha) */}
+      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+
+        {/* ÁREA DE GRABACIÓN - lado izquierdo */}
+        <Box sx={{ flex: 1 }}>
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, border: `2px solid ${colors.primary.main}40` }}>
+            <Typography variant="h6" sx={{ color: colors.primary.dark, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <VideoCallIcon sx={{ color: colors.primary.main }} />
+              Área de Grabación
+            </Typography>
+
+            {/* Estado inicial - sin cámara */}
+            {!cameraActive && !previewUrl && (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 3 }}>
+                  Asegúrese de haber leído todos los requisitos antes de iniciar. Una vez activada la cámara,
+                  tendrá una cuenta regresiva de 3 segundos antes de comenzar a grabar.
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<VideoCallIcon />}
+                  onClick={startCamera}
+                  sx={{ textTransform: 'none', bgcolor: colors.primary.main, px: 4, py: 1.5 }}
+                >
+                  Activar Cámara y Micrófono
+                </Button>
+              </Box>
+            )}
+
+            {/* Cámara activa o preview */}
+            {(cameraActive || previewUrl) && (
+              <Box>
+                {/* Video */}
+                <Box sx={{
+                  position: 'relative',
+                  backgroundColor: '#000',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  aspectRatio: '4/3',
+                  mb: 2
+                }}>
+                  {previewUrl ? (
+                    <video src={previewUrl} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+
+                  {countdown && (
+                    <Box sx={{
+                      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: 'rgba(0,0,0,0.5)', color: 'white',
+                      fontSize: '5rem', fontWeight: 'bold'
+                    }}>
+                      {countdown}
+                    </Box>
+                  )}
+
+                  {recording && (
+                    <Box sx={{
+                      position: 'absolute', top: 10, right: 10,
+                      display: 'flex', alignItems: 'center', gap: 1,
+                      backgroundColor: 'rgba(0,0,0,0.7)', color: 'white',
+                      padding: '4px 10px', borderRadius: 4
+                    }}>
+                      <FiberManualRecordIcon sx={{ color: '#f44336', fontSize: '1rem', animation: 'pulse 1s infinite' }} />
+                      <Typography variant="caption" sx={{ fontWeight: '600', letterSpacing: 1 }}>
+                        {String(Math.floor(tiempoGrabado / 60)).padStart(2, '0')}:
+                        {String(tiempoGrabado % 60).padStart(2, '0')}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Alerta de estado */}
+                {cameraActive && !recording && !previewUrl && (
+                  <Alert severity="info" sx={{ mb: 2, py: 1 }}>
+                    <Typography variant="caption">
+                      Cámara activa. Asegúrese de tener buena iluminación y sus documentos a la mano.
+                    </Typography>
+                  </Alert>
+                )}
+
+                {recording && (
+                  <Alert severity="warning" sx={{ mb: 2, py: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: '600' }}>
+                      GRABANDO — Declare sus datos y muestre su identificación oficial.
+                    </Typography>
+                  </Alert>
+                )}
+
+                {previewUrl && (
+                  <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ fontWeight: '600' }}>
+                      Video capturado correctamente
+                    </Typography>
+                    <Typography variant="caption">
+                      Duración: {String(Math.floor(tiempoGrabado / 60)).padStart(2, '0')}:{String(tiempoGrabado % 60).padStart(2, '0')}
+                    </Typography>
+                  </Alert>
+                )}
+
+                {/* Botones en la parte inferior */}
+                <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                  {cameraActive && !recording && !previewUrl && (
+                    <>
+                      <Button
+                        variant="contained"
+                        startIcon={<FiberManualRecordIcon />}
+                        onClick={startRecording}
+                        fullWidth
+                        sx={{ textTransform: 'none', bgcolor: '#f44336', '&:hover': { bgcolor: '#d32f2f' }, py: 1.5 }}
+                      >
+                        Iniciar Grabación
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<CloseIcon />}
+                        onClick={stopCamera}
+                        fullWidth
+                        sx={{ textTransform: 'none', color: colors.status.error, borderColor: colors.status.error, py: 1.5 }}
+                      >
+                        Cancelar
+                      </Button>
+                    </>
+                  )}
+
+                  {recording && (
+                    <Button
+                      variant="contained"
+                      startIcon={<StopIcon />}
+                      onClick={stopRecording}
+                      fullWidth
+                      sx={{ textTransform: 'none', bgcolor: colors.status.warning, py: 1.5 }}
+                    >
+                      Detener Grabación
+                    </Button>
+                  )}
+
+                  {previewUrl && (
+                    <>
+                      <Button
+                        variant="outlined"
+                        startIcon={<ReplayIcon />}
+                        onClick={resetRecording}
+                        fullWidth
+                        sx={{ textTransform: 'none', color: colors.primary.main, py: 1.5 }}
+                      >
+                        Grabar Nuevamente
+                      </Button>
+                      <Button
+                        variant="contained"
+                        startIcon={enviado ? <CheckCircleIcon /> : <SendIcon />}
+                        fullWidth
+                        disabled={enviado}
+                        onClick={() => {
+                          setEnviado(true);
+                          setSnackbar({
+                            open: true,
+                            message: '✓ Video enviado a validación correctamente',
+                            severity: 'success'
+                          });
+                        }}
+                        sx={{
+                          textTransform: 'none',
+                          bgcolor: enviado ? colors.status.success : colors.primary.main,
+                          '&:hover': { bgcolor: enviado ? colors.status.success : colors.primary.dark },
+                          '&.Mui-disabled': { bgcolor: '#e0e0e0' },
+                          py: 1.5
+                        }}
+                      >
+                        {enviado ? 'Enviado' : 'Enviar a Validación'}
+                      </Button>
+                    </>
+                  )}
+                </Stack>
+
+              </Box>
+            )}
+
+            {videoFile && (
+              <Box sx={{ mt: 2, p: 2, backgroundColor: '#e8f5e9', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CheckCircleIcon sx={{ color: colors.status.success, fontSize: '1.2rem' }} />
+                  Video registrado: {videoFile.name} — {(videoFile.size / 1024 / 1024).toFixed(2)} MB
+                </Typography>
+              </Box>
+            )}
+          </Paper>
+        </Box>
+
+        {/* GUIÓN - lado derecho */}
+        <Box sx={{ flex: '0 0 38%' }}>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2.5,
+              borderRadius: 2,
+              backgroundColor: '#f3f4f6',
+              border: `1px dashed ${colors.primary.main}50`,
+              position: 'sticky',
+              top: 0
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: '700', color: colors.primary.dark, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <InfoIcon sx={{ fontSize: '1rem', color: colors.primary.main }} />
+              GUIÓN SUGERIDO PARA LA DECLARACIÓN
+            </Typography>
+            <Paper elevation={0} sx={{ p: 2, backgroundColor: 'white', borderRadius: 1, borderLeft: `4px solid ${colors.primary.main}` }}>
+              <Typography variant="body2" sx={{ color: colors.text.primary, lineHeight: 2, fontStyle: 'italic' }}>
+                "Yo, <strong>[Nombre completo]</strong>, titular de la Patente Aduanal número{' '}
+                <strong>[Número de patente]</strong>, con RFC <strong>[RFC]</strong>, adscrito a la Aduana de{' '}
+                <strong>[Aduana(s)]</strong>, me encuentro en pleno uso de mis facultades físicas y legales
+                para el ejercicio de mi función como Agente Aduanal. El día de hoy,{' '}
+                <strong>[fecha completa]</strong>, declaro que la información contenida en este expediente
+                es verídica y que me encuentro en estatus <strong>[activo / en trámite]</strong> ante el
+                Servicio de Administración Tributaria. Presento para su verificación mi{' '}
+                <strong>identificación oficial</strong> [mostrar INE / ID de Agente Aduanal frente a cámara]."
+              </Typography>
+            </Paper>
+            <Typography variant="caption" sx={{ color: colors.text.secondary, mt: 1.5, display: 'block' }}>
+              * Este guión es una referencia. Puede adaptarlo siempre que incluya todos los datos obligatorios señalados anteriormente.
+            </Typography>
+
+            {/* Recordatorio visual mientras graba */}
+            {recording && (
+              <Alert severity="warning" sx={{ mt: 2 }} icon={<FiberManualRecordIcon sx={{ color: '#f44336' }} />}>
+                <Typography variant="caption" sx={{ fontWeight: '700' }}>
+                  Siga el guión mientras graba
+                </Typography>
+              </Alert>
+            )}
+          </Paper>
+        </Box>
+
+      </Box>
+
+      <style>{`
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+      `}</style>
+    </Box>
+  );
+};
+
 const Expediente = () => {
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState(false);
@@ -94,7 +636,34 @@ const Expediente = () => {
     message: '',
     severity: 'success'
   });
-  
+
+  // Nuevo estado para Prueba de Vida
+const [pruebaVida, setPruebaVida] = useState({
+  videoArchivo: null,
+  fechaGrabacion: null,  // nombre más limpio
+  estado: 'pendiente' // Valores posibles: 'pendiente', 'completado', 'aprobado'
+});
+
+// Función para manejar video capturado
+const handleVideoCaptured = (videoFile) => {
+  setPruebaVida({
+    videoFile: videoFile,
+    fechaGrabacion: new Date().toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+    estado: 'completado'
+  });
+
+  setSnackbar({
+    open: true,
+    message: '✓ Video de prueba de vida capturado correctamente',
+    severity: 'success'
+  });
+};
   // Estado para certificados con subsecciones y horas - COMPLETAMENTE VACÍO
   const [certificadosData, setCertificadosData] = useState({
     formacionEtica: {
@@ -1630,6 +2199,8 @@ const Expediente = () => {
             Comienza a construir tu expediente cargando tus certificaciones y documentos
           </Typography>
         </Box>
+
+        
         
         <Stack direction="row" spacing={2}>
           <Button variant={editMode ? "contained" : "outlined"} startIcon={<EditIcon />} onClick={() => setEditMode(!editMode)} sx={{ textTransform: 'none', color: editMode ? 'white' : colors.primary.main, borderColor: colors.primary.main, bgcolor: editMode ? colors.primary.main : 'transparent', '&:hover': { bgcolor: editMode ? colors.primary.dark : `${colors.primary.main}10` } }}>
@@ -1743,6 +2314,116 @@ const Expediente = () => {
         <Typography variant="h5" sx={{ color: colors.primary.dark, mb: 3, fontWeight: 'bold', borderBottom: `3px solid ${colors.primary.dark}`, pb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
           # INFORMACIÓN COMPLEMENTARIA
         </Typography>
+
+        <Accordion
+  expanded={expanded === 'prueba_vida'}
+  onChange={handleAccordionChange('prueba_vida')}
+  sx={{
+    mb: 2,
+    border: '2px solid',
+    borderColor: pruebaVida.estado === 'completado'
+      ? colors.status.success
+      : colors.status.warning,
+    borderRadius: '8px !important',
+    boxShadow: `0 2px 12px ${pruebaVida.estado === 'completado'
+      ? colors.status.success + '20'
+      : colors.status.warning + '20'}`,
+    '&:before': { display: 'none' }
+  }}
+>
+  <AccordionSummary
+    expandIcon={<ExpandMoreIcon />}
+    sx={{
+      backgroundColor: expanded === 'prueba_vida' ? '#f8f9fa' : 'white',
+      borderRadius: '8px',
+      minHeight: '70px'
+    }}
+  >
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+      <Box sx={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 40, height: 40, borderRadius: '50%',
+        backgroundColor: pruebaVida.estado === 'completado' ? '#e8f5e9' : '#fff3e0',
+        color: pruebaVida.estado === 'completado' ? colors.status.success : colors.status.warning
+      }}>
+        <VideoCallIcon />
+      </Box>
+
+      <Box sx={{ flexGrow: 1 }}>
+        <Typography sx={{ fontWeight: '700', color: colors.text.primary, fontSize: '1rem', mb: 0.5 }}>
+          PRUEBA DE VIDA
+        </Typography>
+        <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+          {pruebaVida.estado === 'completado'
+            ? `Completado • ${pruebaVida.fechaGrabacion}`
+            : 'Grabación de video requerida'}
+        </Typography>
+      </Box>
+
+      <Chip
+        label={pruebaVida.estado === 'completado' ? 'COMPLETADO' : 'PENDIENTE'}
+        size="small"
+        color={pruebaVida.estado === 'completado' ? 'success' : 'warning'}
+        icon={pruebaVida.estado === 'completado' ? <CheckCircleIcon /> : <WarningIcon />}
+        sx={{ height: '24px', fontSize: '0.75rem', fontWeight: '600' }}
+      />
+    </Box>
+  </AccordionSummary>
+
+  <AccordionDetails sx={{ pt: 3, pb: 3 }}>
+    <Alert severity="info" sx={{ mb: 3, backgroundColor: `${colors.primary.main}10` }}>
+      <Typography variant="body2">
+        <strong>Requisito para agentes:</strong> Capture un video corto para verificar
+        su identidad y presencia.
+        {pruebaVida.estado !== 'completado' &&
+          ' Complete este paso antes de continuar con el resto del expediente.'}
+      </Typography>
+    </Alert>
+
+    <PruebaVidaRecorder
+      onVideoCaptured={handleVideoCaptured}
+      videoFile={pruebaVida.videoArchivo}
+      setVideoFile={(file) => setPruebaVida(prev => ({ ...prev, videoArchivo: file }))}
+    />
+
+    {pruebaVida.videoArchivo && (
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+        <Button
+          variant="outlined"
+          startIcon={<VisibilityIcon />}
+          onClick={() => {
+            const url = URL.createObjectURL(pruebaVida.videoArchivo);
+            window.open(url, '_blank');
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }}
+          sx={{ textTransform: 'none', color: colors.primary.main }}
+        >
+          Ver Video
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={() => {
+            const url = URL.createObjectURL(pruebaVida.videoArchivo);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = pruebaVida.videoArchivo.name;
+            a.click();
+            URL.revokeObjectURL(url);
+            setSnackbar({
+              open: true,
+              message: '✓ Descargando video...',
+              severity: 'success'
+            });
+          }}
+          sx={{ textTransform: 'none', color: colors.status.success }}
+        >
+          Descargar
+        </Button>
+      </Box>
+    )}
+  </AccordionDetails>
+</Accordion>
         
         {/* Renderizar apartados */}
         {informacionComplementaria.map((section) => {
@@ -1755,6 +2436,8 @@ const Expediente = () => {
           }
         })}
       </Box>
+
+      
 
       {/* Diálogo para agregar documento */}
       <Dialog open={addDialog.open} onClose={() => setAddDialog({...addDialog, open: false})} maxWidth="sm" fullWidth>
