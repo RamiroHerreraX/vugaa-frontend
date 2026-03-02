@@ -1,4 +1,3 @@
-// src/pages/expediente/ConfigExpediente.jsx
 import React, { useState } from 'react';
 import {
   Box,
@@ -16,10 +15,6 @@ import {
   ListItem,
   ListItemIcon,
   ListItemSecondaryAction,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   MenuItem,
   Stack,
   Tooltip,
@@ -42,20 +37,26 @@ import {
   AdminPanelSettings as AdminPanelSettingsIcon
 } from '@mui/icons-material';
 
+// Importar los modales separados
+import CreateCategoryDialog from '../../components/expediente/CreateCategoryDialog';
+import EditCategoryDialog from '../../components/expediente/EditCategoryDialog';
+import CreateDocumentDialog from '../../components/expediente/CreateDocumentDialog';
+import EditDocumentDialog from '../../components/expediente/EditDocumentDialog';
+
 // Colores institucionales
 const institutionalColors = {
-  primary: '#133B6B',      // Azul oscuro principal
-  secondary: '#1a4c7a',    // Azul medio
-  accent: '#e9e9e9',       // Color para acentos (gris claro)
-  background: '#f5f7fa',   // Fondo claro
-  lightBlue: 'rgba(19, 59, 107, 0.08)',  // Azul transparente para hover
-  darkBlue: '#0D2A4D',     // Azul más oscuro
-  textPrimary: '#2c3e50',  // Texto principal
-  textSecondary: '#7f8c8d', // Texto secundario
-  success: '#27ae60',      // Verde para éxito
-  warning: '#f39c12',      // Naranja para advertencias
-  error: '#e74c3c',        // Rojo para errores
-  info: '#3498db',         // Azul para información
+  primary: '#133B6B',
+  secondary: '#1a4c7a',
+  accent: '#e9e9e9',
+  background: '#f5f7fa',
+  lightBlue: 'rgba(19, 59, 107, 0.08)',
+  darkBlue: '#0D2A4D',
+  textPrimary: '#2c3e50',
+  textSecondary: '#7f8c8d',
+  success: '#27ae60',
+  warning: '#f39c12',
+  error: '#e74c3c',
+  info: '#3498db',
 };
 
 const ConfigExpediente = () => {
@@ -86,6 +87,7 @@ const ConfigExpediente = () => {
           id: 102, 
           name: 'Comprobante de Domicilio', 
           description: 'No mayor a 3 meses de antigüedad', 
+          
           required: true, 
           format: 'PDF', 
           maxSize: '5MB',
@@ -246,10 +248,16 @@ const ConfigExpediente = () => {
     }
   ]);
 
-  const [editDialog, setEditDialog] = useState(false);
+  // Estados para los diálogos
+  const [openCreateCategory, setOpenCreateCategory] = useState(false);
+  const [openEditCategory, setOpenEditCategory] = useState(false);
+  const [openCreateDocument, setOpenCreateDocument] = useState(false);
+  const [openEditDocument, setOpenEditDocument] = useState(false);
+  
   const [currentCategory, setCurrentCategory] = useState(null);
   const [currentDocument, setCurrentDocument] = useState(null);
-  const [editMode, setEditMode] = useState('category');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  
   const [expandedCategory, setExpandedCategory] = useState(1);
 
   const stats = {
@@ -262,59 +270,78 @@ const ConfigExpediente = () => {
       total + cat.documents.filter(doc => doc.committeeReview).length, 0)
   };
 
+  // Handlers para categorías
   const handleAddCategory = () => {
-    setEditMode('category');
-    setCurrentCategory({
-      id: Date.now(),
-      name: '',
-      description: '',
-      required: false,
-      icon: '📁',
-      color: institutionalColors.textSecondary,
-      documents: [],
-      order: categories.length + 1
-    });
-    setEditDialog(true);
+    setOpenCreateCategory(true);
   };
 
   const handleEditCategory = (category) => {
-    setEditMode('category');
-    setCurrentCategory({ ...category });
-    setEditDialog(true);
+    setCurrentCategory(category);
+    setOpenEditCategory(true);
   };
 
-  const handleAddDocument = (categoryId) => {
-    setEditMode('document');
-    const category = categories.find(c => c.id === categoryId);
-    setCurrentDocument({
-      id: Date.now(),
-      name: '',
-      description: '',
-      required: false,
-      format: 'PDF',
-      maxSize: '5MB',
-      validation: '',
-      tags: [],
-      order: category.documents.length + 1,
-      periodicReview: '0',
-      committeeReview: false,
-      reviewDescription: ''
-    });
-    setCurrentCategory(category);
-    setEditDialog(true);
+  const handleCreateCategory = (newCategory) => {
+    setCategories([...categories, newCategory]);
+    setOpenCreateCategory(false);
   };
 
-  const handleEditDocument = (category, document) => {
-    setEditMode('document');
-    setCurrentDocument({ ...document });
-    setCurrentCategory(category);
-    setEditDialog(true);
+  const handleUpdateCategory = (updatedCategory) => {
+    setCategories(categories.map(c => 
+      c.id === updatedCategory.id ? updatedCategory : c
+    ));
+    setOpenEditCategory(false);
+    setCurrentCategory(null);
   };
 
   const handleDeleteCategory = (categoryId) => {
     if (window.confirm('¿Está seguro de eliminar esta categoría y todos sus documentos?')) {
       setCategories(categories.filter(c => c.id !== categoryId));
     }
+  };
+
+  // Handlers para documentos
+  const handleAddDocument = (categoryId) => {
+    const category = categories.find(c => c.id === categoryId);
+    setCurrentCategory(category);
+    setSelectedCategoryId(categoryId);
+    setOpenCreateDocument(true);
+  };
+
+  const handleEditDocument = (category, document) => {
+    setCurrentCategory(category);
+    setCurrentDocument(document);
+    setOpenEditDocument(true);
+  };
+
+  const handleCreateDocument = (categoryId, newDocument) => {
+    setCategories(categories.map(category => {
+      if (category.id === categoryId) {
+        return {
+          ...category,
+          documents: [...category.documents, newDocument]
+        };
+      }
+      return category;
+    }));
+    setOpenCreateDocument(false);
+    setCurrentCategory(null);
+  };
+
+  const handleUpdateDocument = (categoryId, updatedDocument) => {
+    setCategories(categories.map(category => {
+      if (category.id === categoryId) {
+        return {
+          ...category,
+          documents: category.documents.map(doc => 
+            doc.id === updatedDocument.id ? updatedDocument : doc
+          )
+        };
+      }
+      return category;
+    }));
+    setOpenEditDocument(false);
+    setCurrentCategory(null);
+    setCurrentDocument(null);
   };
 
   const handleDeleteDocument = (categoryId, documentId) => {
@@ -329,33 +356,6 @@ const ConfigExpediente = () => {
         return category;
       }));
     }
-  };
-
-  const handleSave = () => {
-    if (editMode === 'category') {
-      if (currentCategory.id > 100) {
-        setCategories([...categories, currentCategory]);
-      } else {
-        setCategories(categories.map(c => 
-          c.id === currentCategory.id ? currentCategory : c
-        ));
-      }
-    } else {
-      setCategories(categories.map(category => {
-        if (category.id === currentCategory.id) {
-          const existingDocIndex = category.documents.findIndex(d => d.id === currentDocument.id);
-          if (existingDocIndex >= 0) {
-            const updatedDocuments = [...category.documents];
-            updatedDocuments[existingDocIndex] = currentDocument;
-            return { ...category, documents: updatedDocuments };
-          } else {
-            return { ...category, documents: [...category.documents, currentDocument] };
-          }
-        }
-        return category;
-      }));
-    }
-    setEditDialog(false);
   };
 
   const handleToggleRequired = (categoryId, documentId) => {
@@ -991,236 +991,44 @@ const ConfigExpediente = () => {
         </Paper>
       </Box>
 
-      {/* Diálogo de edición */}
-      <Dialog 
-        open={editDialog} 
-        onClose={() => setEditDialog(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: '12px' }
+      {/* Modales */}
+      <CreateCategoryDialog
+        open={openCreateCategory}
+        onClose={() => setOpenCreateCategory(false)}
+        onSave={handleCreateCategory}
+      />
+
+      <EditCategoryDialog
+        open={openEditCategory}
+        onClose={() => {
+          setOpenEditCategory(false);
+          setCurrentCategory(null);
         }}
-      >
-        <DialogTitle>
-          <Typography variant="h6" sx={{ color: institutionalColors.textPrimary }}>
-            {editMode === 'category' ? 
-              (currentCategory?.id > 100 ? 'Nueva Categoría' : 'Editar Categoría') : 
-              (currentDocument?.id > 1000 ? 'Nuevo Documento' : 'Editar Documento')}
-          </Typography>
-        </DialogTitle>
-        
-        <DialogContent>
-          {editMode === 'category' ? (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField
-                fullWidth
-                label="Nombre de la Categoría"
-                value={currentCategory?.name || ''}
-                onChange={(e) => setCurrentCategory({...currentCategory, name: e.target.value})}
-                helperText="Ej: Documentación Personal"
-              />
-              
-              <TextField
-                fullWidth
-                label="Descripción"
-                multiline
-                rows={2}
-                value={currentCategory?.description || ''}
-                onChange={(e) => setCurrentCategory({...currentCategory, description: e.target.value})}
-                helperText="Describe el propósito de esta categoría"
-              />
-              
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Ícono"
-                  value={currentCategory?.icon || ''}
-                  onChange={(e) => setCurrentCategory({...currentCategory, icon: e.target.value})}
-                  helperText="Emoji o código"
-                />
-                
-                <TextField
-                  fullWidth
-                  type="color"
-                  label="Color"
-                  value={currentCategory?.color || institutionalColors.textSecondary}
-                  onChange={(e) => setCurrentCategory({...currentCategory, color: e.target.value})}
-                />
-              </Box>
-              
-              <TextField
-                fullWidth
-                label="Orden"
-                type="number"
-                value={currentCategory?.order || 1}
-                onChange={(e) => setCurrentCategory({...currentCategory, order: parseInt(e.target.value)})}
-                helperText="Número de orden en la lista"
-              />
-              
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={currentCategory?.required || false}
-                    onChange={(e) => setCurrentCategory({...currentCategory, required: e.target.checked})}
-                    sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': {
-                        color: institutionalColors.primary,
-                      },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                        backgroundColor: institutionalColors.primary,
-                      }
-                    }}
-                  />
-                }
-                label="Categoría Obligatoria"
-              />
-            </Stack>
-          ) : (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField
-                fullWidth
-                label="Nombre del Documento"
-                value={currentDocument?.name || ''}
-                onChange={(e) => setCurrentDocument({...currentDocument, name: e.target.value})}
-              />
-              
-              <TextField
-                fullWidth
-                label="Descripción"
-                multiline
-                rows={2}
-                value={currentDocument?.description || ''}
-                onChange={(e) => setCurrentDocument({...currentDocument, description: e.target.value})}
-              />
-              
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  fullWidth
-                  select
-                  label="Formato"
-                  value={currentDocument?.format || 'PDF'}
-                  onChange={(e) => setCurrentDocument({...currentDocument, format: e.target.value})}
-                >
-                  {formatOptions.map(format => (
-                    <MenuItem key={format} value={format}>{format}</MenuItem>
-                  ))}
-                </TextField>
-                
-                <TextField
-                  fullWidth
-                  select
-                  label="Tamaño Máximo"
-                  value={currentDocument?.maxSize || '5MB'}
-                  onChange={(e) => setCurrentDocument({...currentDocument, maxSize: e.target.value})}
-                >
-                  {sizeOptions.map(size => (
-                    <MenuItem key={size} value={size}>{size}</MenuItem>
-                  ))}
-                </TextField>
-              </Box>
-              
-              {/* REVISIÓN PERIÓDICA */}
-              <TextField
-                fullWidth
-                label="Revisión Periódica"
-                value={currentDocument?.periodicReview || ''}
-                onChange={(e) => setCurrentDocument({...currentDocument, periodicReview: e.target.value})}
-                helperText="Ej: 30 días (mensual), 90 días (trimestral), 180 días (semestral), 365 días (anual), 730 días (bianual)"
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">días</InputAdornment>,
-                }}
-              />
-              
-              <TextField
-                fullWidth
-                label="Validación Requerida"
-                value={currentDocument?.validation || ''}
-                onChange={(e) => setCurrentDocument({...currentDocument, validation: e.target.value})}
-                helperText="Ej: OCR, Vigencia, Firma, etc."
-              />
-              
-              <TextField
-                fullWidth
-                label="Etiquetas"
-                value={currentDocument?.tags?.join(', ') || ''}
-                onChange={(e) => setCurrentDocument({...currentDocument, tags: e.target.value.split(', ')})}
-                helperText="Separar por comas"
-              />
-              
-              <TextField
-                fullWidth
-                label="Orden"
-                type="number"
-                value={currentDocument?.order || 1}
-                onChange={(e) => setCurrentDocument({...currentDocument, order: parseInt(e.target.value)})}
-              />
-              
-              <Stack spacing={1}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={currentDocument?.required || false}
-                      onChange={(e) => setCurrentDocument({...currentDocument, required: e.target.checked})}
-                      sx={{
-                        '& .MuiSwitch-switchBase.Mui-checked': {
-                          color: institutionalColors.primary,
-                        },
-                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                          backgroundColor: institutionalColors.primary,
-                        }
-                      }}
-                    />
-                  }
-                  label="Documento Obligatorio"
-                />
-                
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={currentDocument?.committeeReview || false}
-                      onChange={(e) => setCurrentDocument({...currentDocument, committeeReview: e.target.checked})}
-                      color="warning"
-                      sx={{
-                        '& .MuiSwitch-switchBase.Mui-checked': {
-                          color: institutionalColors.warning,
-                        },
-                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                          backgroundColor: institutionalColors.warning,
-                        }
-                      }}
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <PeopleIcon fontSize="small" sx={{ color: institutionalColors.warning }} />
-                      <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                        Requiere revisión por comité
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Stack>
-            </Stack>
-          )}
-        </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={() => setEditDialog(false)} sx={{ color: institutionalColors.textSecondary }}>Cancelar</Button>
-          <Button 
-            onClick={handleSave} 
-            variant="contained"
-            disabled={editMode === 'category' ? 
-              !currentCategory?.name : 
-              !currentDocument?.name}
-            sx={{
-              bgcolor: institutionalColors.primary,
-              '&:hover': { bgcolor: institutionalColors.secondary }
-            }}
-          >
-            Guardar
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onSave={handleUpdateCategory}
+        category={currentCategory}
+      />
+
+      <CreateDocumentDialog
+        open={openCreateDocument}
+        onClose={() => {
+          setOpenCreateDocument(false);
+          setCurrentCategory(null);
+        }}
+        onSave={handleCreateDocument}
+        categoryId={selectedCategoryId}
+      />
+
+      <EditDocumentDialog
+        open={openEditDocument}
+        onClose={() => {
+          setOpenEditDocument(false);
+          setCurrentCategory(null);
+          setCurrentDocument(null);
+        }}
+        onSave={handleUpdateDocument}
+        categoryId={currentCategory?.id}
+        document={currentDocument}
+      />
     </Box>
   );
 };
