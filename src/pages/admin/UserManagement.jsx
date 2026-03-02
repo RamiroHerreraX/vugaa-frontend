@@ -1,5 +1,5 @@
 // src/pages/admin/UserManagement.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -40,7 +40,6 @@ import {
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
   Search as SearchIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
@@ -57,6 +56,8 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import usuarioService from '../../services/usuarioService';
+import rolService from '../../services/rol';
+import regionesService from '../../services/regiones';
 
 // Paleta corporativa
 const colors = {
@@ -99,96 +100,171 @@ const UserManagement = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [availableRoles, setAvailableRoles] = useState([]);
   const [availableRegions, setAvailableRegions] = useState([]);
+  const [loadingRegions, setLoadingRegions] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(false);
 
   const rowsPerPage = 10;
 
-  // Cargar usuarios al montar el componente
+  // Cargar usuarios, roles y regiones al montar el componente
   useEffect(() => {
     cargarUsuarios();
+    cargarRoles();
+    cargarRegiones();
   }, []);
-
-  // Extraer roles y regiones únicos de los usuarios
-  useEffect(() => {
-    if (users.length > 0) {
-      // Extraer roles únicos
-      const roles = [...new Set(users.map(user => user.rolNombre))];
-      setAvailableRoles(roles);
-      
-      // Extraer regiones únicas
-      const regions = [...new Set(users.map(user => user.regionNombre))];
-      setAvailableRegions(regions);
-    }
-  }, [users]);
 
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
-      // Usar el nuevo endpoint para la tabla
       const data = await usuarioService.findAllForTable();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
       mostrarSnackbar('Error al cargar usuarios', 'error');
       console.error('Error cargando usuarios:', error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const cargarRoles = async () => {
+    try {
+      setLoadingRoles(true);
+      const roles = await rolService.findAll();
+      // Extraer nombres de roles
+      const roleNames = roles.map(rol => rol.nombre).filter(Boolean);
+      setAvailableRoles(roleNames);
+    } catch (error) {
+      console.error('Error cargando roles:', error);
+      setAvailableRoles([]);
+    } finally {
+      setLoadingRoles(false);
+    }
+  };
+
+  const cargarRegiones = async () => {
+    try {
+      setLoadingRegions(true);
+      const regiones = await regionesService.findByActivas();
+      // Extraer nombres de regiones
+      const regionNames = regiones.map(region => region.nombre).filter(Boolean);
+      setAvailableRegions(regionNames);
+    } catch (error) {
+      console.error('Error cargando regiones:', error);
+      setAvailableRegions([]);
+    } finally {
+      setLoadingRegions(false);
+    }
+  };
+
+  // Extraer roles únicos de los usuarios como respaldo
+  useEffect(() => {
+    if (users && users.length > 0 && availableRoles.length === 0) {
+      const roles = [...new Set(users
+        .map(user => user.rolNombre)
+        .filter(rol => rol !== null && rol !== undefined && rol !== '')
+      )];
+      setAvailableRoles(roles);
+    }
+  }, [users, availableRoles.length]);
+
+  // Extraer regiones únicas de los usuarios como respaldo
+  useEffect(() => {
+    if (users && users.length > 0 && availableRegions.length === 0) {
+      const regions = [...new Set(users
+        .map(user => user.regionNombre)
+        .filter(region => region !== null && region !== undefined && region !== '')
+      )];
+      setAvailableRegions(regions);
+    }
+  }, [users, availableRegions.length]);
+
   // Obtener color para el rol basado en su nombre
   const getRoleColor = (rolNombre) => {
-    switch (rolNombre?.toLowerCase()) {
+    if (!rolNombre) return colors.text.secondary;
+
+    switch (rolNombre.toLowerCase()) {
       case 'administrador': return colors.primary.dark;
       case 'comité': return colors.accents.purple;
       case 'agente aduanal': return colors.primary.main;
       case 'profesionista': return colors.accents.blue;
       case 'empresario': return colors.secondary.main;
-      default: return colors.text.secondary;
+      default: return colors.accents.blue;
     }
   };
 
   // Estadísticas
-  const stats = {
-    total: users.length,
-    active: users.filter(u => u.estado === 'Activo').length,
-    inactive: users.filter(u => u.estado === 'Inactivo').length,
-    blocked: users.filter(u => u.estado === 'Bloqueado').length,
-    byRole: {}
-  };
+  const stats = useMemo(() => {
+    const statsData = {
+      total: users.length,
+      active: users.filter(u => u.estado === 'ACTIVO').length,
+      inactive: users.filter(u => u.estado === 'INACTIVO').length,
+      blocked: users.filter(u => u.estado === 'BLOQUEADO').length,
+      byRole: {}
+    };
 
-  // Calcular estadísticas por rol
-  useEffect(() => {
-    if (users.length > 0) {
-      users.forEach(user => {
-        const roleName = user.rolNombre?.toLowerCase() || 'sin rol';
-        stats.byRole[roleName] = (stats.byRole[roleName] || 0) + 1;
-      });
-    }
+    // Calcular estadísticas por rol
+    users.forEach(user => {
+      if (user.rolNombre) {
+        const roleName = user.rolNombre.toLowerCase();
+        statsData.byRole[roleName] = (statsData.byRole[roleName] || 0) + 1;
+      }
+    });
+
+    return statsData;
   }, [users]);
 
   // Filtros
-  const filteredUsers = users.filter(user => {
-    const matchesSearch =
-      (user.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (user.rolNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (user.regionNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const matchesSearch = !searchTerm ||
+        (user.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (user.rolNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (user.regionNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase());
 
-    const matchesTab =
-      selectedTab === 'all' ? true :
-        selectedTab === 'active' ? user.estado === 'Activo' :
-          selectedTab === 'inactive' ? user.estado === 'Inactivo' :
-            selectedTab === 'blocked' ? user.estado === 'Bloqueado' :
-              // Si es un tab de rol, filtrar por nombre del rol
+      const matchesTab = selectedTab === 'all' ? true :
+        selectedTab === 'active' ? user.estado === 'ACTIVO' :
+          selectedTab === 'inactive' ? user.estado === 'INACTIVO' :
+            selectedTab === 'blocked' ? user.estado === 'BLOQUEADO' :
               user.rolNombre?.toLowerCase() === selectedTab.toLowerCase();
 
-    return matchesSearch && matchesTab;
-  });
+      return matchesSearch && matchesTab;
+    });
+  }, [users, searchTerm, selectedTab]);
 
   // Paginación
-  const paginatedUsers = filteredUsers.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
+  const paginatedUsers = useMemo(() => {
+    return filteredUsers.slice(
+      (page - 1) * rowsPerPage,
+      page * rowsPerPage
+    );
+  }, [filteredUsers, page, rowsPerPage]);
+
+  // Construir tabs dinámicamente
+  const tabs = useMemo(() => {
+    const tabsList = [
+      { value: 'all', label: `Todos (${stats.total})`, icon: <SecurityIcon /> },
+      { value: 'active', label: `Activos (${stats.active})`, icon: <CheckCircleIcon /> },
+      { value: 'inactive', label: `Inactivos (${stats.inactive})`, icon: <CancelIcon /> },
+      { value: 'blocked', label: `Bloqueados (${stats.blocked})`, icon: <LockIcon /> },
+    ];
+
+    // Agregar tabs para cada rol
+    if (availableRoles && availableRoles.length > 0) {
+      availableRoles.forEach(rol => {
+        if (rol && typeof rol === 'string' && rol.trim() !== '') {
+          const rolLower = rol.toLowerCase();
+          tabsList.push({
+            value: rolLower,
+            label: `${rol} (${stats.byRole[rolLower] || 0})`,
+            icon: <PersonIcon />
+          });
+        }
+      });
+    }
+
+    return tabsList;
+  }, [stats, availableRoles]);
 
   const mostrarSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -200,7 +276,7 @@ const UserManagement = () => {
       nombre: '',
       email: '',
       rolNombre: availableRoles.length > 0 ? availableRoles[0] : '',
-      regionNombre: availableRegions.length > 0 ? availableRegions[0] : 'No asignada',
+      regionNombre: availableRegions.length > 0 ? availableRegions[0] : '',
       activo: true
     });
     setPassword('');
@@ -213,9 +289,9 @@ const UserManagement = () => {
       id: user.id,
       nombre: user.nombre,
       email: user.email,
-      rolNombre: user.rolNombre,
-      regionNombre: user.regionNombre,
-      activo: user.estado === 'Activo'
+      rolNombre: user.rolNombre || '',
+      regionNombre: user.regionNombre || '',
+      activo: user.estado === 'ACTIVO'
     });
     setPassword('');
     setOpenDialog(true);
@@ -226,31 +302,30 @@ const UserManagement = () => {
       id: user.id,
       nombre: user.nombre,
       email: user.email,
-      rolNombre: user.rolNombre,
-      regionNombre: user.regionNombre
+      rolNombre: user.rolNombre || '',
+      regionNombre: user.regionNombre || ''
     });
     setOpenRoleDialog(true);
   };
 
   const handleSaveRole = async () => {
-    if (!selectedUser?.rolNombre) return;
+    if (!selectedUser?.rolNombre) {
+      mostrarSnackbar('Debe seleccionar un rol', 'error');
+      return;
+    }
 
     try {
-      // Aquí llamarías a un endpoint para cambiar el rol
-      // Por ahora solo simulamos el cambio
-      const updatedUser = {
+      // Aquí llamarías al endpoint para cambiar el rol
+      await usuarioService.update(selectedUser.id, {
         ...selectedUser,
-        rolNombre: selectedUser.rolNombre
-      };
-
-      setUsers(users.map(user =>
-        user.id === selectedUser.id ? updatedUser : user
-      ));
-
+        activo: true // Mantener estado actual
+      });
+      
+      await cargarUsuarios();
       mostrarSnackbar(`Rol de ${selectedUser.nombre} actualizado a ${selectedUser.rolNombre}`, 'success');
       setOpenRoleDialog(false);
     } catch (error) {
-      mostrarSnackbar('Error al actualizar el rol', 'error');
+      mostrarSnackbar(error.error || 'Error al actualizar el rol', 'error');
     }
   };
 
@@ -267,38 +342,30 @@ const UserManagement = () => {
           return;
         }
 
-        // Crear usuario en formato DTO completo
         const newUserDTO = {
           email: selectedUser.email,
           password: password,
           nombre: selectedUser.nombre,
           activo: selectedUser.activo,
-          bloqueado: false
+          bloqueado: false,
+          rolNombre: selectedUser.rolNombre,
+          regionNombre: selectedUser.regionNombre
         };
 
-        const createdUser = await usuarioService.create(newUserDTO);
-        
-        // Recargar la lista de usuarios para obtener los datos formateados
+        await usuarioService.create(newUserDTO);
         await cargarUsuarios();
-        
         mostrarSnackbar('Usuario creado exitosamente', 'success');
       } else {
-        // Actualizar usuario
         const updatedUserDTO = {
           email: selectedUser.email,
           nombre: selectedUser.nombre,
-          activo: selectedUser.activo
+          activo: selectedUser.activo,
+          rolNombre: selectedUser.rolNombre,
+          regionNombre: selectedUser.regionNombre
         };
 
-        const updatedUser = await usuarioService.update(selectedUser.id, updatedUserDTO);
-        
-        // Actualizar el usuario en la lista manteniendo los campos de tabla
-        setUsers(users.map(user =>
-          user.id === selectedUser.id 
-            ? { ...user, nombre: updatedUser.nombre, email: updatedUser.email, estado: updatedUser.activo ? 'Activo' : 'Inactivo' }
-            : user
-        ));
-        
+        await usuarioService.update(selectedUser.id, updatedUserDTO);
+        await cargarUsuarios();
         mostrarSnackbar('Usuario actualizado exitosamente', 'success');
       }
       setOpenDialog(false);
@@ -309,34 +376,16 @@ const UserManagement = () => {
 
   const handleToggleStatus = async (id) => {
     const user = users.find(u => u.id === id);
-    const nuevoEstado = !(user.estado === 'Activo');
-    
+    const nuevoEstado = !(user.estado === 'ACTIVO');
+
     try {
-      const updatedUser = await usuarioService.cambiarEstadoActivo(id, nuevoEstado);
-      setUsers(users.map(u => 
-        u.id === id 
-          ? { ...u, estado: updatedUser.activo ? 'Activo' : 'Inactivo' }
-          : u
-      ));
+      await usuarioService.cambiarEstadoActivo(id, nuevoEstado);
+      await cargarUsuarios();
       mostrarSnackbar('Estado del usuario actualizado', 'success');
     } catch (error) {
       mostrarSnackbar('Error al cambiar el estado', 'error');
     }
   };
-
-  // Construir tabs dinámicamente
-  const tabs = [
-    { value: 'all', label: `Todos (${stats.total})`, icon: <SecurityIcon /> },
-    { value: 'active', label: `Activos (${stats.active})`, icon: <CheckCircleIcon /> },
-    { value: 'inactive', label: `Inactivos (${stats.inactive})`, icon: <CancelIcon /> },
-    { value: 'blocked', label: `Bloqueados (${stats.blocked})`, icon: <LockIcon /> },
-    // Agregar tabs para cada rol
-    ...availableRoles.map(rol => ({
-      value: rol.toLowerCase(),
-      label: `${rol} (${stats.byRole[rol.toLowerCase()] || 0})`,
-      icon: <PersonIcon />
-    }))
-  ];
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
@@ -470,7 +519,7 @@ const UserManagement = () => {
                     hover
                     sx={{
                       '&:hover': { bgcolor: '#f8f9fa' },
-                      opacity: user.estado === 'Inactivo' ? 0.7 : 1
+                      opacity: user.estado === 'INACTIVO' ? 0.7 : 1
                     }}
                   >
                     <TableCell>
@@ -489,7 +538,7 @@ const UserManagement = () => {
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
                             {user.nombre}
-                            {user.estado === 'Inactivo' && (
+                            {user.estado === 'INACTIVO' && (
                               <Chip
                                 label="INACTIVO"
                                 size="small"
@@ -502,7 +551,7 @@ const UserManagement = () => {
                                 }}
                               />
                             )}
-                            {user.estado === 'Bloqueado' && (
+                            {user.estado === 'BLOQUEADO' && (
                               <Chip
                                 label="BLOQUEADO"
                                 size="small"
@@ -524,23 +573,29 @@ const UserManagement = () => {
                     </TableCell>
 
                     <TableCell>
-                      <Chip
-                        label={user.rolNombre || 'Sin rol'}
-                        size="small"
-                        sx={{
-                          bgcolor: `${getRoleColor(user.rolNombre)}15`,
-                          color: getRoleColor(user.rolNombre),
-                          fontWeight: 600,
-                          border: `1px solid ${getRoleColor(user.rolNombre)}30`
-                        }}
-                      />
+                      {user.rolNombre ? (
+                        <Chip
+                          label={user.rolNombre}
+                          size="small"
+                          sx={{
+                            bgcolor: `${getRoleColor(user.rolNombre)}15`,
+                            color: getRoleColor(user.rolNombre),
+                            fontWeight: 600,
+                            border: `1px solid ${getRoleColor(user.rolNombre)}30`
+                          }}
+                        />
+                      ) : (
+                        <Typography variant="body2" sx={{ color: colors.text.secondary, fontStyle: 'italic' }}>
+                          —
+                        </Typography>
+                      )}
                     </TableCell>
 
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <LocationIcon sx={{ fontSize: 14, color: colors.text.secondary }} />
                         <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                          {user.regionNombre || 'No asignada'}
+                          {user.regionNombre || '—'}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -553,12 +608,12 @@ const UserManagement = () => {
 
                     <TableCell>
                       <Chip
-                        label={user.estado || 'Desconocido'}
+                        label={user.estado || 'DESCONOCIDO'}
                         size="small"
                         sx={{
-                          bgcolor: user.estado === 'Activo' 
-                            ? colors.secondary.main 
-                            : user.estado === 'Bloqueado'
+                          bgcolor: user.estado === 'ACTIVO'
+                            ? colors.secondary.main
+                            : user.estado === 'BLOQUEADO'
                               ? colors.status.error
                               : colors.primary.light,
                           color: 'white',
@@ -600,12 +655,12 @@ const UserManagement = () => {
                           </IconButton>
                         </Tooltip>
 
-                        <Tooltip title={user.estado === 'Activo' ? 'Desactivar' : 'Activar'}>
+                        <Tooltip title={user.estado === 'ACTIVO' ? 'Desactivar' : 'Activar'}>
                           <FormControlLabel
                             control={
                               <Switch
                                 size="small"
-                                checked={user.estado === 'Activo'}
+                                checked={user.estado === 'ACTIVO'}
                                 onChange={() => handleToggleStatus(user.id)}
                                 sx={{
                                   '& .MuiSwitch-switchBase.Mui-checked': {
@@ -696,17 +751,19 @@ const UserManagement = () => {
                     <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block' }}>
                       {selectedUser.email}
                     </Typography>
-                    <Chip
-                      label={`Rol actual: ${selectedUser.rolNombre || 'Sin rol'}`}
-                      size="small"
-                      sx={{
-                        mt: 0.5,
-                        bgcolor: `${getRoleColor(selectedUser.rolNombre)}15`,
-                        color: getRoleColor(selectedUser.rolNombre),
-                        fontSize: '0.7rem',
-                        height: 20
-                      }}
-                    />
+                    {selectedUser.rolNombre && (
+                      <Chip
+                        label={`Rol actual: ${selectedUser.rolNombre}`}
+                        size="small"
+                        sx={{
+                          mt: 0.5,
+                          bgcolor: `${getRoleColor(selectedUser.rolNombre)}15`,
+                          color: getRoleColor(selectedUser.rolNombre),
+                          fontSize: '0.7rem',
+                          height: 20
+                        }}
+                      />
+                    )}
                   </Box>
                 </Box>
               </Box>
@@ -728,20 +785,26 @@ const UserManagement = () => {
                     rolNombre: e.target.value
                   })}
                 >
-                  {availableRoles.map((rolNombre) => {
-                    const roleColor = getRoleColor(rolNombre);
-                    return (
-                      <MenuItem key={rolNombre} value={rolNombre}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: roleColor }} />
-                          <Typography sx={{ flex: 1 }}>{rolNombre}</Typography>
-                          {selectedUser.rolNombre === rolNombre && (
-                            <Chip label="Actual" size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
-                          )}
-                        </Box>
-                      </MenuItem>
-                    );
-                  })}
+                  {loadingRoles ? (
+                    <MenuItem disabled>Cargando roles...</MenuItem>
+                  ) : availableRoles.length > 0 ? (
+                    availableRoles.map((rolNombre) => {
+                      const roleColor = getRoleColor(rolNombre);
+                      return (
+                        <MenuItem key={rolNombre} value={rolNombre}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: roleColor }} />
+                            <Typography sx={{ flex: 1 }}>{rolNombre}</Typography>
+                            {selectedUser.rolNombre === rolNombre && (
+                              <Chip label="Actual" size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            )}
+                          </Box>
+                        </MenuItem>
+                      );
+                    })
+                  ) : (
+                    <MenuItem disabled>No hay roles disponibles</MenuItem>
+                  )}
                 </Select>
               </FormControl>
             </>
@@ -834,21 +897,21 @@ const UserManagement = () => {
               <FormControl fullWidth size="small">
                 <InputLabel>Rol</InputLabel>
                 <Select
-                  value={selectedUser?.rolNombre || (availableRoles.length > 0 ? availableRoles[0] : '')}
+                  value={selectedUser?.rolNombre || ''}
                   label="Rol"
                   onChange={(e) => setSelectedUser({ ...selectedUser, rolNombre: e.target.value })}
                 >
-                  {availableRoles.map((rolNombre) => {
-                    const roleColor = getRoleColor(rolNombre);
-                    return (
-                      <MenuItem key={rolNombre} value={rolNombre}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: roleColor }} />
-                          {rolNombre}
-                        </Box>
-                      </MenuItem>
-                    );
-                  })}
+                  {loadingRoles ? (
+                    <MenuItem disabled>Cargando roles...</MenuItem>
+                  ) : availableRoles.length > 0 ? (
+                    availableRoles.map((rolNombre) => (
+                      <MenuItem key={rolNombre} value={rolNombre}>{rolNombre}</MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="">
+                      <em>No hay roles disponibles</em>
+                    </MenuItem>
+                  )}
                 </Select>
               </FormControl>
             </Grid>
@@ -856,22 +919,20 @@ const UserManagement = () => {
               <FormControl fullWidth size="small">
                 <InputLabel>Región</InputLabel>
                 <Select
-                  value={selectedUser?.regionNombre || (availableRegions.length > 0 ? availableRegions[0] : 'No asignada')}
+                  value={selectedUser?.regionNombre || ''}
                   label="Región"
                   onChange={(e) => setSelectedUser({ ...selectedUser, regionNombre: e.target.value })}
                 >
-                  {availableRegions.length > 0 ? (
+                  {loadingRegions ? (
+                    <MenuItem disabled>Cargando regiones...</MenuItem>
+                  ) : availableRegions.length > 0 ? (
                     availableRegions.map((region) => (
                       <MenuItem key={region} value={region}>{region}</MenuItem>
                     ))
                   ) : (
-                    <>
-                      <MenuItem value="Norte">Norte</MenuItem>
-                      <MenuItem value="Centro">Centro</MenuItem>
-                      <MenuItem value="Sur">Sur</MenuItem>
-                      <MenuItem value="Occidente">Occidente</MenuItem>
-                      <MenuItem value="Metropolitana">Metropolitana</MenuItem>
-                    </>
+                    <MenuItem value="">
+                      <em>No hay regiones disponibles</em>
+                    </MenuItem>
                   )}
                 </Select>
               </FormControl>
