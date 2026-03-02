@@ -24,7 +24,6 @@ import PaginaLegalCompleta from "./pages/Pagina_Principal/pagina_legal";
 import SiteMap from "./pages/Pagina_Principal/SiteMap";
 
 // Páginas de Super Admin
-import SystemInstances from "./pages/superadmin/SystemInstances";
 import SuperASystemInstances from "./pages/superadmin/SuperASystemInstances";
 import SuperAAdminDashboard from "./pages/superadmin/SuperAAdminDashboard";
 import SuperAUserManagement from "./pages/superadmin/SuperAUserManagement";
@@ -101,9 +100,8 @@ function App() {
               }
             >
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="instancias" element={<SystemInstances />} />
+              <Route path="instancias" element={<SuperASystemInstances />} />
               <Route path="dashboard" element={<SuperAAdminDashboard />} />
-              <Route path="instanciasñ" element={<SuperASystemInstances />} />
               <Route path="users" element={<SuperAUserManagement />} />
               <Route path="audit" element={<SuperAAuditLog />} />
               <Route

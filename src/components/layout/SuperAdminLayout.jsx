@@ -172,62 +172,7 @@ const SuperAdminLayout = () => {
           minHeight: 80,
         }}
       >
-        <Avatar
-          sx={{
-            width: open ? 48 : 40,
-            height: open ? 48 : 40,
-            bgcolor: "white",
-            color: primaryColor,
-            fontSize: open ? "1.2rem" : "1rem",
-            fontWeight: "bold",
-            border: "3px solid rgba(255, 255, 255, 0.3)",
-          }}
-        >
-          SA
-        </Avatar>
-
-        {open && (
-          <Box sx={{ flex: 1 }}>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 800,
-                color: "white",
-                lineHeight: 1.2,
-                fontSize: "1rem",
-                textShadow: "0 2px 4px rgba(0,0,0,0.2)",
-              }}
-            >
-              {user?.name?.split(" ")[0] || "Supera"}
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "rgba(255, 255, 255, 0.9)",
-                display: "block",
-                fontWeight: 600,
-                fontSize: "0.75rem",
-              }}
-            >
-              Super Administrador
-            </Typography>
-          </Box>
-        )}
-
-        {open && (
-          <Chip
-            label="SUPERA"
-            size="small"
-            sx={{
-              bgcolor: "rgba(255, 255, 255, 0.2)",
-              color: "white",
-              fontWeight: 800,
-              fontSize: "0.7rem",
-              height: 22,
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-            }}
-          />
-        )}
+        
       </Box>
 
       {/* Menú Principal - Con elementos en blanco sobre azul */}

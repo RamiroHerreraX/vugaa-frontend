@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import React from "react";
 import {
-  Box,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -10,209 +9,300 @@ import {
   TextField,
   Typography,
   Stack,
-  Avatar,
-  Divider,
-  CircularProgress,
   FormControl,
   Select,
   MenuItem,
+  Avatar,
+  Divider,
+  Box,
 } from "@mui/material";
 import { FiberNew as NewIcon } from "@mui/icons-material";
-import { crearInstancia } from "../../services/Instancia";
 
-const defaultForm = {
-  nombre: "",
-  codigo: "",
-  descripcion: "",
-  estado: "ACTIVE",
-  activa: true,
-  colorPrimario: "#1976d2",
-  colorSecundario: "#ff9800",
-  colorAcento: "#4caf50",
-  adminNombre: "",
-  adminEmail: "",
+// Colores institucionales
+const institutionalColors = {
+  primary: '#133B6B',      // Azul oscuro principal
+  secondary: '#1a4c7a',    // Azul medio
+  accent: '#e9e9e9',       // Color para acentos (gris claro)
+  background: '#f8f9fa',   // Fondo claro
+  lightBlue: 'rgba(19, 59, 107, 0.08)',  // Azul transparente para hover
+  darkBlue: '#0D2A4D',     // Azul más oscuro
+  textPrimary: '#2c3e50',  // Texto principal
+  textSecondary: '#7f8c8d', // Texto secundario
+  success: '#27ae60',      // Verde para éxito
+  warning: '#f39c12',      // Naranja para advertencias
+  error: '#e74c3c',        // Rojo para errores
+  info: '#3498db',         // Azul para información
 };
 
-const CreateInstanceDialog = ({ open, onClose, onCreated }) => {
-  const [form, setForm] = useState(defaultForm);
-  const [loading, setLoading] = useState(false);
-  // Para mensaje temporal
-
-  const handleChange = (field, value) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
-  
-  const handleCrear = async () => {
-  if (loading) return;
-
-  setLoading(true);
-
-  try {
-    const newInstance = await crearInstancia(form);
-
-    if (onCreated) {
-      onCreated(newInstance);
-    }
-
-    // limpiar formulario
-    setForm(defaultForm);
-
-    // ❌ NO cerrar modal
-    // onClose();
-
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setLoading(false);
-  }
-};
-
+const CreateInstanceDialog = ({ open, onClose }) => {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          border: `1px solid ${institutionalColors.lightBlue}`,
+        },
+      }}
+    >
+      {/* HEADER */}
+      <DialogTitle sx={{ pb: 1, bgcolor: institutionalColors.background }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <Avatar
             sx={{
-              bgcolor: "primary.light",
-              color: "primary.main",
+              bgcolor: institutionalColors.lightBlue,
+              color: institutionalColors.primary,
               width: 40,
               height: 40,
             }}
           >
             <NewIcon />
           </Avatar>
+
           <Box>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" fontWeight={700} sx={{ color: institutionalColors.primary }}>
               Crear Nueva Instancia
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
               Complete la información para registrar una nueva instancia
             </Typography>
           </Box>
         </Stack>
       </DialogTitle>
 
-      <Divider />
+      <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
 
-      <DialogContent sx={{ py: 4 }}>
-        <Grid container spacing={3} sx={{ mt: 1 }}>
+      <DialogContent sx={{ py: 4, bgcolor: 'white' }}>
+        <Grid container spacing={3}>
+          {/* Nombre */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
               Nombre *
             </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              value={form.nombre}
-              onChange={(e) => handleChange("nombre", e.target.value)}
+            <TextField 
+              fullWidth 
+              size="small" 
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
             />
           </Grid>
+
+          {/* Código */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
               Código *
             </Typography>
-            <TextField
-              fullWidth
+            <TextField 
+              fullWidth 
               size="small"
-              value={form.codigo}
-              onChange={(e) => handleChange("codigo", e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
             />
           </Grid>
+
+          {/* Estado */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" fontWeight={600}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
               Estado
             </Typography>
             <FormControl fullWidth size="small">
-              <Select
-                value={form.estado}
-                onChange={(e) => handleChange("estado", e.target.value)}
+              <Select 
+                defaultValue="active"
+                sx={{
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: institutionalColors.primary,
+                  },
+                }}
               >
-                <MenuItem value="ACTIVE">Activa</MenuItem>
-                <MenuItem value="INACTIVE">Inactiva</MenuItem>
-                <MenuItem value="SUSPENDED">Suspendida</MenuItem>
+                <MenuItem value="active">Activa</MenuItem>
+                <MenuItem value="inactive">Inactiva</MenuItem>
+                <MenuItem value="suspended">Suspendida</MenuItem>
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2">Color Primario</Typography>
-            <TextField
-              type="color"
-              fullWidth
-              size="small"
-              value={form.colorPrimario}
-              onChange={(e) => handleChange("colorPrimario", e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2">Color Secundario</Typography>
-            <TextField
-              type="color"
-              fullWidth
-              size="small"
-              value={form.colorSecundario}
-              onChange={(e) => handleChange("colorSecundario", e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2">Color Acento</Typography>
-            <TextField
-              type="color"
-              fullWidth
-              size="small"
-              value={form.colorAcento}
-              onChange={(e) => handleChange("colorAcento", e.target.value)}
-            />
-          </Grid>
+
+          {/* Activa */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">
-              Nombre del Administrador
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Activa
+            </Typography>
+            <FormControl fullWidth size="small">
+              <Select 
+                defaultValue={true}
+                sx={{
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: institutionalColors.primary,
+                  },
+                }}
+              >
+                <MenuItem value={true}>Sí</MenuItem>
+                <MenuItem value={false}>No</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Color Primario */}
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Color Primario
             </Typography>
             <TextField
+              type="color"
               fullWidth
               size="small"
-              value={form.adminNombre}
-              onChange={(e) => handleChange("adminNombre", e.target.value)}
+              defaultValue={institutionalColors.primary}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
             />
           </Grid>
+
+          {/* Color Secundario */}
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Color Secundario
+            </Typography>
+            <TextField
+              type="color"
+              fullWidth
+              size="small"
+              defaultValue={institutionalColors.secondary}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
+            />
+          </Grid>
+
+          {/* Color Acento */}
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Color Acento
+            </Typography>
+            <TextField
+              type="color"
+              fullWidth
+              size="small"
+              defaultValue={institutionalColors.success}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
+            />
+          </Grid>
+
+          {/* Admin Nombre */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Email del Administrador</Typography>
-            <TextField
-              fullWidth
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Nombre del Administrador
+            </Typography>
+            <TextField 
+              fullWidth 
               size="small"
-              type="email"
-              value={form.adminEmail}
-              onChange={(e) => handleChange("adminEmail", e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
             />
           </Grid>
+
+          {/* Admin Email */}
           <Grid item xs={12}>
-            <Typography variant="subtitle2">Descripción</Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Email del Administrador
+            </Typography>
+            <TextField 
+              fullWidth 
+              size="small" 
+              type="email"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
+            />
+          </Grid>
+
+          {/* Descripción */}
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ color: institutionalColors.textPrimary, mb: 1 }}>
+              Descripción
+            </Typography>
+            <TextField 
+              fullWidth 
+              multiline 
+              rows={3} 
               size="small"
-              value={form.descripcion}
-              onChange={(e) => handleChange("descripcion", e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: institutionalColors.primary,
+                  },
+                },
+              }}
             />
           </Grid>
         </Grid>
       </DialogContent>
 
-      <Divider />
+      <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose}>Cancelar</Button>
+      {/* ACTIONS */}
+      <DialogActions sx={{ px: 3, py: 2, bgcolor: institutionalColors.background }}>
+        <Button 
+          onClick={onClose} 
+          variant="text" 
+          sx={{ 
+            textTransform: "none",
+            color: institutionalColors.textSecondary,
+          }}
+        >
+          Cancelar
+        </Button>
 
         <Button
-          type="button"
           variant="contained"
-          onClick={handleCrear}
-          disabled={loading}
+          onClick={onClose}
+          sx={{
+            textTransform: "none",
+            px: 3,
+            borderRadius: 2,
+            boxShadow: 2,
+            bgcolor: institutionalColors.primary,
+            '&:hover': {
+              bgcolor: institutionalColors.secondary,
+            }
+          }}
         >
-          {loading ? (
-            <CircularProgress size={20} color="inherit" />
-          ) : (
-            "Crear Instancia"
-          )}
+          Crear Instancia
         </Button>
       </DialogActions>
     </Dialog>

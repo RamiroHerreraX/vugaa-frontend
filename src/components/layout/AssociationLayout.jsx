@@ -164,21 +164,7 @@ const CommitteeLayout = () => {
           minHeight: 80,
         }}
       >
-        
-        {open && (
-          <Chip
-            label="Comité"
-            size="small"
-            sx={{
-              bgcolor: "rgba(255, 255, 255, 0.2)",
-              color: "white",
-              fontWeight: 700,
-              fontSize: "0.7rem",
-              height: 20,
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-            }}
-          />
-        )}
+      
       </Box>
 
       {/* Menú Principal - Con elementos en blanco sobre azul */}

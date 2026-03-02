@@ -24,7 +24,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Checkbox,
   TablePagination,
   Toolbar,
   alpha,
@@ -74,10 +73,8 @@ const institutionalColors = {
 
 const SystemInstances = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [selectedTab, setSelectedTab] = useState(0);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [selectedRows, setSelectedRows] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openViewDialog, setOpenViewDialog] = useState(false);
@@ -88,12 +85,11 @@ const SystemInstances = () => {
   const [openStatusDialog, setOpenStatusDialog] = useState(false);
   const [statusAction, setStatusAction] = useState(null); // 'activate' o 'deactivate'
   const [actionInstance, setActionInstance] = useState(null);
-  const [bulkAction, setBulkAction] = useState(false);
   
   // Estado para notificaciones
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Datos de las instancias del sistema (ahora como estado para poder modificarlas)
+  // Datos de las instancias del sistema
   const [systemInstances, setSystemInstances] = useState([
     {
       id: 1,
@@ -241,14 +237,6 @@ const SystemInstances = () => {
     },
   ]);
 
-  const statusOptions = [
-    { value: "all", label: "Todos los estados" },
-    { value: "active", label: "Activas", color: institutionalColors.success },
-    { value: "inactive", label: "Inactivas", color: institutionalColors.error },
-    { value: "maintenance", label: "En mantenimiento", color: institutionalColors.warning },
-    { value: "draft", label: "Borrador", color: "#9e9e9e" },
-  ];
-
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
@@ -283,48 +271,12 @@ const SystemInstances = () => {
   const handleStatusChange = (instance, action) => {
     setActionInstance(instance);
     setStatusAction(action);
-    setBulkAction(false);
-    setOpenStatusDialog(true);
-  };
-
-  // Función para cambiar el estado de múltiples instancias
-  const handleBulkStatusChange = (action) => {
-    if (selectedRows.length === 0) {
-      setSnackbar({
-        open: true,
-        message: 'Selecciona al menos una instancia',
-        severity: 'warning'
-      });
-      return;
-    }
-    setStatusAction(action);
-    setBulkAction(true);
     setOpenStatusDialog(true);
   };
 
   // Función para confirmar el cambio de estado
   const confirmStatusChange = () => {
-    if (bulkAction) {
-      // Acción masiva
-      setSystemInstances(prevInstances => 
-        prevInstances.map(instance => {
-          if (selectedRows.includes(instance.id)) {
-            const newStatus = statusAction === 'activate' ? 'active' : 'inactive';
-            return { ...instance, status: newStatus };
-          }
-          return instance;
-        })
-      );
-
-      const actionText = statusAction === 'activate' ? 'activadas' : 'desactivadas';
-      setSnackbar({
-        open: true,
-        message: `${selectedRows.length} instancias ${actionText} correctamente`,
-        severity: 'success'
-      });
-      setSelectedRows([]);
-    } else if (actionInstance) {
-      // Acción individual
+    if (actionInstance) {
       setSystemInstances(prevInstances => 
         prevInstances.map(instance => {
           if (instance.id === actionInstance.id) {
@@ -346,53 +298,35 @@ const SystemInstances = () => {
     setOpenStatusDialog(false);
     setActionInstance(null);
     setStatusAction(null);
-    setBulkAction(false);
   };
 
-  const filteredInstances = systemInstances.filter((instance) => {
+  // Filtrar instancias según el tab seleccionado
+  const getFilteredByTab = () => {
+    switch (selectedTab) {
+      case 0: // Todas
+        return systemInstances;
+      case 1: // Activas
+        return systemInstances.filter(instance => instance.status === 'active');
+      case 2: // Inactivas
+        return systemInstances.filter(instance => instance.status === 'inactive');
+      default:
+        return systemInstances;
+    }
+  };
+
+  // Aplicar filtro de búsqueda
+  const filteredInstances = getFilteredByTab().filter((instance) => {
     const matchesSearch =
       instance.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instance.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instance.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instance.admin.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      filterStatus === "all" ? true : instance.status === filterStatus;
-
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   const handleCreateInstance = () => {
     setOpenCreateDialog(true);
-  };
-
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelected = filteredInstances.map((n) => n.id);
-      setSelectedRows(newSelected);
-      return;
-    }
-    setSelectedRows([]);
-  };
-
-  const handleClick = (event, id) => {
-    const selectedIndex = selectedRows.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selectedRows, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selectedRows.slice(1));
-    } else if (selectedIndex === selectedRows.length - 1) {
-      newSelected = newSelected.concat(selectedRows.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(
-        selectedRows.slice(0, selectedIndex),
-        selectedRows.slice(selectedIndex + 1),
-      );
-    }
-
-    setSelectedRows(newSelected);
   };
 
   const handleChangePage = (event, newPage) => {
@@ -404,10 +338,31 @@ const SystemInstances = () => {
     setPage(0);
   };
 
-  const isSelected = (id) => selectedRows.indexOf(id) !== -1;
-
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setSelectedTab(newValue);
+    setPage(0); // Resetear página al cambiar de tab
+  };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+  };
+
+  // Obtener el título según el tab seleccionado
+  const getTabTitle = () => {
+    switch (selectedTab) {
+      case 0:
+        return "Todas las Instancias";
+      case 1:
+        return "Instancias Activas";
+      case 2:
+        return "Instancias Inactivas";
+      default:
+        return "Instancias";
+    }
   };
 
   return (
@@ -449,505 +404,381 @@ const SystemInstances = () => {
             </Button>
           </Stack>
         </Box>
+      </Box>
 
-        {/* Tabs */}
-        <Paper sx={{ mb: 2, border: `1px solid #e5e7eb` }}>
-          <Tabs
-            value={selectedTab}
-            onChange={(e, newValue) => setSelectedTab(newValue)}
-            variant="scrollable"
-            scrollButtons="auto"
+      {/* Contenido principal */}
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* Tabla de instancias */}
+        <Paper
+          sx={{
+            width: "100%",
+            overflow: "hidden",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            border: `1px solid #e5e7eb`,
+          }}
+        >
+          {/* Barra de herramientas con tabs y buscador al mismo nivel */}
+          <Toolbar
             sx={{
-              '& .MuiTab-root.Mui-selected': {
-                color: institutionalColors.primary,
-              },
-              '& .MuiTabs-indicator': {
-                backgroundColor: institutionalColors.primary,
-              }
+              pl: { sm: 2 },
+              pr: { xs: 1, sm: 1 },
+              bgcolor: alpha(institutionalColors.primary, 0.05),
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { xs: "flex-start", md: "center" },
+              gap: 2,
+              py: 1,
             }}
           >
-            <Tab icon={<DomainIcon />} label="Todas las Instancias" />
-          </Tabs>
-        </Paper>
+            {/* Tabs a la izquierda */}
+            <Tabs
+              value={selectedTab}
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                minHeight: 40,
+                '& .MuiTab-root': {
+                  minHeight: 40,
+                  py: 0.5,
+                  px: 2,
+                  fontSize: '0.9rem',
+                },
+                '& .MuiTab-root.Mui-selected': {
+                  color: institutionalColors.primary,
+                  fontWeight: 'bold',
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: institutionalColors.primary,
+                  height: 2.5,
+                }
+              }}
+            >
+              <Tab 
+                icon={<DomainIcon sx={{ fontSize: 18 }} />} 
+                label="Todas" 
+                iconPosition="start"
+                sx={{ 
+                  '&.Mui-selected': { 
+                    color: institutionalColors.primary,
+                  } 
+                }}
+              />
+              <Tab 
+                icon={<CheckCircleIcon sx={{ fontSize: 18 }} />} 
+                label="Activas" 
+                iconPosition="start"
+                sx={{ 
+                  '&.Mui-selected': { 
+                    color: institutionalColors.primary,
+                  } 
+                }}
+              />
+              <Tab 
+                icon={<ErrorIcon sx={{ fontSize: 18 }} />} 
+                label="Inactivas" 
+                iconPosition="start"
+                sx={{ 
+                  '&.Mui-selected': { 
+                    color: institutionalColors.primary,
+                  } 
+                }}
+              />
+            </Tabs>
 
-        {/* Filtros y búsqueda */}
-        <Paper elevation={0} sx={{ p: 2, bgcolor: "white", border: `1px solid #e5e7eb` }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+            {/* Buscador a la derecha */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, justifyContent: "flex-end" }}>
               <TextField
-                fullWidth
                 size="small"
-                placeholder="Buscar por nombre, código, administrador..."
+                placeholder={`Buscar en ${getTabTitle().toLowerCase()}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ minWidth: 280 }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
                       <SearchIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
                     </InputAdornment>
                   ),
+                  endAdornment: searchTerm && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={clearSearch} edge="end">
+                        <Typography sx={{ fontSize: '1.2rem', lineHeight: 1, color: institutionalColors.textSecondary }}>×</Typography>
+                      </IconButton>
+                    </InputAdornment>
+                  ),
                 }}
               />
-            </Grid>
 
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ '&.Mui-focused': { color: institutionalColors.primary } }}>Estado</InputLabel>
-                <Select
-                  value={filterStatus}
-                  label="Estado"
-                  onChange={(e) => setFilterStatus(e.target.value)}
+              {searchTerm && (
+                <Button
+                  size="small"
+                  onClick={clearSearch}
+                  variant="outlined"
                   sx={{
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: institutionalColors.primary,
+                    color: institutionalColors.primary,
+                    borderColor: institutionalColors.primary,
+                    whiteSpace: 'nowrap',
+                    '&:hover': {
+                      borderColor: institutionalColors.secondary,
+                      bgcolor: institutionalColors.lightBlue,
                     }
                   }}
                 >
-                  {statusOptions.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        {option.color && (
-                          <Box
+                  Limpiar
+                </Button>
+              )}
+
+              <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, fontWeight: 'medium', whiteSpace: 'nowrap', ml: 1 }}>
+                {filteredInstances.length} {filteredInstances.length === 1 ? 'instancia' : 'instancias'}
+              </Typography>
+            </Box>
+          </Toolbar>
+
+          {/* Tabla */}
+          <TableContainer sx={{ flex: 1 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Instancia</TableCell>
+                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Estado</TableCell>
+                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Usuarios</TableCell>
+                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Certificaciones</TableCell>
+                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Administrador</TableCell>
+                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Acciones</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredInstances
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((instance) => {
+                    return (
+                      <TableRow hover key={instance.id}>
+                        <TableCell>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                            <Avatar
+                              sx={{
+                                width: 40,
+                                height: 40,
+                                bgcolor: instance.colors.primary,
+                                fontSize: "1rem",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {instance.name.charAt(0)}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
+                                {instance.name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
+                                {instance.code} • {instance.description}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }} display="block">
+                                <CalendarIcon
+                                  sx={{
+                                    fontSize: "0.8rem",
+                                    verticalAlign: "middle",
+                                    mr: 0.5,
+                                    color: institutionalColors.textSecondary,
+                                  }}
+                                />
+                                Creada: {instance.created}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={
+                              instance.status === "active"
+                                ? "Activa"
+                                : instance.status === "inactive"
+                                  ? "Inactiva"
+                                  : instance.status === "maintenance"
+                                    ? "Mantenimiento"
+                                    : "Borrador"
+                            }
+                            icon={getStatusIcon(instance.status)}
                             sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: "50%",
-                              bgcolor: option.color,
+                              bgcolor: `${getStatusColor(instance.status)}15`,
+                              color: getStatusColor(instance.status),
+                              fontWeight: "medium",
+                              minWidth: 100,
                             }}
                           />
-                        )}
-                        {option.label}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+                        </TableCell>
 
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterStatus("all");
-                  setSelectedRows([]);
-                }}
-                sx={{
-                  borderColor: institutionalColors.primary,
-                  color: institutionalColors.primary,
-                  '&:hover': {
-                    borderColor: institutionalColors.secondary,
-                    bgcolor: institutionalColors.lightBlue,
-                  }
-                }}
-              >
-                Limpiar Filtros
-              </Button>
-            </Grid>
-          </Grid>
+                        <TableCell align="center">
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                            <PersonIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
+                              {instance.users}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+
+                        <TableCell align="center">
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                            <BookIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
+                              {instance.certifications}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+
+                        <TableCell>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Avatar
+                              sx={{
+                                width: 28,
+                                height: 28,
+                                fontSize: "0.8rem",
+                                bgcolor: institutionalColors.primary,
+                              }}
+                            >
+                              {instance.admin.charAt(0)}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
+                                {instance.admin}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
+                                {instance.email}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+
+                        <TableCell align="center">
+                          <Stack direction="row" spacing={0.5} justifyContent="center">
+                            <Tooltip title="Ver detalles">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setSelectedInstance(instance);
+                                  setOpenViewDialog(true);
+                                }}
+                                sx={{ color: institutionalColors.primary }}
+                              >
+                                <VisibilityIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+
+                            <Tooltip title="Editar">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setSelectedInstance(instance);
+                                  setOpenEditDialog(true);
+                                }}
+                                sx={{ color: institutionalColors.primary }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+
+                            {instance.status === "inactive" ? (
+                              <Tooltip title="Activar">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleStatusChange(instance, 'activate')}
+                                  sx={{ color: institutionalColors.success }}
+                                >
+                                  <EnableIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            ) : instance.status === "active" ? (
+                              <Tooltip title="Desactivar">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleStatusChange(instance, 'deactivate')}
+                                  sx={{ color: institutionalColors.error }}
+                                >
+                                  <DisableIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            ) : null}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                {filteredInstances.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <Box sx={{ textAlign: "center" }}>
+                        {selectedTab === 0 && <DomainIcon sx={{ fontSize: 60, color: institutionalColors.textSecondary, mb: 2 }} />}
+                        {selectedTab === 1 && <CheckCircleIcon sx={{ fontSize: 60, color: institutionalColors.success, mb: 2 }} />}
+                        {selectedTab === 2 && <ErrorIcon sx={{ fontSize: 60, color: institutionalColors.error, mb: 2 }} />}
+                        
+                        <Typography variant="h6" sx={{ color: institutionalColors.textPrimary }} gutterBottom>
+                          No hay instancias {selectedTab === 1 ? 'activas' : selectedTab === 2 ? 'inactivas' : ''}
+                        </Typography>
+                        
+                        <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
+                          {searchTerm 
+                            ? 'No se encontraron resultados para tu búsqueda' 
+                            : selectedTab === 0 
+                              ? 'Comienza creando una nueva instancia'
+                              : `No hay instancias ${selectedTab === 1 ? 'activas' : 'inactivas'} en este momento`
+                          }
+                        </Typography>
+                        
+                        {!searchTerm && selectedTab === 0 && (
+                          <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={handleCreateInstance}
+                            sx={{ mt: 2, bgcolor: institutionalColors.primary }}
+                          >
+                            Crear Instancia
+                          </Button>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredInstances.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Filas por página:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+            sx={{
+              borderTop: '1px solid #e5e7eb',
+              '& .MuiTablePagination-select': { color: institutionalColors.textPrimary },
+              '& .MuiTablePagination-selectLabel': { color: institutionalColors.textPrimary },
+              '& .MuiTablePagination-displayedRows': { color: institutionalColors.textPrimary },
+              '& .MuiTablePagination-actions button': { color: institutionalColors.primary },
+            }}
+          />
         </Paper>
       </Box>
 
-      {/* Contenido principal */}
-      {selectedTab === 0 && (
-        <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          {/* Tabla de instancias */}
-          <Paper
-            sx={{
-              width: "100%",
-              overflow: "hidden",
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              border: `1px solid #e5e7eb`,
-            }}
-          >
-            <Toolbar
-              sx={{
-                pl: { sm: 2 },
-                pr: { xs: 1, sm: 1 },
-                bgcolor: alpha(institutionalColors.primary, 0.05),
-              }}
-            >
-              <Box sx={{ flex: "1 1 100%" }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
-                  Instancias del Sistema
-                </Typography>
-                <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
-                  {filteredInstances.length} instancias encontradas
-                </Typography>
-              </Box>
-
-              {selectedRows.length > 0 && (
-                <Stack direction="row" spacing={1}>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: institutionalColors.primary, display: "flex", alignItems: "center" }}
-                  >
-                    {selectedRows.length} seleccionados
-                  </Typography>
-                  <Tooltip title="Activar seleccionadas">
-                    <IconButton 
-                      size="small"
-                      onClick={() => handleBulkStatusChange('activate')}
-                      sx={{ color: institutionalColors.primary }}
-                    >
-                      <EnableIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Desactivar seleccionadas">
-                    <IconButton 
-                      size="small"
-                      onClick={() => handleBulkStatusChange('deactivate')}
-                      sx={{ color: institutionalColors.primary }}
-                    >
-                      <DisableIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Eliminar seleccionadas">
-                    <IconButton size="small" sx={{ color: institutionalColors.error }}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              )}
-            </Toolbar>
-
-            <TableContainer sx={{ flex: 1 }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        indeterminate={
-                          selectedRows.length > 0 &&
-                          selectedRows.length < filteredInstances.length
-                        }
-                        checked={
-                          filteredInstances.length > 0 &&
-                          selectedRows.length === filteredInstances.length
-                        }
-                        onChange={handleSelectAllClick}
-                        sx={{
-                          color: institutionalColors.primary,
-                          '&.Mui-checked': {
-                            color: institutionalColors.primary,
-                          },
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Instancia</TableCell>
-                    <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Estado</TableCell>
-                    <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Usuarios</TableCell>
-                    <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Certificaciones</TableCell>
-                    <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Administrador</TableCell>
-                    <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Acciones</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredInstances
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((instance) => {
-                      const isItemSelected = isSelected(instance.id);
-
-                      return (
-                        <TableRow
-                          hover
-                          key={instance.id}
-                          selected={isItemSelected}
-                          onClick={(event) => handleClick(event, instance.id)}
-                          sx={{ cursor: "pointer" }}
-                        >
-                          <TableCell padding="checkbox">
-                            <Checkbox 
-                              checked={isItemSelected}
-                              sx={{
-                                color: institutionalColors.primary,
-                                '&.Mui-checked': {
-                                  color: institutionalColors.primary,
-                                },
-                              }}
-                            />
-                          </TableCell>
-
-                          <TableCell>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 2,
-                              }}
-                            >
-                              <Avatar
-                                sx={{
-                                  width: 40,
-                                  height: 40,
-                                  bgcolor: instance.colors.primary,
-                                  fontSize: "1rem",
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                {instance.name.charAt(0)}
-                              </Avatar>
-                              <Box>
-                                <Typography variant="body2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
-                                  {instance.name}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{ color: institutionalColors.textSecondary }}
-                                >
-                                  {instance.code} • {instance.description}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{ color: institutionalColors.textSecondary }}
-                                  display="block"
-                                >
-                                  <CalendarIcon
-                                    sx={{
-                                      fontSize: "0.8rem",
-                                      verticalAlign: "middle",
-                                      mr: 0.5,
-                                      color: institutionalColors.textSecondary,
-                                    }}
-                                  />
-                                  Creada: {instance.created}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </TableCell>
-
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              label={
-                                instance.status === "active"
-                                  ? "Activa"
-                                  : instance.status === "inactive"
-                                    ? "Inactiva"
-                                    : instance.status === "maintenance"
-                                      ? "Mantenimiento"
-                                      : "Borrador"
-                              }
-                              icon={getStatusIcon(instance.status)}
-                              sx={{
-                                bgcolor: `${getStatusColor(instance.status)}15`,
-                                color: getStatusColor(instance.status),
-                                fontWeight: "medium",
-                                minWidth: 100,
-                              }}
-                            />
-                          </TableCell>
-
-                          <TableCell align="center">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <PersonIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
-                              <Typography variant="body2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
-                                {instance.users}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-
-                          <TableCell align="center">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <BookIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
-                              <Typography variant="body2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
-                                {instance.certifications}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-
-                          <TableCell>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Avatar
-                                sx={{
-                                  width: 28,
-                                  height: 28,
-                                  fontSize: "0.8rem",
-                                  bgcolor: institutionalColors.primary,
-                                }}
-                              >
-                                {instance.admin.charAt(0)}
-                              </Avatar>
-                              <Box>
-                                <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                                  {instance.admin}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{ color: institutionalColors.textSecondary }}
-                                >
-                                  {instance.email}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </TableCell>
-
-                          <TableCell align="center">
-                            <Stack
-                              direction="row"
-                              spacing={0.5}
-                              justifyContent="center"
-                            >
-                              <Tooltip title="Ver detalles">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedInstance(instance);
-                                    setOpenViewDialog(true);
-                                  }}
-                                  sx={{ color: institutionalColors.primary }}
-                                >
-                                  <VisibilityIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-
-                              <Tooltip title="Editar">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedInstance(instance);
-                                    setOpenEditDialog(true);
-                                  }}
-                                  sx={{ color: institutionalColors.primary }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-
-                              {instance.status === "inactive" ? (
-                                <Tooltip title="Activar">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStatusChange(instance, 'activate');
-                                    }}
-                                    sx={{ color: institutionalColors.success }}
-                                  >
-                                    <EnableIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              ) : instance.status === "active" ? (
-                                <Tooltip title="Desactivar">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStatusChange(instance, 'deactivate');
-                                    }}
-                                    sx={{ color: institutionalColors.error }}
-                                  >
-                                    <DisableIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              ) : null}
-                            </Stack>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-
-                  {filteredInstances.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <DomainIcon
-                            sx={{ fontSize: 60, color: institutionalColors.textSecondary, mb: 2 }}
-                          />
-                          <Typography
-                            variant="body1"
-                            sx={{ color: institutionalColors.textSecondary }}
-                            gutterBottom
-                          >
-                            No se encontraron instancias
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
-                            Intenta con otros términos de búsqueda o filtros
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={filteredInstances.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-              labelRowsPerPage="Filas por página:"
-              labelDisplayedRows={({ from, to, count }) =>
-                `${from}-${to} de ${count}`
-              }
-              sx={{
-                '& .MuiTablePagination-select': {
-                  color: institutionalColors.textPrimary,
-                },
-                '& .MuiTablePagination-selectLabel': {
-                  color: institutionalColors.textPrimary,
-                },
-                '& .MuiTablePagination-displayedRows': {
-                  color: institutionalColors.textPrimary,
-                },
-                '& .MuiTablePagination-actions button': {
-                  color: institutionalColors.primary,
-                },
-              }}
-            />
-          </Paper>
-        </Box>
-      )}
-
       {/* Diálogo de confirmación para cambiar estado */}
-      <Dialog
-        open={openStatusDialog}
-        onClose={() => setOpenStatusDialog(false)}
-      >
+      <Dialog open={openStatusDialog} onClose={() => setOpenStatusDialog(false)}>
         <DialogTitle>
           <Typography sx={{ color: institutionalColors.textPrimary }}>
-            {statusAction === 'activate' ? 'Activar' : 'Desactivar'} {bulkAction ? 'instancias' : 'instancia'}
+            {statusAction === 'activate' ? 'Activar' : 'Desactivar'} instancia
           </Typography>
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: institutionalColors.textSecondary }}>
-            {bulkAction ? (
-              `¿Estás seguro de que deseas ${statusAction === 'activate' ? 'activar' : 'desactivar'} las ${selectedRows.length} instancias seleccionadas?`
-            ) : (
-              `¿Estás seguro de que deseas ${statusAction === 'activate' ? 'activar' : 'desactivar'} la instancia "${actionInstance?.name}"?`
-            )}
+            {`¿Estás seguro de que deseas ${statusAction === 'activate' ? 'activar' : 'desactivar'} la instancia "${actionInstance?.name}"?`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -979,23 +810,10 @@ const SystemInstances = () => {
         </Alert>
       </Snackbar>
 
-      {/* Diálogo de creación */}
-      <CreateInstanceDialog
-        open={openCreateDialog}
-        onClose={() => setOpenCreateDialog(false)}
-      />
-
-      <ViewInstanceDialog
-        open={openViewDialog}
-        onClose={() => setOpenViewDialog(false)}
-        instance={selectedInstance}
-      />
-
-      <EditInstanceDialog
-        open={openEditDialog}
-        onClose={() => setOpenEditDialog(false)}
-        instance={selectedInstance}
-      />
+      {/* Diálogos */}
+      <CreateInstanceDialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} />
+      <ViewInstanceDialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} instance={selectedInstance} />
+      <EditInstanceDialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} instance={selectedInstance} />
     </Box>
   );
 };

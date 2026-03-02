@@ -1,3 +1,4 @@
+// src/pages/superadmin/components/ViewInstanceDialog.jsx
 import React from "react";
 import {
   Dialog,
@@ -11,278 +12,335 @@ import {
   Chip,
   Box,
   Grid,
-  Divider,
+  Divider
 } from "@mui/material";
 
+const institutionalColors = {
+  primary: '#133B6B',
+  secondary: '#1a4c7a',
+  accent: '#e9e9e9',
+  background: '#f8f9fa',
+  lightBlue: 'rgba(19, 59, 107, 0.08)',
+  darkBlue: '#0D2A4D',
+  textPrimary: '#2c3e50',
+  textSecondary: '#7f8c8d',
+  success: '#27ae60',
+  warning: '#f39c12',
+  error: '#e74c3c',
+  info: '#3498db',
+};
+
 const ViewInstanceDialog = ({ open, onClose, instance }) => {
-  const safeInstance = instance || {};
+
+  if (!instance) return null;
 
   const estadoColor = {
     active: "success",
     inactive: "default",
-    suspended: "error",
+    suspended: "error"
   };
 
   return (
     <Dialog
-      open={open && !!instance}
+      open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
-      keepMounted
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          border: `1px solid ${institutionalColors.lightBlue}`,
+          width: "100%",
+        },
+      }}
     >
-      <DialogTitle>
+
+      {/* HEADER */}
+      <DialogTitle sx={{ bgcolor: institutionalColors.background }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <Avatar
-            src={safeInstance.logoUrl}
+            src={instance.logoUrl}
             sx={{
-              bgcolor:
-                safeInstance.colorPrimario || "primary.main",
+              bgcolor: instance.colorPrimario || institutionalColors.primary,
               width: 50,
-              height: 50,
+              height: 50
             }}
           >
-            {safeInstance.nombre?.charAt(0) || ""}
+            {instance.nombre?.charAt(0)}
           </Avatar>
 
-          <Box>
-            <Typography variant="h6" fontWeight={700}>
-              {safeInstance.nombre || ""}
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography
+              variant="h6"
+              fontWeight={700}
+              sx={{ color: institutionalColors.primary }}
+            >
+              {instance.nombre}
             </Typography>
 
             <Typography
               variant="body2"
-              color="text.secondary"
+              sx={{ color: institutionalColors.textSecondary }}
             >
-              Código: {safeInstance.codigo || ""}
+              Código: {instance.codigo}
             </Typography>
           </Box>
         </Stack>
       </DialogTitle>
 
-      <DialogContent dividers>
-        <Stack spacing={3}>
-          <Box>
-            <Chip
-              label={safeInstance.estado || "active"}
-              color={
-                estadoColor[safeInstance.estado] ||
-                "default"
-              }
-              variant="outlined"
-            />
 
-            <Chip
-              label={
-                safeInstance.activa
-                  ? "Activa"
-                  : "Inactiva"
-              }
-              color={
-                safeInstance.activa
-                  ? "success"
-                  : "default"
-              }
-              sx={{ ml: 1 }}
-            />
-          </Box>
+      {/* CONTENT */}
+      <DialogContent
+        dividers
+        sx={{
+          borderColor: institutionalColors.lightBlue,
+          p: 3
+        }}
+      >
 
-          <Box>
-            <Typography
-              variant="subtitle2"
-              color="text.secondary"
-            >
+        <Grid container spacing={3}>
+
+          {/* ESTADO */}
+          <Grid item xs={12}>
+            <Stack direction="row" spacing={1}>
+              <Chip
+                label={instance.estado || "active"}
+                color={estadoColor[instance.estado] || "default"}
+                variant="outlined"
+              />
+
+              <Chip
+                label={instance.activa ? "Activa" : "Inactiva"}
+                sx={{
+                  bgcolor: instance.activa
+                    ? `${institutionalColors.success}15`
+                    : `${institutionalColors.textSecondary}15`,
+                  color: instance.activa
+                    ? institutionalColors.success
+                    : institutionalColors.textSecondary,
+                }}
+              />
+            </Stack>
+          </Grid>
+
+
+          {/* DESCRIPCIÓN */}
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" color="text.secondary">
               Descripción
             </Typography>
 
-            <Typography>
-              {safeInstance.descripcion ||
-                "Sin descripción"}
+            <Typography color="text.primary">
+              {instance.descripcion || "Sin descripción"}
             </Typography>
-          </Box>
-
-          <Divider />
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Administrador
-              </Typography>
-
-              <Typography>
-                {safeInstance.adminNombre ||
-                  "No asignado"}
-              </Typography>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Email Administrador
-              </Typography>
-
-              <Typography>
-                {safeInstance.adminEmail ||
-                  "No asignado"}
-              </Typography>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Fecha de creación
-              </Typography>
-
-              <Typography>
-                {safeInstance.fechaCreacion
-                  ? new Date(
-                      safeInstance.fechaCreacion
-                    ).toLocaleString()
-                  : "No disponible"}
-              </Typography>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Logo URL
-              </Typography>
-
-              <Typography>
-                {safeInstance.logoUrl ||
-                  "No asignado"}
-              </Typography>
-            </Grid>
           </Grid>
 
-          <Divider />
 
-          <Box>
+          <Grid item xs={12}>
+            <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
+          </Grid>
+
+
+          {/* INFORMACIÓN GENERAL (2 COLUMNAS REALES) */}
+
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Administrador
+            </Typography>
+
+            <Typography>
+              {instance.adminNombre || "No asignado"}
+            </Typography>
+          </Grid>
+
+
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Email Administrador
+            </Typography>
+
+            <Typography>
+              {instance.adminEmail || "No asignado"}
+            </Typography>
+          </Grid>
+
+
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Fecha de creación
+            </Typography>
+
+            <Typography>
+              {instance.fechaCreacion
+                ? new Date(instance.fechaCreacion).toLocaleString()
+                : "No disponible"}
+            </Typography>
+          </Grid>
+
+
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Logo URL
+            </Typography>
+
+            <Typography>
+              {instance.logoUrl || "No asignado"}
+            </Typography>
+          </Grid>
+
+
+          <Grid item xs={12}>
+            <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
+          </Grid>
+
+
+          {/* COLORES */}
+
+          <Grid item xs={12}>
             <Typography
               variant="subtitle2"
               color="text.secondary"
-              gutterBottom
+              sx={{ mb: 1 }}
             >
               Colores del Sistema
             </Typography>
 
-            <Stack direction="row" spacing={2}>
-              <Box>
-                <Typography variant="caption">
-                  Primario
-                </Typography>
+            <Grid container spacing={3}>
+
+              <Grid item>
+                <Typography variant="caption">Primario</Typography>
 
                 <Box
                   sx={{
-                    width: 40,
-                    height: 20,
+                    width: 60,
+                    height: 25,
                     bgcolor:
-                      safeInstance.colorPrimario ||
-                      "#1976d2",
+                      instance.colorPrimario ||
+                      institutionalColors.primary,
                     borderRadius: 1,
+                    border: `1px solid ${institutionalColors.lightBlue}`,
                   }}
                 />
-              </Box>
+              </Grid>
 
-              <Box>
-                <Typography variant="caption">
-                  Secundario
-                </Typography>
+
+              <Grid item>
+                <Typography variant="caption">Secundario</Typography>
 
                 <Box
                   sx={{
-                    width: 40,
-                    height: 20,
+                    width: 60,
+                    height: 25,
                     bgcolor:
-                      safeInstance.colorSecundario ||
-                      "#ff9800",
+                      instance.colorSecundario ||
+                      institutionalColors.secondary,
                     borderRadius: 1,
+                    border: `1px solid ${institutionalColors.lightBlue}`,
                   }}
                 />
-              </Box>
+              </Grid>
 
-              <Box>
-                <Typography variant="caption">
-                  Acento
-                </Typography>
+
+              <Grid item>
+                <Typography variant="caption">Acento</Typography>
 
                 <Box
                   sx={{
-                    width: 40,
-                    height: 20,
+                    width: 60,
+                    height: 25,
                     bgcolor:
-                      safeInstance.colorAcento ||
-                      "#4caf50",
+                      instance.colorAcento ||
+                      institutionalColors.success,
                     borderRadius: 1,
+                    border: `1px solid ${institutionalColors.lightBlue}`,
                   }}
                 />
-              </Box>
-            </Stack>
-          </Box>
+              </Grid>
 
-          <Divider />
-
-          <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Usuarios
-              </Typography>
-
-              <Typography variant="h6">
-                {safeInstance.totalUsuarios || 0}
-              </Typography>
             </Grid>
 
-            <Grid item xs={4}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Certificaciones
-              </Typography>
-
-              <Typography variant="h6">
-                {safeInstance.totalCertificaciones ||
-                  0}
-              </Typography>
-            </Grid>
-
-            <Grid item xs={4}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-              >
-                Cursos
-              </Typography>
-
-              <Typography variant="h6">
-                {safeInstance.totalCursos || 0}
-              </Typography>
-            </Grid>
           </Grid>
-        </Stack>
+
+
+          <Grid item xs={12}>
+            <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
+          </Grid>
+
+
+          {/* ESTADÍSTICAS (OCUPAN TODO EL ANCHO) */}
+
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Usuarios
+            </Typography>
+
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              color={institutionalColors.primary}
+            >
+              {instance.totalUsuarios || 0}
+            </Typography>
+          </Grid>
+
+
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Certificaciones
+            </Typography>
+
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              color={institutionalColors.primary}
+            >
+              {instance.totalCertificaciones || 0}
+            </Typography>
+          </Grid>
+
+
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Cursos
+            </Typography>
+
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              color={institutionalColors.primary}
+            >
+              {instance.totalCursos || 0}
+            </Typography>
+          </Grid>
+
+        </Grid>
+
       </DialogContent>
 
-      <DialogActions>
+
+      {/* FOOTER */}
+
+      <DialogActions
+        sx={{
+          p: 2,
+          bgcolor: institutionalColors.background
+        }}
+      >
         <Button
           variant="contained"
           onClick={onClose}
+          sx={{
+            bgcolor: institutionalColors.primary,
+            px: 4,
+            '&:hover': {
+              bgcolor: institutionalColors.secondary,
+            }
+          }}
         >
           Cerrar
         </Button>
       </DialogActions>
+
     </Dialog>
   );
 };
