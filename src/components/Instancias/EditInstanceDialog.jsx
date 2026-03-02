@@ -10,34 +10,32 @@ import {
   TextField,
   Typography,
   Stack,
-  FormControl,
-  Select,
-  MenuItem,
-  CircularProgress
+  Avatar,
+  Divider,
+  Box,
+  CircularProgress,
+  Alert,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { Edit as EditIcon } from "@mui/icons-material";
 import { editarInstancia } from "../../services/Instancia";
+import { alpha } from "@mui/material/styles";
 
-// Colores institucionales
 const institutionalColors = {
   primary: '#133B6B',
   secondary: '#1a4c7a',
-  accent: '#e9e9e9',
   background: '#f8f9fa',
   lightBlue: 'rgba(19, 59, 107, 0.08)',
-  darkBlue: '#0D2A4D',
   textPrimary: '#2c3e50',
   textSecondary: '#7f8c8d',
-  success: '#27ae60',
-  warning: '#f39c12',
-  error: '#e74c3c',
-  info: '#3498db',
+  success: '#4caf50',
+  error: '#f44336',
 };
 
 const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
-
   const [loading, setLoading] = useState(false);
-
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     nombre: "",
     codigo: "",
@@ -45,56 +43,101 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
     activa: true,
     colorPrimario: institutionalColors.primary,
     colorSecundario: institutionalColors.secondary,
-    colorAcento: institutionalColors.success,
+    colorAcento: "#27ae60",
     adminNombre: "",
     adminEmail: ""
   });
 
+  // Cargar datos cuando se abre el diálogo con una instancia
   useEffect(() => {
-    if (instance) {
+    if (instance && open) {
+      // Determinar si es objeto mapeado o rawData
+      const isMapped = instance.name !== undefined;
+      
       setFormData({
-        nombre: instance.nombre || "",
-        codigo: instance.codigo || "",
-        descripcion: instance.descripcion || "",
-        activa: instance.activa ?? true,
-        colorPrimario: instance.colorPrimario || institutionalColors.primary,
-        colorSecundario: instance.colorSecundario || institutionalColors.secondary,
-        colorAcento: instance.colorAcento || institutionalColors.success,
-        adminNombre: instance.adminNombre || "",
-        adminEmail: instance.adminEmail || ""
+        nombre: isMapped ? instance.name : instance.nombre || "",
+        codigo: isMapped ? instance.code : instance.codigo || "",
+        descripcion: isMapped ? instance.description : instance.descripcion || "",
+        activa: isMapped ? instance.status === 'active' : instance.activa !== false,
+        colorPrimario: isMapped 
+          ? instance.colors?.primary || institutionalColors.primary 
+          : instance.colorPrimario || institutionalColors.primary,
+        colorSecundario: isMapped 
+          ? instance.colors?.secondary || institutionalColors.secondary 
+          : instance.colorSecundario || institutionalColors.secondary,
+        colorAcento: isMapped 
+          ? instance.colors?.accent || "#27ae60" 
+          : instance.colorAcento || "#27ae60",
+        adminNombre: isMapped ? instance.admin : instance.adminNombre || "",
+        adminEmail: isMapped ? instance.email : instance.adminEmail || ""
       });
+      setError("");
     }
-  }, [instance]);
-
-  if (!instance) return null;
+  }, [instance, open]);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    if (error) setError("");
+  };
+
+  const validateForm = () => {
+    if (!formData.nombre.trim()) {
+      setError("El nombre es requerido");
+      return false;
+    }
+    if (!formData.codigo.trim()) {
+      setError("El código es requerido");
+      return false;
+    }
+    if (formData.adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) {
+      setError("El email del administrador no es válido");
+      return false;
+    }
+    return true;
   };
 
   const handleSave = async () => {
+    if (!validateForm()) return;
+    if (!instance) return;
+
     try {
       setLoading(true);
+      setError("");
 
-      await editarInstancia(instance.codigo, formData);
+      // Obtener el código correcto
+      const codigo = instance.code || instance.codigo;
+      
+      await editarInstancia(codigo, formData);
 
-      if (onUpdated) onUpdated();
+      if (onUpdated) {
+        onUpdated();
+      }
 
       onClose();
+
     } catch (error) {
-      console.error("Error al actualizar instancia:", error);
+      console.error("Error al editar instancia:", error);
+      setError(error.response?.data?.message || "Error al editar la instancia");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleClose = () => {
+    if (!loading) {
+      onClose();
+    }
+  };
+
+  if (!instance) return null;
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="md"
       fullWidth
       PaperProps={{
@@ -104,19 +147,44 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
         },
       }}
     >
-      <DialogTitle sx={{ bgcolor: institutionalColors.background }}>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <EditIcon sx={{ color: institutionalColors.primary }} />
-          <Typography variant="h6" fontWeight={600} sx={{ color: institutionalColors.primary }}>
-            Editar Instancia
-          </Typography>
+      <DialogTitle sx={{ pb: 1, bgcolor: institutionalColors.background }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Avatar
+            sx={{
+              bgcolor: institutionalColors.lightBlue,
+              color: institutionalColors.primary,
+              width: 40,
+              height: 40,
+            }}
+          >
+            <EditIcon />
+          </Avatar>
+
+          <Box>
+            <Typography variant="h6" fontWeight={700} sx={{ color: institutionalColors.primary }}>
+              Editar Instancia
+            </Typography>
+            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
+              {formData.nombre} ({formData.codigo})
+            </Typography>
+          </Box>
         </Stack>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ borderColor: institutionalColors.lightBlue }}>
-        <Grid container spacing={3} sx={{ mt: 1 }}>
+      <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
 
-          {/* Nombre */}
+      <DialogContent sx={{ py: 4 }}>
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ mb: 3 }}
+            onClose={() => setError("")}
+          >
+            {error}
+          </Alert>
+        )}
+
+        <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
               Nombre *
@@ -126,10 +194,11 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               size="small"
               value={formData.nombre}
               onChange={(e) => handleChange("nombre", e.target.value)}
+              error={!!error && error.includes("nombre")}
+              disabled={loading}
             />
           </Grid>
 
-          {/* Código */}
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
               Código *
@@ -139,26 +208,51 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               size="small"
               value={formData.codigo}
               onChange={(e) => handleChange("codigo", e.target.value)}
+              error={!!error && error.includes("código")}
+              disabled={loading}
             />
           </Grid>
 
-          {/* Activa */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Activa
+              Descripción
             </Typography>
-            <FormControl fullWidth size="small">
-              <Select
-                value={formData.activa}
-                onChange={(e) => handleChange("activa", e.target.value === true || e.target.value === "true")}
-              >
-                <MenuItem value={true}>Sí</MenuItem>
-                <MenuItem value={false}>No</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              size="small"
+              value={formData.descripcion}
+              onChange={(e) => handleChange("descripcion", e.target.value)}
+              disabled={loading}
+            />
           </Grid>
 
-          {/* Colores */}
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.activa}
+                  onChange={(e) => handleChange("activa", e.target.checked)}
+                  disabled={loading}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: institutionalColors.success,
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      backgroundColor: institutionalColors.success,
+                    }
+                  }}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ color: formData.activa ? institutionalColors.success : institutionalColors.textSecondary }}>
+                  {formData.activa ? "Instancia activa" : "Instancia inactiva"}
+                </Typography>
+              }
+            />
+          </Grid>
+
           <Grid item xs={12} md={4}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
               Color Primario
@@ -169,6 +263,13 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               size="small"
               value={formData.colorPrimario}
               onChange={(e) => handleChange("colorPrimario", e.target.value)}
+              disabled={loading}
+              sx={{
+                '& input': {
+                  height: 40,
+                  cursor: 'pointer',
+                }
+              }}
             />
           </Grid>
 
@@ -182,6 +283,13 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               size="small"
               value={formData.colorSecundario}
               onChange={(e) => handleChange("colorSecundario", e.target.value)}
+              disabled={loading}
+              sx={{
+                '& input': {
+                  height: 40,
+                  cursor: 'pointer',
+                }
+              }}
             />
           </Grid>
 
@@ -195,10 +303,16 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               size="small"
               value={formData.colorAcento}
               onChange={(e) => handleChange("colorAcento", e.target.value)}
+              disabled={loading}
+              sx={{
+                '& input': {
+                  height: 40,
+                  cursor: 'pointer',
+                }
+              }}
             />
           </Grid>
 
-          {/* Admin */}
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
               Nombre del Administrador
@@ -208,6 +322,7 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               size="small"
               value={formData.adminNombre}
               onChange={(e) => handleChange("adminNombre", e.target.value)}
+              disabled={loading}
             />
           </Grid>
 
@@ -221,32 +336,31 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
               type="email"
               value={formData.adminEmail}
               onChange={(e) => handleChange("adminEmail", e.target.value)}
+              disabled={loading}
             />
           </Grid>
 
-          {/* Descripción */}
+          {/* Vista previa de colores */}
           <Grid item xs={12}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Descripción
+              Vista previa de colores
             </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              size="small"
-              value={formData.descripcion}
-              onChange={(e) => handleChange("descripcion", e.target.value)}
-            />
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, bgcolor: formData.colorPrimario, borderRadius: 1 }} />
+              <Box sx={{ width: 40, height: 40, bgcolor: formData.colorSecundario, borderRadius: 1 }} />
+              <Box sx={{ width: 40, height: 40, bgcolor: formData.colorAcento, borderRadius: 1 }} />
+            </Box>
           </Grid>
-
         </Grid>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, bgcolor: institutionalColors.background }}>
-        <Button
-          onClick={onClose}
-          variant="outlined"
+      <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
+
+      <DialogActions sx={{ px: 3, py: 2, bgcolor: institutionalColors.background }}>
+        <Button 
+          onClick={handleClose} 
           disabled={loading}
+          sx={{ color: institutionalColors.textSecondary }}
         >
           Cancelar
         </Button>
@@ -255,9 +369,27 @@ const EditInstanceDialog = ({ open, onClose, instance, onUpdated }) => {
           variant="contained"
           onClick={handleSave}
           disabled={loading}
-          sx={{ bgcolor: institutionalColors.primary }}
+          sx={{
+            px: 3,
+            borderRadius: 2,
+            bgcolor: institutionalColors.primary,
+            minWidth: 140,
+            '&:hover': { 
+              bgcolor: institutionalColors.secondary 
+            },
+            '&.Mui-disabled': {
+              bgcolor: alpha(institutionalColors.primary, 0.5),
+            }
+          }}
         >
-          {loading ? <CircularProgress size={20} color="inherit" /> : "Guardar Cambios"}
+          {loading ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={20} color="inherit" />
+              <Typography variant="button">Guardando...</Typography>
+            </Box>
+          ) : (
+            "Guardar Cambios"
+          )}
         </Button>
       </DialogActions>
     </Dialog>

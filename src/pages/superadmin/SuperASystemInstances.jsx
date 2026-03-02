@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -29,7 +29,10 @@ import {
   DialogActions,
   Alert,
   Snackbar,
+  LinearProgress,
+  Fade,
 } from "@mui/material";
+
 import {
   Search as SearchIcon,
   Add as AddIcon,
@@ -44,10 +47,16 @@ import {
   Person as PersonIcon,
   CalendarToday as CalendarIcon,
   Book as BookIcon,
+  Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import CreateInstanceDialog from "../../components/Instancias/CreateInstanceDialog";
 import ViewInstanceDialog from "../../components/Instancias/ViewInstanceDialog";
 import EditInstanceDialog from "../../components/Instancias/EditInstanceDialog";
+
+import { 
+  getInstancias, 
+  cambiarEstadoInstancia 
+} from "../../services/Instancia";
 
 // Colores institucionales
 const institutionalColors = {
@@ -74,6 +83,9 @@ const SystemInstances = () => {
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState(null);
+  const [systemInstances, setSystemInstances] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Estados para diálogos de confirmación
   const [openStatusDialog, setOpenStatusDialog] = useState(false);
@@ -83,153 +95,131 @@ const SystemInstances = () => {
   // Estado para notificaciones
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Datos de las instancias del sistema
-  const [systemInstances, setSystemInstances] = useState([
-    {
-      id: 1,
-      name: "Área de Ingeniería",
-      code: "ENG-001",
-      description: "Sistema de certificaciones para la Facultad de Ingeniería",
-      status: "active",
-      users: 245,
-      certifications: 15,
-      courses: 8,
-      colors: {
-        primary: institutionalColors.success,
-        secondary: "#4caf50",
-        accent: "#8bc34a",
-      },
-      created: "10/01/2024",
-      admin: "Dr. Carlos Méndez",
-      email: "carlos.mendez@institucion.edu",
-    },
-    {
-      id: 2,
-      name: "Área de Medicina",
-      code: "MED-001",
-      description: "Sistema para certificaciones médicas y especialidades",
-      status: "active",
-      users: 189,
-      certifications: 12,
-      courses: 6,
-      colors: {
-        primary: institutionalColors.primary,
-        secondary: "#2196f3",
-        accent: "#64b5f6",
-      },
-      created: "15/03/2024",
-      admin: "Dra. Ana López",
-      email: "ana.lopez@institucion.edu",
-    },
-    {
-      id: 3,
-      name: "Programa de Posgrado",
-      code: "POS-001",
-      description: "Gestión de certificaciones para programas de posgrado",
-      status: "active",
-      users: 78,
-      certifications: 8,
-      courses: 4,
-      colors: {
-        primary: "#4a148c",
-        secondary: "#7b1fa2",
-        accent: "#ba68c8",
-      },
-      created: "20/06/2024",
-      admin: "Mtro. Roberto Díaz",
-      email: "roberto.diaz@institucion.edu",
-    },
-    {
-      id: 4,
-      name: "Área de Derecho",
-      code: "LAW-001",
-      description: "Certificaciones y colegiaturas para abogados",
-      status: "inactive",
-      users: 156,
-      certifications: 10,
-      courses: 5,
-      colors: {
-        primary: "#bf360c",
-        secondary: "#e64a19",
-        accent: "#ff8a65",
-      },
-      created: "05/09/2024",
-      admin: "Lic. Fernando Gómez",
-      email: "fernando.gomez@institucion.edu",
-    },
-    {
-      id: 5,
-      name: "Campus Virtual",
-      code: "VIR-001",
-      description: "Plataforma de certificaciones en línea",
-      status: "active",
-      users: 342,
-      certifications: 20,
-      courses: 15,
-      colors: {
-        primary: "#00695c",
-        secondary: "#009688",
-        accent: "#4db6ac",
-      },
-      created: "12/11/2024",
-      admin: "Ing. Sofía Ramírez",
-      email: "sofia.ramirez@institucion.edu",
-    },
-    {
-      id: 6,
-      name: "Departamento de Ciencias",
-      code: "SCI-001",
-      description: "Certificaciones para ciencias básicas y aplicadas",
-      status: "active",
-      users: 198,
-      certifications: 14,
-      courses: 9,
-      colors: {
-        primary: "#827717",
-        secondary: "#9e9d24",
-        accent: "#cddc39",
-      },
-      created: "22/02/2024",
-      admin: "Dr. Miguel Ángel Ruiz",
-      email: "miguel.ruiz@institucion.edu",
-    },
-    {
-      id: 7,
-      name: "Programa de Extensión",
-      code: "EXT-001",
-      description: "Certificaciones para cursos de extensión universitaria",
-      status: "active",
-      users: 45,
-      certifications: 3,
-      courses: 2,
-      colors: {
-        primary: "#37474f",
-        secondary: "#546e7a",
-        accent: "#78909c",
-      },
-      created: "30/12/2024",
-      admin: "Lic. Patricia Castro",
-      email: "patricia.castro@institucion.edu",
-    },
-    {
-      id: 8,
-      name: "Área de Arquitectura",
-      code: "ARC-001",
-      description: "Sistema para colegiaturas y certificaciones profesionales",
-      status: "active",
-      users: 167,
-      certifications: 11,
-      courses: 7,
-      colors: {
-        primary: "#3e2723",
-        secondary: "#5d4037",
-        accent: "#8d6e63",
-      },
-      created: "18/07/2024",
-      admin: "Arq. Luis Fernando Morales",
-      email: "luis.morales@institucion.edu",
-    },
-  ]);
+  // Cargar instancias desde la base de datos
+  const loadInstancias = async (showRefreshing = false) => {
+    try {
+      if (showRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
+      const data = await getInstancias();
+
+      // Mapear backend → formato tabla
+      const mapped = data.map((instancia) => ({
+        id: instancia.id,
+        name: instancia.nombre,
+        code: instancia.codigo,
+        description: instancia.descripcion || "Sin descripción",
+        status: instancia.activa ? "active" : "inactive",
+        users: instancia.totalUsuarios || 0,
+        certifications: instancia.totalCertificaciones || 0,
+        courses: instancia.totalCursos || 0,
+        colors: {
+          primary: instancia.colorPrimario || institutionalColors.primary,
+          secondary: instancia.colorSecundario || institutionalColors.secondary,
+          accent: instancia.colorAcento || institutionalColors.accent,
+        },
+        created: instancia.fechaCreacion 
+          ? new Date(instancia.fechaCreacion).toLocaleDateString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })
+          : "-",
+        admin: instancia.adminNombre || "No asignado",
+        email: instancia.adminEmail || "Sin email",
+        // Guardar datos originales para edición
+        rawData: instancia
+      }));
+
+      setSystemInstances(mapped);
+
+      if (showRefreshing) {
+        setSnackbar({
+          open: true,
+          message: 'Instancias actualizadas correctamente',
+          severity: 'success'
+        });
+      }
+
+    } catch (error) {
+      console.error("Error cargando instancias:", error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || "Error al cargar las instancias",
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    loadInstancias();
+  }, []);
+
+  // Función para cambiar el estado de una instancia
+  const handleStatusChange = (instance, action) => {
+    setActionInstance(instance);
+    setStatusAction(action);
+    setOpenStatusDialog(true);
+  };
+
+  // Función para confirmar el cambio de estado (conectada a la BD)
+  const confirmStatusChange = async () => {
+    if (!actionInstance) return;
+
+    try {
+      const activa = statusAction === "activate";
+      
+      // Llamar al servicio para cambiar estado
+      await cambiarEstadoInstancia(actionInstance.id, activa);
+
+      // Mostrar notificación de éxito
+      setSnackbar({
+        open: true,
+        message: `Instancia ${activa ? "activada" : "desactivada"} correctamente`,
+        severity: "success",
+      });
+
+      // Recargar datos de la BD
+      await loadInstancias();
+
+    } catch (error) {
+      console.error("Error cambiando estado:", error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || "Error al cambiar el estado de la instancia",
+        severity: "error",
+      });
+    }
+
+    // Cerrar diálogo y limpiar estado
+    setOpenStatusDialog(false);
+    setActionInstance(null);
+    setStatusAction(null);
+  };
+
+  // Función para refrescar manualmente
+  const handleRefresh = () => {
+    loadInstancias(true);
+  };
+
+
+const handleCreated = useCallback(() => {
+  loadInstancias();
+  setOpenCreateDialog(false);
+}, []); // Dependencias vacías porque loadInstancias es estable
+
+  // Función para manejar edición exitosa
+  const handleUpdated = () => {
+    loadInstancias();
+    setOpenEditDialog(false);
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -261,39 +251,6 @@ const SystemInstances = () => {
     }
   };
 
-  // Función para cambiar el estado de una instancia
-  const handleStatusChange = (instance, action) => {
-    setActionInstance(instance);
-    setStatusAction(action);
-    setOpenStatusDialog(true);
-  };
-
-  // Función para confirmar el cambio de estado
-  const confirmStatusChange = () => {
-    if (actionInstance) {
-      setSystemInstances(prevInstances => 
-        prevInstances.map(instance => {
-          if (instance.id === actionInstance.id) {
-            const newStatus = statusAction === 'activate' ? 'active' : 'inactive';
-            return { ...instance, status: newStatus };
-          }
-          return instance;
-        })
-      );
-
-      const actionText = statusAction === 'activate' ? 'activada' : 'desactivada';
-      setSnackbar({
-        open: true,
-        message: `Instancia ${actionText} correctamente`,
-        severity: 'success'
-      });
-    }
-
-    setOpenStatusDialog(false);
-    setActionInstance(null);
-    setStatusAction(null);
-  };
-
   // Filtrar instancias según el tab seleccionado
   const getFilteredByTab = () => {
     switch (selectedTab) {
@@ -318,10 +275,6 @@ const SystemInstances = () => {
 
     return matchesSearch;
   });
-
-  const handleCreateInstance = () => {
-    setOpenCreateDialog(true);
-  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -384,11 +337,27 @@ const SystemInstances = () => {
           </Box>
 
           <Stack direction="row" spacing={1}>
+            <Tooltip title="Refrescar datos">
+              <IconButton 
+                onClick={handleRefresh} 
+                disabled={refreshing}
+                sx={{ 
+                  color: institutionalColors.primary,
+                  animation: refreshing ? 'spin 1s linear infinite' : 'none',
+                  '@keyframes spin': {
+                    '0%': { transform: 'rotate(0deg)' },
+                    '100%': { transform: 'rotate(360deg)' }
+                  }
+                }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               size="small"
-              onClick={handleCreateInstance}
+              onClick={() => setOpenCreateDialog(true)}
               sx={{
                 bgcolor: institutionalColors.primary,
                 '&:hover': { bgcolor: institutionalColors.secondary }
@@ -411,8 +380,34 @@ const SystemInstances = () => {
             display: "flex",
             flexDirection: "column",
             border: `1px solid #e5e7eb`,
+            position: 'relative',
           }}
         >
+          {/* Loading overlay */}
+          {(loading || refreshing) && (
+            <Fade in={loading || refreshing}>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  zIndex: 1000,
+                }}
+              >
+                <LinearProgress 
+                  sx={{ 
+                    height: 2,
+                    bgcolor: institutionalColors.lightBlue,
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: institutionalColors.primary,
+                    }
+                  }} 
+                />
+              </Box>
+            </Fade>
+          )}
+
           {/* Barra de herramientas con tabs y buscador al mismo nivel */}
           <Toolbar
             sx={{
@@ -452,7 +447,7 @@ const SystemInstances = () => {
             >
               <Tab 
                 icon={<DomainIcon sx={{ fontSize: 18 }} />} 
-                label="Todas" 
+                label={`Todas (${systemInstances.length})`}
                 iconPosition="start"
                 sx={{ 
                   '&.Mui-selected': { 
@@ -462,7 +457,7 @@ const SystemInstances = () => {
               />
               <Tab 
                 icon={<CheckCircleIcon sx={{ fontSize: 18 }} />} 
-                label="Activas" 
+                label={`Activas (${systemInstances.filter(i => i.status === 'active').length})`}
                 iconPosition="start"
                 sx={{ 
                   '&.Mui-selected': { 
@@ -472,7 +467,7 @@ const SystemInstances = () => {
               />
               <Tab 
                 icon={<ErrorIcon sx={{ fontSize: 18 }} />} 
-                label="Inactivas" 
+                label={`Inactivas (${systemInstances.filter(i => i.status === 'inactive').length})`}
                 iconPosition="start"
                 sx={{ 
                   '&.Mui-selected': { 
@@ -536,16 +531,16 @@ const SystemInstances = () => {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Instancia</TableCell>
-                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Estado</TableCell>
-                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Usuarios</TableCell>
-                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Certificaciones</TableCell>
-                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Administrador</TableCell>
-                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold' }}>Acciones</TableCell>
+                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold', width: '30%' }}>Instancia</TableCell>
+                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold', width: '15%' }}>Estado</TableCell>
+                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold', width: '10%' }}>Usuarios</TableCell>
+                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold', width: '10%' }}>Certificaciones</TableCell>
+                  <TableCell sx={{ color: institutionalColors.primary, fontWeight: 'bold', width: '20%' }}>Administrador</TableCell>
+                  <TableCell align="center" sx={{ color: institutionalColors.primary, fontWeight: 'bold', width: '15%' }}>Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredInstances
+                {!loading && filteredInstances
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((instance) => {
                     return (
@@ -568,7 +563,8 @@ const SystemInstances = () => {
                                 {instance.name}
                               </Typography>
                               <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
-                                {instance.code} • {instance.description}
+                                {instance.code} • {instance.description.substring(0, 30)}
+                                {instance.description.length > 30 ? '...' : ''}
                               </Typography>
                               <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }} display="block">
                                 <CalendarIcon
@@ -703,7 +699,7 @@ const SystemInstances = () => {
                     );
                   })}
 
-                {filteredInstances.length === 0 && (
+                {!loading && filteredInstances.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       <Box sx={{ textAlign: "center" }}>
@@ -728,12 +724,25 @@ const SystemInstances = () => {
                           <Button
                             variant="contained"
                             startIcon={<AddIcon />}
-                            onClick={handleCreateInstance}
+                            onClick={() => setOpenCreateDialog(true)}
                             sx={{ mt: 2, bgcolor: institutionalColors.primary }}
                           >
                             Crear Instancia
                           </Button>
                         )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {loading && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <LinearProgress sx={{ width: 200 }} />
+                        <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
+                          Cargando instancias...
+                        </Typography>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -773,10 +782,19 @@ const SystemInstances = () => {
         <DialogContent>
           <DialogContentText sx={{ color: institutionalColors.textSecondary }}>
             {`¿Estás seguro de que deseas ${statusAction === 'activate' ? 'activar' : 'desactivar'} la instancia "${actionInstance?.name}"?`}
+            <Box sx={{ mt: 2, p: 2, bgcolor: alpha(institutionalColors.warning, 0.1), borderRadius: 1 }}>
+              <Typography variant="caption" sx={{ color: institutionalColors.warning }}>
+                {statusAction === 'deactivate' 
+                  ? 'Al desactivar la instancia, los usuarios no podrán acceder a ella hasta que sea activada nuevamente.'
+                  : 'Al activar la instancia, los usuarios podrán acceder nuevamente a ella.'}
+              </Typography>
+            </Box>
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenStatusDialog(false)} sx={{ color: institutionalColors.textSecondary }}>Cancelar</Button>
+          <Button onClick={() => setOpenStatusDialog(false)} sx={{ color: institutionalColors.textSecondary }}>
+            Cancelar
+          </Button>
           <Button 
             onClick={confirmStatusChange} 
             variant="contained" 
@@ -799,15 +817,36 @@ const SystemInstances = () => {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
 
       {/* Diálogos */}
-      <CreateInstanceDialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} />
-      <ViewInstanceDialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} instance={selectedInstance} />
-      <EditInstanceDialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} instance={selectedInstance} />
+      <CreateInstanceDialog 
+        open={openCreateDialog} 
+        onClose={() => setOpenCreateDialog(false)}  
+        onCreated={handleCreated} 
+      />
+      
+      <ViewInstanceDialog 
+        open={openViewDialog} 
+        onClose={() => {
+          setOpenViewDialog(false);
+          setSelectedInstance(null);
+        }} 
+        instance={selectedInstance} 
+      />
+      
+      <EditInstanceDialog 
+        open={openEditDialog} 
+        onClose={() => {
+          setOpenEditDialog(false);
+          setSelectedInstance(null);
+        }} 
+        instance={selectedInstance}  
+        onUpdated={handleUpdated} 
+      />
     </Box>
   );
 };
