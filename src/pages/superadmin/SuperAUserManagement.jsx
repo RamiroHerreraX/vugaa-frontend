@@ -5,6 +5,8 @@ import {
   Paper,
   Typography,
   Grid,
+  Card,
+  CardContent,
   TextField,
   Button,
   Chip,
@@ -23,6 +25,7 @@ import {
   Stack,
   InputAdornment,
   Avatar,
+  Badge,
   Tooltip,
   Switch,
   FormControlLabel,
@@ -35,16 +38,26 @@ import {
   Select
 } from '@mui/material';
 import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
   Search as SearchIcon,
+  FilterList as FilterIcon,
+  MoreVert as MoreVertIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
+  Visibility as VisibilityIcon,
+  Mail as MailIcon,
   Phone as PhoneIcon,
+  LocationOn as LocationIcon,
   Security as SecurityIcon,
   Refresh as RefreshIcon,
+  Download as DownloadIcon,
   Group as GroupIcon,
   PersonAdd as PersonAddIcon,
   Business as BusinessIcon
 } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 
 // Colores institucionales
 const institutionalColors = {

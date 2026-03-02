@@ -29,16 +29,9 @@ const institutionalColors = {
   error: '#e74c3c',
   info: '#3498db',
 };
-
 const ViewInstanceDialog = ({ open, onClose, instance }) => {
 
   if (!instance) return null;
-
-  const estadoColor = {
-    active: "success",
-    inactive: "default",
-    suspended: "error"
-  };
 
   return (
     <Dialog
@@ -59,7 +52,6 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
       <DialogTitle sx={{ bgcolor: institutionalColors.background }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <Avatar
-            src={instance.logoUrl}
             sx={{
               bgcolor: instance.colorPrimario || institutionalColors.primary,
               width: 50,
@@ -88,41 +80,24 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
         </Stack>
       </DialogTitle>
 
-
-      {/* CONTENT */}
-      <DialogContent
-        dividers
-        sx={{
-          borderColor: institutionalColors.lightBlue,
-          p: 3
-        }}
-      >
+      <DialogContent dividers sx={{ p: 3 }}>
 
         <Grid container spacing={3}>
 
-          {/* ESTADO */}
+          {/* ACTIVA */}
           <Grid item xs={12}>
-            <Stack direction="row" spacing={1}>
-              <Chip
-                label={instance.estado || "active"}
-                color={estadoColor[instance.estado] || "default"}
-                variant="outlined"
-              />
-
-              <Chip
-                label={instance.activa ? "Activa" : "Inactiva"}
-                sx={{
-                  bgcolor: instance.activa
-                    ? `${institutionalColors.success}15`
-                    : `${institutionalColors.textSecondary}15`,
-                  color: instance.activa
-                    ? institutionalColors.success
-                    : institutionalColors.textSecondary,
-                }}
-              />
-            </Stack>
+            <Chip
+              label={instance.activa ? "Activa" : "Inactiva"}
+              sx={{
+                bgcolor: instance.activa
+                  ? `${institutionalColors.success}15`
+                  : `${institutionalColors.textSecondary}15`,
+                color: instance.activa
+                  ? institutionalColors.success
+                  : institutionalColors.textSecondary,
+              }}
+            />
           </Grid>
-
 
           {/* DESCRIPCIÓN */}
           <Grid item xs={12}>
@@ -130,19 +105,16 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
               Descripción
             </Typography>
 
-            <Typography color="text.primary">
+            <Typography>
               {instance.descripcion || "Sin descripción"}
             </Typography>
           </Grid>
-
 
           <Grid item xs={12}>
             <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
           </Grid>
 
-
-          {/* INFORMACIÓN GENERAL (2 COLUMNAS REALES) */}
-
+          {/* ADMIN */}
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" color="text.secondary">
               Administrador
@@ -153,7 +125,6 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
             </Typography>
           </Grid>
 
-
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" color="text.secondary">
               Email Administrador
@@ -163,7 +134,6 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
               {instance.adminEmail || "No asignado"}
             </Typography>
           </Grid>
-
 
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" color="text.secondary">
@@ -177,31 +147,25 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
             </Typography>
           </Grid>
 
-
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" color="text.secondary">
-              Logo URL
+              Última actualización
             </Typography>
 
             <Typography>
-              {instance.logoUrl || "No asignado"}
+              {instance.fechaActualizacion
+                ? new Date(instance.fechaActualizacion).toLocaleString()
+                : "No disponible"}
             </Typography>
           </Grid>
-
 
           <Grid item xs={12}>
             <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
           </Grid>
 
-
           {/* COLORES */}
-
           <Grid item xs={12}>
-            <Typography
-              variant="subtitle2"
-              color="text.secondary"
-              sx={{ mb: 1 }}
-            >
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
               Colores del Sistema
             </Typography>
 
@@ -209,106 +173,59 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
 
               <Grid item>
                 <Typography variant="caption">Primario</Typography>
-
-                <Box
-                  sx={{
-                    width: 60,
-                    height: 25,
-                    bgcolor:
-                      instance.colorPrimario ||
-                      institutionalColors.primary,
-                    borderRadius: 1,
-                    border: `1px solid ${institutionalColors.lightBlue}`,
-                  }}
-                />
+                <Box sx={{
+                  width: 60,
+                  height: 25,
+                  bgcolor: instance.colorPrimario || institutionalColors.primary,
+                  borderRadius: 1,
+                }} />
               </Grid>
-
 
               <Grid item>
                 <Typography variant="caption">Secundario</Typography>
-
-                <Box
-                  sx={{
-                    width: 60,
-                    height: 25,
-                    bgcolor:
-                      instance.colorSecundario ||
-                      institutionalColors.secondary,
-                    borderRadius: 1,
-                    border: `1px solid ${institutionalColors.lightBlue}`,
-                  }}
-                />
+                <Box sx={{
+                  width: 60,
+                  height: 25,
+                  bgcolor: instance.colorSecundario || institutionalColors.secondary,
+                  borderRadius: 1,
+                }} />
               </Grid>
-
 
               <Grid item>
                 <Typography variant="caption">Acento</Typography>
-
-                <Box
-                  sx={{
-                    width: 60,
-                    height: 25,
-                    bgcolor:
-                      instance.colorAcento ||
-                      institutionalColors.success,
-                    borderRadius: 1,
-                    border: `1px solid ${institutionalColors.lightBlue}`,
-                  }}
-                />
+                <Box sx={{
+                  width: 60,
+                  height: 25,
+                  bgcolor: instance.colorAcento || institutionalColors.success,
+                  borderRadius: 1,
+                }} />
               </Grid>
 
             </Grid>
-
           </Grid>
-
 
           <Grid item xs={12}>
             <Divider sx={{ borderColor: institutionalColors.lightBlue }} />
           </Grid>
 
-
-          {/* ESTADÍSTICAS (OCUPAN TODO EL ANCHO) */}
-
+          {/* ESTADÍSTICAS */}
           <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Usuarios
-            </Typography>
-
-            <Typography
-              variant="h5"
-              fontWeight={700}
-              color={institutionalColors.primary}
-            >
+            <Typography variant="subtitle2">Usuarios</Typography>
+            <Typography variant="h5" fontWeight={700}>
               {instance.totalUsuarios || 0}
             </Typography>
           </Grid>
 
-
           <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Certificaciones
-            </Typography>
-
-            <Typography
-              variant="h5"
-              fontWeight={700}
-              color={institutionalColors.primary}
-            >
+            <Typography variant="subtitle2">Certificaciones</Typography>
+            <Typography variant="h5" fontWeight={700}>
               {instance.totalCertificaciones || 0}
             </Typography>
           </Grid>
 
-
           <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Cursos
-            </Typography>
-
-            <Typography
-              variant="h5"
-              fontWeight={700}
-              color={institutionalColors.primary}
-            >
+            <Typography variant="subtitle2">Cursos</Typography>
+            <Typography variant="h5" fontWeight={700}>
               {instance.totalCursos || 0}
             </Typography>
           </Grid>
@@ -317,25 +234,11 @@ const ViewInstanceDialog = ({ open, onClose, instance }) => {
 
       </DialogContent>
 
-
-      {/* FOOTER */}
-
-      <DialogActions
-        sx={{
-          p: 2,
-          bgcolor: institutionalColors.background
-        }}
-      >
+      <DialogActions sx={{ p: 2, bgcolor: institutionalColors.background }}>
         <Button
           variant="contained"
           onClick={onClose}
-          sx={{
-            bgcolor: institutionalColors.primary,
-            px: 4,
-            '&:hover': {
-              bgcolor: institutionalColors.secondary,
-            }
-          }}
+          sx={{ bgcolor: institutionalColors.primary }}
         >
           Cerrar
         </Button>

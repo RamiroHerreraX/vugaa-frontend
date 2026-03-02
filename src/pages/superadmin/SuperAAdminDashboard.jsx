@@ -48,7 +48,6 @@ const institutionalColors = {
 };
 
 const SystemInstancesDashboard = () => {
-  const [timeFilter, setTimeFilter] = useState("24h");
 
   // Estadísticas de las instancias - Ampliado a 6 cards
   const systemStats = [

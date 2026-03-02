@@ -93,7 +93,6 @@ const InstanceReports = () => {
   const [reportType, setReportType] = useState("performance");
   const [dateRange, setDateRange] = useState("month");
   const [instanceFilter, setInstanceFilter] = useState("all");
-  const [activePieIndex, setActivePieIndex] = useState(0);
 
   // Estados individuales para cada gráfica
   const [showLineChart, setShowLineChart] = useState(true);
