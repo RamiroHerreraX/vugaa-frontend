@@ -35,13 +35,20 @@ import SuperAAlerts from "./pages/superadmin/SuperAAlerts";
 
 // Páginas de Admin
 import AdminDashboard from "./pages/admin/Dashboard";
+import SystemConfig from './pages/admin/SystemConfig';
+import AdminProfile from './pages/admin/AdminProfile';
+import ConfigExpediente from './pages/admin/ConfigExpediente';
+import GeneralAlerts from './pages/admin/GeneralAlerts';
+import Reports from './pages/admin/Reports';
+import UserManagement from './pages/admin/UserManagement';
+import UserReview from './pages/admin/UserReview';
 
 // Páginas de Comité
 import CommitteeDashboard from "./pages/committee/Dashboard";
 import PendingReviews from "./pages/committee/PendingReviews";
 
 // Páginas de Usuario
-import UserDashboard from "./pages/user/Dashboard";
+import UserDashboard from "./pages/agente/dashboard/Dashboard";
 
 // Componente protegido
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -117,13 +124,20 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <AdminLayout />
                 </ProtectedRoute>
               }
             >
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/config_expedientes" element={<ConfigExpediente />} />
+              <Route path="/admin/alerts" element={<GeneralAlerts />} />
+              <Route path="/admin/reports" element={<Reports />} />
+              <Route path="/admin/users" element={<UserManagement />} />
+              <Route path="/admin/users/:id/review" element={<UserReview />} />
+              <Route path="/admin/config" element={<SystemConfig />} />
+              <Route path="/admin/profile" element={<AdminProfile />} />
             </Route>
 
             {/* Rutas protegidas - Comité */}
