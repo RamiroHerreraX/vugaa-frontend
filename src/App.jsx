@@ -49,7 +49,7 @@ import CommitteeDashboard from "./pages/committee/Dashboard";
 import PendingReviews from "./pages/committee/PendingReviews";
 
 // Páginas de Usuario
-import UserDashboard from "./pages/agente/Dashboard";
+import UserDashboard from "./pages/agente/dashboard/Dashboard";
 
 // Componente protegido
 import ProtectedRoute from "./components/ProtectedRoute";
