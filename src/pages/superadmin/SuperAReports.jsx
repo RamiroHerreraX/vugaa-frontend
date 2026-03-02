@@ -388,10 +388,6 @@ const InstanceReports = () => {
     });
   };
 
-  const onPieEnter = (_, index) => {
-    setActivePieIndex(index);
-  };
-
   // Funciones para toggle individual
   const toggleLineChart = () => {
     setShowLineChart(!showLineChart);
@@ -1062,6 +1058,7 @@ const InstanceReports = () => {
         </Grid>
       </Grid>
 
+<br />
       {/* TABLA DE INSTANCIAS */}
       <Paper
         sx={{
