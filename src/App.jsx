@@ -47,8 +47,15 @@ import UserReview from './pages/admin/UserReview';
 import CommitteeDashboard from "./pages/committee/Dashboard";
 import PendingReviews from "./pages/committee/PendingReviews";
 
-// Páginas de Usuario
+// Páginas de Usuario agente
 import UserDashboard from "./pages/agente/dashboard/Dashboard";
+import Certifications from "./pages/agente/certifications/Certifications";
+import Declaraciones from "./pages/agente/expediente/Declaraciones";
+import Notificaciones from "./pages/agente/notifications/AlertsAgent";
+import Expediente from "./pages/agente/expediente/Expediente";
+import Profile from "./pages/agente/profile/Profile_agent";
+import AuditAgent from './pages/agente/auditoria/AuditAgent';
+
 
 // Componente protegido
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -184,6 +191,14 @@ function App() {
               }
             >
               <Route index element={<UserDashboard />} />
+              <Route path="dashboard" element={<UserDashboard />} />
+              <Route path="notificaciones" element={<Notificaciones />} />
+              <Route path="certificaciones" element={<Certifications />} />
+              <Route path="declaraciones" element={<Declaraciones />} />
+              <Route path="expediente" element={<Expediente />} />
+              <Route path="perfil" element={<Profile />} />
+              <Route path="auditoria-agente" element={<AuditAgent />} />
+
             </Route>
 
             {/* Ruta por defecto */}
