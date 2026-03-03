@@ -1,9 +1,6 @@
-// src/services/usuarioService.js
 import API from './api';
 
 class UsuarioService {
-  // ============= MÉTODOS EXISTENTES (para CRUD normal) =============
-  
   async findAll() {
     try {
       const response = await API.get('/usuarios');
@@ -26,6 +23,7 @@ class UsuarioService {
 
   async create(usuarioDTO) {
     try {
+      console.log('Creando usuario con datos:', JSON.stringify(usuarioDTO));
       const response = await API.post('/usuarios', usuarioDTO);
       return response.data;
     } catch (error) {
@@ -36,6 +34,7 @@ class UsuarioService {
 
   async update(id, usuarioDTO) {
     try {
+      console.log(`Actualizando usuario ID ${id}:`, JSON.stringify(usuarioDTO));
       const response = await API.put(`/usuarios/${id}`, usuarioDTO);
       return response.data;
     } catch (error) {
@@ -56,8 +55,6 @@ class UsuarioService {
     }
   }
 
-  // ============= MÉTODOS PARA LA TABLA PRINCIPAL =============
-
   async findAllForTable() {
     try {
       const response = await API.get('/usuarios/tabla');
@@ -70,70 +67,50 @@ class UsuarioService {
 
   async findByIdForTable(id) {
     try {
-      const response = await API.get(`/usuarios/tabla/${id}`);
+      const response = await API.get(`/usuarios/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error en findByIdForTable:', error);
-      throw error.response?.data || { error: 'Usuario no encontrado en tabla' };
+      throw error.response?.data || { error: 'Usuario no encontrado' };
     }
   }
 
-  // ============= MÉTODOS DE UTILIDAD =============
-
   formatUltimoAcceso(ultimoAcceso) {
     if (!ultimoAcceso) return 'Nunca';
-    
     try {
       const fecha = new Date(ultimoAcceso);
       const ahora = new Date();
       const diffHoras = Math.floor((ahora - fecha) / (1000 * 60 * 60));
-      
-      if (diffHoras < 24) {
-        if (diffHoras < 1) {
-          const diffMinutos = Math.floor((ahora - fecha) / (1000 * 60));
-          return diffMinutos < 1 ? 'Hace unos segundos' : `Hace ${diffMinutos} minutos`;
-        }
-        return `Hace ${diffHoras} horas`;
-      } else if (diffHoras < 48) {
-        return 'Ayer';
-      } else {
-        return fecha.toLocaleDateString('es-ES', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+      if (diffHoras < 1) {
+        const diffMinutos = Math.floor((ahora - fecha) / (1000 * 60));
+        return diffMinutos < 1 ? 'Hace unos segundos' : `Hace ${diffMinutos} minutos`;
       }
-    } catch (error) {
-      console.error('Error formateando fecha:', error);
+      if (diffHoras < 24) return `Hace ${diffHoras} horas`;
+      if (diffHoras < 48) return 'Ayer';
+      return fecha.toLocaleDateString('es-ES', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch {
       return 'Fecha inválida';
     }
   }
 
   getEstadoClass(estado) {
-    switch(estado?.toLowerCase()) {
-      case 'activo':
-        return 'badge-success';
-      case 'inactivo':
-        return 'badge-warning';
-      case 'bloqueado':
-        return 'badge-danger';
-      default:
-        return 'badge-secondary';
+    switch (estado?.toLowerCase()) {
+      case 'activo': return 'badge-success';
+      case 'inactivo': return 'badge-warning';
+      case 'bloqueado': return 'badge-danger';
+      default: return 'badge-secondary';
     }
   }
 
   getEstadoTexto(estado) {
-    switch(estado?.toLowerCase()) {
-      case 'activo':
-        return 'Activo';
-      case 'inactivo':
-        return 'Inactivo';
-      case 'bloqueado':
-        return 'Bloqueado';
-      default:
-        return 'Desconocido';
+    switch (estado?.toLowerCase()) {
+      case 'activo': return 'Activo';
+      case 'inactivo': return 'Inactivo';
+      case 'bloqueado': return 'Bloqueado';
+      default: return 'Desconocido';
     }
   }
 }

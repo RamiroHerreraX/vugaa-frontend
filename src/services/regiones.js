@@ -4,226 +4,237 @@ import API from './api';
 class RegionesService {
   // ============ OPERACIONES CRUD BÁSICAS ============
 
+  /**
+   * Obtiene todas las regiones
+   * @returns {Promise<Array>} Lista de regiones
+   */
   async findAll() {
     try {
       const response = await API.get('/regiones');
-      return response.data;
+      // Mapear la respuesta para asegurar consistencia
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return data.map(region => this.normalizarRegion(region));
+      }
+      return data;
     } catch (error) {
+      console.error('Error en findAll:', error);
       throw error.response?.data || { error: 'Error al obtener regiones' };
     }
   }
 
+  /**
+   * Obtiene una región por su ID
+   * @param {number} id - ID de la región
+   * @returns {Promise<Object>} Región encontrada
+   */
   async findById(id) {
     try {
-      const response = await API.get(`/regiones/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Región no encontrada' };
-    }
-  }
-
-  async create(regionesDTO) {
-    try {
-      const response = await API.post('/regiones', regionesDTO);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al crear la región' };
-    }
-  }
-
-  async update(id, regionesDTO) {
-    try {
-      const response = await API.put(`/regiones/${id}`, regionesDTO);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al actualizar la región' };
-    }
-  }
-
-  async deleteById(id) {
-    try {
-      const response = await API.delete(`/regiones/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al eliminar la región' };
-    }
-  }
-
-  async deleteAll() {
-    try {
-      const response = await API.delete('/regiones');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al eliminar todas las regiones' };
-    }
-  }
-
-  // ============ ENDPOINTS POR INSTANCIA ============
-
-  async findByInstanciaId(idInstancia) {
-    try {
-      const response = await API.get(`/regiones/instancia/${idInstancia}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones por instancia' };
-    }
-  }
-
-  async findByInstanciaIdAndActivas(idInstancia) {
-    try {
-      const response = await API.get(`/regiones/instancia/${idInstancia}/activas`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones activas por instancia' };
-    }
-  }
-
-  async countByInstanciaId(idInstancia) {
-    try {
-      const response = await API.get(`/regiones/instancia/${idInstancia}/count`);
-      return response.data.total;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al contar regiones por instancia' };
-    }
-  }
-
-  async existsByInstanciaIdAndNombre(idInstancia, nombre) {
-    try {
-      const response = await API.get(`/regiones/instancia/${idInstancia}/exists`, {
-        params: { nombre }
-      });
-      return response.data.exists;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al verificar existencia de región' };
-    }
-  }
-
-  async deleteByInstanciaId(idInstancia) {
-    try {
-      const response = await API.delete(`/regiones/instancia/${idInstancia}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al eliminar regiones por instancia' };
-    }
-  }
-
-  // ============ ENDPOINTS POR NOMBRE DE INSTANCIA ============
-
-  async findByNombreInstancia(nombreInstancia) {
-    try {
-      const response = await API.get(`/regiones/instancia/nombre/${encodeURIComponent(nombreInstancia)}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones por nombre de instancia' };
-    }
-  }
-
-  async findByNombreInstanciaAndActivas(nombreInstancia) {
-    try {
-      const response = await API.get(`/regiones/instancia/nombre/${encodeURIComponent(nombreInstancia)}/activas`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones activas por nombre de instancia' };
-    }
-  }
-
-  // ============ ENDPOINTS POR PROPIEDADES DE REGIONES ============
-
-  async findByActivas() {
-    try {
-      const response = await API.get('/regiones/activas');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones activas' };
-    }
-  }
-
-  async findByNombreContaining(nombre) {
-    try {
-      const response = await API.get('/regiones/buscar', {
-        params: { nombre }
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al buscar regiones por nombre' };
-    }
-  }
-
-  async findByNombreIgnoreCase(nombre) {
-    try {
-      const response = await API.get(`/regiones/nombre/${encodeURIComponent(nombre)}`);
-      return response.data;
+      const numericId = Number(id);
+      if (isNaN(numericId)) {
+        throw new Error('ID inválido');
+      }
+      
+      const response = await API.get(`/regiones/${numericId}`);
+      return this.normalizarRegion(response.data);
     } catch (error) {
       if (error.response?.status === 404) {
         return null;
       }
-      throw error.response?.data || { error: 'Error al buscar región por nombre' };
+      console.error('Error en findById:', error);
+      throw error.response?.data || { error: 'Error al buscar la región' };
     }
   }
 
-  async findByPais(pais) {
+  /**
+   * Obtiene todas las regiones activas de una instancia específica
+   * @param {number} idInstancia - ID de la instancia
+   * @returns {Promise<Array>} Lista de regiones activas de la instancia
+   */
+  async findActivasByInstanciaId(idInstancia) {
     try {
-      const response = await API.get(`/regiones/pais/${encodeURIComponent(pais)}`);
+      const numericId = Number(idInstancia);
+      if (isNaN(numericId)) {
+        throw new Error('ID de instancia inválido');
+      }
+
+      console.log(`Obteniendo regiones activas para instancia ID: ${numericId}`);
+      const response = await API.get(`/regiones/instancia/${numericId}/activas`);
+      
+      // Mapear la respuesta para asegurar consistencia
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return data.map(region => this.normalizarRegion(region));
+      }
+      return data;
+    } catch (error) {
+      console.error('Error en findActivasByInstanciaId:', error);
+      throw error.response?.data || { error: 'Error al obtener regiones activas de la instancia' };
+    }
+  }
+
+  /**
+   * Normaliza una región para usar siempre idRegion
+   * @param {Object} region - Región del backend
+   * @returns {Object} Región normalizada
+   */
+  normalizarRegion(region) {
+    if (!region) return null;
+    
+    return {
+      idRegion: region.idRegion,           // Mantener el nombre original
+      id: region.idRegion,                  // Alias para compatibilidad
+      idInstancia: region.idInstancia,
+      nombreInstancia: region.nombreInstancia,
+      nombre: region.nombre,
+      estado: region.estado,
+      pais: region.pais,
+      activa: region.activa
+    };
+  }
+
+  /**
+   * Prepara una región para enviar al backend
+   * @param {Object} region - Región del frontend
+   * @returns {Object} Región para el backend
+   */
+  prepararParaBackend(region) {
+    return {
+      idRegion: region.idRegion || region.id,  // Usar idRegion si existe, o id como fallback
+      idInstancia: Number(region.idInstancia) || 1,
+      nombre: region.nombre,
+      estado: region.estado || null,
+      pais: region.pais || 'México',
+      activa: region.activa !== undefined ? region.activa : true
+    };
+  }
+
+  /**
+   * Crea una nueva región
+   * @param {Object} regionData - Datos de la región a crear
+   * @returns {Promise<Object>} Región creada
+   */
+  async create(regionData) {
+    try {
+      const payload = this.prepararParaBackend(regionData);
+      // No enviar idRegion para creación
+      delete payload.idRegion;
+      
+      console.log('Creando región con payload:', payload);
+      const response = await API.post('/regiones', payload);
+      return this.normalizarRegion(response.data);
+    } catch (error) {
+      console.error('Error en create:', error);
+      throw error.response?.data || { error: 'Error al crear la región' };
+    }
+  }
+
+  /**
+   * Actualiza una región existente
+   * @param {number} id - ID de la región a actualizar
+   * @param {Object} regionData - Datos actualizados de la región
+   * @returns {Promise<Object>} Región actualizada
+   */
+  async update(id, regionData) {
+    try {
+      const numericId = Number(id);
+      if (isNaN(numericId)) {
+        throw new Error('ID inválido');
+      }
+
+      const payload = this.prepararParaBackend({
+        ...regionData,
+        idRegion: numericId
+      });
+
+      console.log(`Actualizando región ${numericId} con payload:`, payload);
+      const response = await API.put(`/regiones/${numericId}`, payload);
+      return this.normalizarRegion(response.data);
+    } catch (error) {
+      console.error('Error en update:', error);
+      throw error.response?.data || { error: 'Error al actualizar la región' };
+    }
+  }
+
+  /**
+   * Cambia el estado activo/inactivo de una región
+   * @param {number} id - ID de la región
+   * @param {boolean} activo - true para activar, false para desactivar
+   * @returns {Promise<Object>} Objeto con mensaje y región actualizada
+   */
+  async cambiarEstadoActivo(id, activo) {
+    try {
+      const numericId = Number(id);
+      if (isNaN(numericId)) {
+        throw new Error('ID inválido');
+      }
+
+      console.log(`Cambiando estado de región ${numericId} a ${activo}`);
+      const response = await API.patch(`/regiones/${numericId}/estado`, null, {
+        params: { activo: Boolean(activo) }
+      });
+      
+      // Normalizar la respuesta
+      if (response.data.region) {
+        response.data.region = this.normalizarRegion(response.data.region);
+      } else {
+        response.data = this.normalizarRegion(response.data);
+      }
+      
       return response.data;
     } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones por país' };
+      console.error('Error en cambiarEstadoActivo:', error);
+      throw error.response?.data || { error: 'Error al cambiar el estado de la región' };
     }
   }
 
-  async findByEstado(estado) {
+  /**
+   * Busca una región por nombre exacto (ignore case)
+   * @param {string} nombre - Nombre de la región
+   * @returns {Promise<Object|null>} Región encontrada o null
+   */
+  async findByNombreIgnoreCase(nombre) {
     try {
-      const response = await API.get(`/regiones/estado/${encodeURIComponent(estado)}`);
-      return response.data;
+      if (!nombre || nombre.length < 3) return null;
+      
+      const response = await API.get(`/regiones/nombre/${encodeURIComponent(nombre)}`);
+      return this.normalizarRegion(response.data);
     } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones por estado' };
+      if (error.response?.status === 404) {
+        return null;
+      }
+      console.error('Error en findByNombreIgnoreCase:', error);
+      return null;
     }
   }
 
-  async findByPaisAndActivas(pais) {
+  /**
+   * Verifica si existe una región por su ID
+   * @param {number} id - ID de la región
+   * @returns {Promise<boolean>} true si existe, false si no
+   */
+  async existsById(id) {
     try {
-      const response = await API.get(`/regiones/pais/${encodeURIComponent(pais)}/activas`);
-      return response.data;
+      const numericId = Number(id);
+      if (isNaN(numericId)) {
+        return false;
+      }
+      const response = await API.get(`/regiones/${numericId}/exists`);
+      return response.data.exists;
     } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones activas por país' };
+      console.error('Error en existsById:', error);
+      return false;
     }
   }
 
-  async findByEstadoAndActivas(estado) {
-    try {
-      const response = await API.get(`/regiones/estado/${encodeURIComponent(estado)}/activas`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al obtener regiones activas por estado' };
-    }
-  }
-
-  // ============ ENDPOINTS ADICIONALES ============
+  // ============ MÉTODOS DE CONVENIENCIA ============
 
   async activarRegion(id) {
-    try {
-      const response = await API.patch(`/regiones/${id}/activar`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al activar la región' };
-    }
+    return this.cambiarEstadoActivo(id, true);
   }
 
   async desactivarRegion(id) {
-    try {
-      const response = await API.patch(`/regiones/${id}/desactivar`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al desactivar la región' };
-    }
-  }
-
-  async existsById(id) {
-    try {
-      const response = await API.get(`/regiones/${id}/exists`);
-      return response.data.exists;
-    } catch (error) {
-      throw error.response?.data || { error: 'Error al verificar existencia de región' };
-    }
+    return this.cambiarEstadoActivo(id, false);
   }
 }
 

@@ -69,6 +69,7 @@ import {
 
 import rolService from '../../services/rol';
 import asociacionService from '../../services/asociacion';
+import regionesService from '../../services/regiones';
 
 // Paleta corporativa (del prototipo)
 const colors = {
@@ -148,6 +149,27 @@ const SystemConfig = () => {
     const [savingAsociacion, setSavingAsociacion] = useState(false);
     const [togglingAsociacion, setTogglingAsociacion] = useState(null);
 
+    // ── Estado Regiones ─────────────────────────────────────────────────────
+    const [regiones, setRegiones] = useState([]);
+    const [loadingRegiones, setLoadingRegiones] = useState(false);
+    const [errorRegiones, setErrorRegiones] = useState(null);
+    const [regionFilter, setRegionFilter] = useState('todos');
+    const [searchRegiones, setSearchRegiones] = useState('');
+    
+    const [regionDialogOpen, setRegionDialogOpen] = useState(false);
+    const [editingRegion, setEditingRegion] = useState(null);
+    const [regionForm, setRegionForm] = useState({ 
+        nombre: '', 
+        pais: 'Chile', 
+        estado: '', 
+        activa: true,
+        idInstancia: 1 
+    });
+    const [savingRegion, setSavingRegion] = useState(false);
+    const [togglingRegion, setTogglingRegion] = useState(null);
+    const [checkingRegionNombre, setCheckingRegionNombre] = useState(false);
+    const [regionNombreExists, setRegionNombreExists] = useState(false);
+
     // ── Config General ──────────────────────────────────────────────────────
     const [config, setConfig] = useState({
         systemName: 'SICAG',
@@ -174,6 +196,7 @@ const SystemConfig = () => {
     useEffect(() => {
         fetchRoles();
         fetchAsociaciones();
+        fetchRegiones(); // Cargar regiones
     }, []);
 
     // ══════════════════════════════════════════════════════════════════════
@@ -437,7 +460,8 @@ const SystemConfig = () => {
         if (!window.confirm(`¿Está seguro de ${accion} la asociación "${asociacion.nombre}"?`)) return;
         setTogglingAsociacion(id);
         try {
-            const result = await asociacionService.changeEstado(id, nuevoEstado);
+            // Usar el método unificado cambiarEstadoActivo
+            const result = await asociacionService.cambiarEstadoActivo(id, nuevoEstado);
             const updatedData = result?.asociacion || result;
             setAsociaciones(prev =>
                 prev.map(a =>
@@ -474,6 +498,222 @@ const SystemConfig = () => {
             return matchSearch && matchFilter;
         })
         .sort((a, b) => a.idAsociacion - b.idAsociacion);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // REGIONES - VERSIÓN CORREGIDA (SIN ELIMINAR)
+    // ══════════════════════════════════════════════════════════════════════
+    const fetchRegiones = async () => {
+        setLoadingRegiones(true);
+        setErrorRegiones(null);
+        try {
+            // Usar el método findAll del servicio de regiones
+            const data = await regionesService.findAll();
+            const regionesArray = Array.isArray(data) ? data : [];
+            const sorted = regionesArray.sort((a, b) => a.id - b.id);
+            setRegiones(sorted);
+        } catch (error) {
+            console.error('Error al cargar regiones:', error);
+            const errorMessage = error?.error || error?.message || 'No se pudieron cargar las regiones';
+            setErrorRegiones(errorMessage);
+            notify(errorMessage, 'error');
+        } finally {
+            setLoadingRegiones(false);
+        }
+    };
+
+    // Debounce: verificar nombre duplicado de región
+    useEffect(() => {
+        const check = async () => {
+            if (!regionForm.nombre || regionForm.nombre.length < 3) {
+                setRegionNombreExists(false);
+                return;
+            }
+            setCheckingRegionNombre(true);
+            try {
+                // Para edición, necesitamos verificar si el nombre ya existe excluyendo el ID actual
+                // Como no tenemos un método específico, podemos buscar por nombre y comparar IDs
+                if (editingRegion) {
+                    try {
+                        const existingRegion = await regionesService.findByNombreIgnoreCase(regionForm.nombre);
+                        setRegionNombreExists(existingRegion !== null && existingRegion.id !== editingRegion.id);
+                    } catch {
+                        setRegionNombreExists(false);
+                    }
+                } else {
+                    // Para creación nueva, verificamos si existe
+                    try {
+                        const existingRegion = await regionesService.findByNombreIgnoreCase(regionForm.nombre);
+                        setRegionNombreExists(existingRegion !== null);
+                    } catch {
+                        setRegionNombreExists(false);
+                    }
+                }
+            } catch (error) {
+                console.error('Error verificando nombre de región:', error);
+                setRegionNombreExists(false);
+            } finally {
+                setCheckingRegionNombre(false);
+            }
+        };
+        const t = setTimeout(check, 500);
+        return () => clearTimeout(t);
+    }, [regionForm.nombre, editingRegion]);
+
+    const filteredRegiones = regiones
+        .filter(region => {
+            const matchSearch = 
+                region.nombre?.toLowerCase().includes(searchRegiones.toLowerCase()) ||
+                (region.pais?.toLowerCase() || '').includes(searchRegiones.toLowerCase()) ||
+                (region.estado?.toLowerCase() || '').includes(searchRegiones.toLowerCase());
+            const matchFilter =
+                regionFilter === 'todos' ? true :
+                    regionFilter === 'activos' ? region.activa === true :
+                        region.activa === false;
+            return matchSearch && matchFilter;
+        })
+        .sort((a, b) => a.id - b.id);
+
+    const handleOpenRegionDialog = (region = null) => {
+        setEditingRegion(region);
+        setRegionForm({
+            nombre: region?.nombre || '',
+            pais: region?.pais || 'Chile',
+            estado: region?.estado || '',
+            activa: region?.activa !== undefined ? region.activa : true,
+            idInstancia: region?.idInstancia || 1
+        });
+        setRegionNombreExists(false);
+        setRegionDialogOpen(true);
+    };
+
+    const handleCloseRegionDialog = () => {
+        if (savingRegion) return;
+        setRegionDialogOpen(false);
+        setEditingRegion(null);
+        setRegionForm({ 
+            nombre: '', 
+            pais: 'Chile', 
+            estado: '', 
+            activa: true,
+            idInstancia: 1 
+        });
+        setRegionNombreExists(false);
+        setSavingRegion(false);
+    };
+
+    const handleRegionFormChange = (field) => (event) => {
+        setRegionForm(prev => ({ ...prev, [field]: event.target.value }));
+    };
+
+    const handleSaveRegion = async () => {
+        if (!regionForm.nombre.trim()) {
+            notify('El nombre de la región es obligatorio', 'error');
+            return;
+        }
+        if (!regionForm.pais.trim()) {
+            notify('El país es obligatorio', 'error');
+            return;
+        }
+        if (regionNombreExists) {
+            notify('Ya existe una región con este nombre', 'error');
+            return;
+        }
+
+        setSavingRegion(true);
+        try {
+            if (editingRegion) {
+                // Actualizar región existente
+                const payload = {
+                    nombre: regionForm.nombre.trim(),
+                    pais: regionForm.pais.trim(),
+                    estado: regionForm.estado.trim() || null,
+                    activa: regionForm.activa,
+                    idInstancia: regionForm.idInstancia
+                };
+                const updatedRegion = await regionesService.update(editingRegion.id, payload);
+                setRegiones(prev =>
+                    prev.map(r => r.id === editingRegion.id
+                        ? { ...r, ...updatedRegion }
+                        : r
+                    ).sort((a, b) => a.id - b.id)
+                );
+                notify('Región actualizada exitosamente');
+            } else {
+                // Crear nueva región
+                const payload = {
+                    nombre: regionForm.nombre.trim(),
+                    pais: regionForm.pais.trim(),
+                    estado: regionForm.estado.trim() || null,
+                    activa: regionForm.activa,
+                    idInstancia: regionForm.idInstancia
+                };
+                const newRegion = await regionesService.create(payload);
+                setRegiones(prev =>
+                    [...prev, newRegion].sort((a, b) => a.id - b.id)
+                );
+                notify('Región creada exitosamente');
+            }
+            handleCloseRegionDialog();
+        } catch (error) {
+            console.error('Error al guardar región:', error);
+            let errorMessage = 'Error al guardar la región';
+            if (error) {
+                if (typeof error === 'string') errorMessage = error;
+                else if (error.message) errorMessage = error.message;
+                else if (error.mensaje) errorMessage = error.mensaje;
+                else if (error.error) errorMessage = error.error;
+            }
+            const errorLower = errorMessage.toLowerCase();
+            if (
+                errorMessage.includes('400') ||
+                errorLower.includes('ya existe') ||
+                errorLower.includes('duplicate') ||
+                errorLower.includes('unique') ||
+                errorLower.includes('nombre ya registrado') ||
+                errorLower.includes('already exists') ||
+                errorLower.includes('conflicto')
+            ) {
+                notify('Ya existe una región con este nombre', 'error');
+            } else {
+                notify(errorMessage, 'error');
+            }
+        } finally {
+            setSavingRegion(false);
+        }
+    };
+
+    const handleToggleRegionStatus = async (id) => {
+        const region = regiones.find(r => r.id === id);
+        if (!region) return;
+        const nuevoEstado = !region.activa;
+        const accion = nuevoEstado ? 'activar' : 'desactivar';
+        if (!window.confirm(`¿Está seguro de ${accion} la región "${region.nombre}"?`)) return;
+        
+        setTogglingRegion(id);
+        try {
+            // Usar el método unificado cambiarEstadoActivo
+            const result = await regionesService.cambiarEstadoActivo(id, nuevoEstado);
+            // La respuesta contiene { mensaje, region }
+            const regionActualizada = result.region;
+            
+            setRegiones(prev =>
+                prev.map(r => r.id === id ? { ...r, ...regionActualizada, activa: nuevoEstado } : r)
+            );
+            notify(result.mensaje || `Región ${nuevoEstado ? 'activada' : 'desactivada'} correctamente`);
+        } catch (error) {
+            console.error('Error al cambiar estado de región:', error);
+            let errorMessage = 'Error al cambiar el estado de la región';
+            if (error) {
+                if (typeof error === 'string') errorMessage = error;
+                else if (error.message) errorMessage = error.message;
+                else if (error.mensaje) errorMessage = error.mensaje;
+                else if (error.error) errorMessage = error.error;
+            }
+            notify(errorMessage, 'error');
+        } finally {
+            setTogglingRegion(null);
+        }
+    };
 
     // ══════════════════════════════════════════════════════════════════════
     // CONFIG GENERAL
@@ -933,15 +1173,196 @@ const SystemConfig = () => {
                             </Box>
                         )}
 
-                        {/* TAB 3: Regiones */}
+                        {/* TAB 3: Regiones - COMPLETADO Y CORREGIDO (SIN ELIMINAR) */}
                         {activeTab === 3 && (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>
-                                    Módulo de Regiones
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>
-                                    Contenido en desarrollo
-                                </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        {['todos', 'activos', 'inactivos'].map(f => (
+                                            <Chip
+                                                key={f}
+                                                label={f.charAt(0).toUpperCase() + f.slice(1)}
+                                                variant={regionFilter === f ? 'filled' : 'outlined'}
+                                                onClick={() => setRegionFilter(f)}
+                                                clickable
+                                                size="small"
+                                                sx={regionFilter === f ? {
+                                                    bgcolor: f === 'activos' ? colors.secondary.main :
+                                                        f === 'inactivos' ? colors.primary.dark : colors.primary.main,
+                                                    color: 'white',
+                                                    cursor: 'pointer'
+                                                } : {
+                                                    borderColor: f === 'activos' ? colors.secondary.main :
+                                                        f === 'inactivos' ? colors.primary.dark : colors.primary.main,
+                                                    color: f === 'activos' ? colors.secondary.main :
+                                                        f === 'inactivos' ? colors.primary.dark : colors.primary.main,
+                                                    cursor: 'pointer'
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+                                            Total: {filteredRegiones.length}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+                                            Activas: {regiones.filter(r => r.activa).length}
+                                        </Typography>
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<AddIcon />}
+                                            onClick={() => handleOpenRegionDialog()}
+                                            size="small"
+                                            sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
+                                        >
+                                            Nueva Región
+                                        </Button>
+                                    </Box>
+                                </Box>
+
+                                <TextField
+                                    placeholder="Buscar región por nombre, país o estado..."
+                                    value={searchRegiones}
+                                    onChange={e => setSearchRegiones(e.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon sx={{ color: colors.primary.main }} />
+                                            </InputAdornment>
+                                        ),
+                                        endAdornment: searchRegiones && (
+                                            <InputAdornment position="end">
+                                                <IconButton size="small" onClick={() => setSearchRegiones('')}>
+                                                    <CloseIcon fontSize="small" sx={{ color: colors.primary.main }} />
+                                                </IconButton>
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                    size="small"
+                                    sx={{
+                                        maxWidth: 500,
+                                        '& .MuiOutlinedInput-root': {
+                                            '&.Mui-focused fieldset': { borderColor: colors.primary.main }
+                                        }
+                                    }}
+                                />
+
+                                <TableContainer sx={{ border: `1px solid ${colors.primary.light}`, borderRadius: 1 }}>
+                                    <Table stickyHeader size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '25%' }}>Nombre</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>País</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Estado/Provincia</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '12%' }} align="center">Estatus</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '18%' }} align="center">Acciones</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {loadingRegiones ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                        <CircularProgress size={30} sx={{ color: colors.primary.main }} />
+                                                        <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>
+                                                            Cargando regiones...
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : errorRegiones ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                        <Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>
+                                                            {errorRegiones}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : filteredRegiones.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+                                                            No se encontraron regiones
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                filteredRegiones.map(region => (
+                                                    <TableRow
+                                                        key={region.id}
+                                                        hover
+                                                        sx={{
+                                                            '&:hover': { bgcolor: '#f8f9fa' },
+                                                            opacity: !region.activa ? 0.7 : 1,
+                                                            backgroundColor: !region.activa ? '#fff5f5' : 'inherit'
+                                                        }}
+                                                    >
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                                                {region.id}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
+                                                                {region.nombre}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                                                {region.pais || 'No especificado'}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                                                {region.estado || 'No especificado'}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell align="center">
+                                                            <Chip
+                                                                label={region.activa ? 'ACTIVA' : 'INACTIVA'}
+                                                                size="small"
+                                                                sx={{
+                                                                    bgcolor: region.activa ? colors.secondary.main : colors.primary.dark,
+                                                                    color: 'white',
+                                                                    fontWeight: 600,
+                                                                    minWidth: 80
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell align="center">
+                                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                                <Tooltip title="Editar región">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        sx={{ color: colors.accents.blue }}
+                                                                        onClick={() => handleOpenRegionDialog(region)}
+                                                                        disabled={togglingRegion === region.id}
+                                                                    >
+                                                                        <EditIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                                <Tooltip title={region.activa ? 'Desactivar' : 'Activar'}>
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        sx={{ color: region.activa ? colors.semaforo.rojo : colors.secondary.main }}
+                                                                        onClick={() => handleToggleRegionStatus(region.id)}
+                                                                        disabled={togglingRegion === region.id}
+                                                                    >
+                                                                        {togglingRegion === region.id
+                                                                            ? <CircularProgress size={16} sx={{ color: colors.primary.main }} />
+                                                                            : region.activa
+                                                                                ? <BlockIcon fontSize="small" />
+                                                                                : <CheckCircleIcon fontSize="small" />
+                                                                        }
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </Stack>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
                             </Box>
                         )}
 
@@ -1511,6 +1932,131 @@ const SystemConfig = () => {
                         sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
                     >
                         {editingRol ? 'Actualizar' : 'Crear'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Diálogo de Regiones (CORREGIDO, SIN OPCIÓN DE ELIMINAR) ── */}
+            <Dialog
+                open={regionDialogOpen}
+                onClose={handleCloseRegionDialog}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 2 } }}
+            >
+                <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.light}` }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PublicIcon sx={{ color: colors.primary.main }} />
+                        <Typography variant="h6" sx={{ color: colors.primary.dark }}>
+                            {editingRegion ? 'Editar Región' : 'Nueva Región'}
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField
+                            fullWidth
+                            label="Nombre de la Región"
+                            value={regionForm.nombre}
+                            onChange={handleRegionFormChange('nombre')}
+                            required
+                            error={regionNombreExists}
+                            helperText={regionNombreExists ? 'Este nombre ya existe' : checkingRegionNombre ? 'Verificando...' : ''}
+                            disabled={savingRegion}
+                            size="small"
+                            sx={{
+                                '& .MuiInputLabel-root': { color: colors.text.secondary },
+                                '& .MuiOutlinedInput-root': {
+                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
+                                }
+                            }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="País"
+                            value={regionForm.pais}
+                            onChange={handleRegionFormChange('pais')}
+                            required
+                            placeholder="Ej: Chile, Argentina, Perú..."
+                            disabled={savingRegion}
+                            size="small"
+                            sx={{
+                                '& .MuiInputLabel-root': { color: colors.text.secondary },
+                                '& .MuiOutlinedInput-root': {
+                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
+                                }
+                            }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Estado / Provincia"
+                            value={regionForm.estado}
+                            onChange={handleRegionFormChange('estado')}
+                            placeholder="Ej: Región Metropolitana, Provincia de Buenos Aires..."
+                            disabled={savingRegion}
+                            size="small"
+                            sx={{
+                                '& .MuiInputLabel-root': { color: colors.text.secondary },
+                                '& .MuiOutlinedInput-root': {
+                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
+                                }
+                            }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={regionForm.activa}
+                                    onChange={handleRegionFormChange('activa')}
+                                    disabled={savingRegion}
+                                    size="small"
+                                    sx={{
+                                        '& .MuiSwitch-switchBase.Mui-checked': {
+                                            color: colors.secondary.main,
+                                            '&:hover': { backgroundColor: '#e8f5e9' },
+                                        },
+                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                            backgroundColor: colors.secondary.main,
+                                        },
+                                    }}
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                    Región Activa
+                                </Typography>
+                            }
+                        />
+                        <Box sx={{ mt: 1, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: `1px solid ${colors.primary.light}` }}>
+                            <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <InfoIcon sx={{ fontSize: 16, color: colors.accents.blue }} />
+                                Las regiones no se eliminan, solo se activan o desactivan
+                            </Typography>
+                            {editingRegion && (
+                                <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
+                                    El estado activo/inactivo también puede cambiarse desde la tabla
+                                </Typography>
+                            )}
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: `1px solid ${colors.primary.light}` }}>
+                    <Button
+                        onClick={handleCloseRegionDialog}
+                        disabled={savingRegion}
+                        sx={{ color: colors.text.secondary }}
+                        size="small"
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={handleSaveRegion}
+                        variant="contained"
+                        disabled={!regionForm.nombre.trim() || !regionForm.pais.trim() || regionNombreExists || checkingRegionNombre || savingRegion}
+                        startIcon={savingRegion ? <CircularProgress size={18} sx={{ color: 'white' }} /> : null}
+                        size="small"
+                        sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
+                    >
+                        {savingRegion ? 'Guardando...' : (editingRegion ? 'Actualizar' : 'Crear')}
                     </Button>
                 </DialogActions>
             </Dialog>
