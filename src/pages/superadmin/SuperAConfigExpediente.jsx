@@ -5,7 +5,6 @@ import {
   Typography,
   Card,
   CardContent,
-  TextField,
   Button,
   Switch,
   FormControlLabel,
@@ -15,13 +14,11 @@ import {
   ListItem,
   ListItemIcon,
   ListItemSecondaryAction,
-  MenuItem,
   Stack,
   Tooltip,
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  InputAdornment,
 } from '@mui/material';
 import {
   Add as AddIcon,
