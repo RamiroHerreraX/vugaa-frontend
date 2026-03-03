@@ -18,3 +18,6 @@ export const getCertificaciones = async (expedienteId) => {
     throw error.response?.data || { mensaje: 'Error al obtener certificaciones' };
   }
 };
+
+
+

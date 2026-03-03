@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,175 +13,228 @@ import {
   Typography,
   MenuItem,
   InputAdornment,
-} from '@mui/material';
-import { Edit as EditIcon } from '@mui/icons-material';
+  CircularProgress,
+} from "@mui/material";
+import { Edit as EditIcon } from "@mui/icons-material";
+import { editarDocumento } from "../../services/documentoExpediente";
 
 const institutionalColors = {
-  primary: '#133B6B',
-  secondary: '#1a4c7a',
-  warning: '#f39c12',
-  info: '#3498db',
-  textPrimary: '#2c3e50',
-  textSecondary: '#7f8c8d',
-  background: '#f5f7fa',
+  primary: "#133B6B",
+  secondary: "#1a4c7a",
+  warning: "#f39c12",
+  textPrimary: "#2c3e50",
+  textSecondary: "#7f8c8d",
 };
 
-const formatOptions = ['PDF', 'JPG', 'PNG', 'DOC', 'DOCX', 'XLS', 'XLSX', 'TXT'];
-const sizeOptions = ['1MB', '5MB', '10MB', '25MB', '50MB', '100MB'];
+const estadosOptions = ["PENDIENTE", "EN_REVISION", "APROBADO", "RECHAZADO"];
 
-const EditDocumentDialog = ({ open, onClose, onSave, categoryId, document }) => {
-  const [editedDocument, setEditedDocument] = useState(null);
+const EditDocumentDialog = ({
+  open,
+  onClose,
+  onUpdated, // 🔥 para refrescar lista
+  documento,
+  expedienteId,
+  apartadoId,
+  instanciaId,
+}) => {
+  const [editedDocumento, setEditedDocumento] = useState(null);
+  const [requiereHoras, setRequiereHoras] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (document) {
-      setEditedDocument({ ...document });
+    if (documento) {
+      setEditedDocumento({ ...documento });
+      setRequiereHoras(documento.horasRequeridas > 0);
     }
-  }, [document]);
+  }, [documento]);
 
-  if (!editedDocument) return null;
+  if (!editedDocumento) return null;
+
+  const handleUpdate = async () => {
+    if (!editedDocumento.nombreArchivo) return;
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        ...editedDocumento,
+        horasRequeridas: requiereHoras
+          ? editedDocumento.horasRequeridas
+          : 0,
+        expediente: { idExpediente: expedienteId },
+        apartado: apartadoId ? { idApartado: apartadoId } : null,
+        instancia: { idInstancia: instanciaId },
+      };
+
+      await editarDocumento(editedDocumento.idDocumento, payload);
+
+      if (onUpdated) onUpdated(); // 🔥 refresca lista
+      onClose();
+    } catch (error) {
+      console.error("Error al actualizar documento:", error);
+      alert("Error al actualizar el documento");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="sm" 
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: '12px' } }}
+      PaperProps={{ sx: { borderRadius: "12px" } }}
     >
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <EditIcon sx={{ color: institutionalColors.primary }} />
-          <Typography variant="h6" sx={{ color: institutionalColors.textPrimary }}>
+          <Typography variant="h6">
             Editar Documento
           </Typography>
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          {/* Nombre */}
           <TextField
             fullWidth
-            label="Nombre del Documento *"
-            value={editedDocument.name}
-            onChange={(e) => setEditedDocument({...editedDocument, name: e.target.value})}
+            label="Nombre del Archivo *"
+            value={editedDocumento.nombreArchivo}
+            onChange={(e) =>
+              setEditedDocumento({
+                ...editedDocumento,
+                nombreArchivo: e.target.value,
+              })
+            }
           />
-          
+
+          {/* Switch requiere horas */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={requiereHoras}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setRequiereHoras(checked);
+
+                  if (!checked) {
+                    setEditedDocumento({
+                      ...editedDocumento,
+                      horasRequeridas: 0,
+                    });
+                  }
+                }}
+              />
+            }
+            label="¿Requiere cumplir horas?"
+          />
+
+          {/* Campo horas */}
+          {requiereHoras && (
+            <TextField
+              fullWidth
+              type="number"
+              label="Horas Requeridas"
+              value={editedDocumento.horasRequeridas || 0}
+              onChange={(e) =>
+                setEditedDocumento({
+                  ...editedDocumento,
+                  horasRequeridas: parseInt(e.target.value) || 0,
+                })
+              }
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">hrs</InputAdornment>
+                ),
+              }}
+            />
+          )}
+
+          {/* Periodo revisión */}
           <TextField
             fullWidth
-            label="Descripción"
+            type="number"
+            label="Periodo de Revisión"
+            value={editedDocumento.periodoRevision || 0}
+            onChange={(e) =>
+              setEditedDocumento({
+                ...editedDocumento,
+                periodoRevision: parseInt(e.target.value) || 0,
+              })
+            }
+            helperText="Días (0 = sin revisión)"
+          />
+
+          {/* Estado */}
+          <TextField
+            fullWidth
+            select
+            label="Estado"
+            value={editedDocumento.estado || "PENDIENTE"}
+            onChange={(e) =>
+              setEditedDocumento({
+                ...editedDocumento,
+                estado: e.target.value,
+              })
+            }
+          >
+            {estadosOptions.map((estado) => (
+              <MenuItem key={estado} value={estado}>
+                {estado}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {/* Observaciones */}
+          <TextField
+            fullWidth
             multiline
             rows={2}
-            value={editedDocument.description}
-            onChange={(e) => setEditedDocument({...editedDocument, description: e.target.value})}
+            label="Observaciones"
+            value={editedDocumento.observaciones || ""}
+            onChange={(e) =>
+              setEditedDocumento({
+                ...editedDocumento,
+                observaciones: e.target.value,
+              })
+            }
           />
-          
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              fullWidth
-              select
-              label="Formato"
-              value={editedDocument.format}
-              onChange={(e) => setEditedDocument({...editedDocument, format: e.target.value})}
-            >
-              {formatOptions.map(format => (
-                <MenuItem key={format} value={format}>{format}</MenuItem>
-              ))}
-            </TextField>
-            
-            <TextField
-              fullWidth
-              select
-              label="Tamaño Máximo"
-              value={editedDocument.maxSize}
-              onChange={(e) => setEditedDocument({...editedDocument, maxSize: e.target.value})}
-            >
-              {sizeOptions.map(size => (
-                <MenuItem key={size} value={size}>{size}</MenuItem>
-              ))}
-            </TextField>
-          </Box>
-          
-          <TextField
-            fullWidth
-            label="Revisión Periódica"
-            value={editedDocument.periodicReview}
-            onChange={(e) => setEditedDocument({...editedDocument, periodicReview: e.target.value})}
-            InputProps={{
-              endAdornment: <InputAdornment position="end">días</InputAdornment>,
-            }}
+
+          {/* Requiere validación */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={editedDocumento.requiereValidacion || false}
+                onChange={(e) =>
+                  setEditedDocumento({
+                    ...editedDocumento,
+                    requiereValidacion: e.target.checked,
+                  })
+                }
+              />
+            }
+            label="Requiere Validación"
           />
-          
-          <TextField
-            fullWidth
-            label="Validación Requerida"
-            value={editedDocument.validation}
-            onChange={(e) => setEditedDocument({...editedDocument, validation: e.target.value})}
-          />
-          
-          <TextField
-            fullWidth
-            label="Etiquetas"
-            value={editedDocument.tags?.join(', ') || ''}
-            onChange={(e) => setEditedDocument({...editedDocument, tags: e.target.value.split(',').map(t => t.trim())})}
-            helperText="Separar por comas"
-          />
-          
-          <TextField
-            fullWidth
-            label="Orden"
-            type="number"
-            value={editedDocument.order}
-            onChange={(e) => setEditedDocument({...editedDocument, order: parseInt(e.target.value)})}
-          />
-          
-          <Stack spacing={1}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={editedDocument.required}
-                  onChange={(e) => setEditedDocument({...editedDocument, required: e.target.checked})}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: institutionalColors.primary,
-                    }
-                  }}
-                />
-              }
-              label="Documento Obligatorio"
-            />
-            
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={editedDocument.committeeReview}
-                  onChange={(e) => setEditedDocument({...editedDocument, committeeReview: e.target.checked})}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: institutionalColors.warning,
-                    }
-                  }}
-                />
-              }
-              label="Requiere revisión por comité"
-            />
-          </Stack>
         </Stack>
       </DialogContent>
-      
+
       <DialogActions>
-        <Button onClick={onClose} sx={{ color: institutionalColors.textSecondary }}>
+        <Button onClick={onClose}>
           Cancelar
         </Button>
-        <Button 
-          onClick={() => onSave(categoryId, editedDocument)} 
+
+        <Button
+          onClick={handleUpdate}
           variant="contained"
-          disabled={!editedDocument.name}
-          sx={{
-            bgcolor: institutionalColors.primary,
-            '&:hover': { bgcolor: institutionalColors.secondary }
-          }}
+          disabled={!editedDocumento.nombreArchivo || loading}
         >
-          Guardar Cambios
+          {loading ? (
+            <CircularProgress size={22} />
+          ) : (
+            "Guardar Cambios"
+          )}
         </Button>
       </DialogActions>
     </Dialog>

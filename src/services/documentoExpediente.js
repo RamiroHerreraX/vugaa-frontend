@@ -48,3 +48,8 @@ export const getDocumentosPorInstancia = async (idInstancia) => {
 export const eliminarDocumento = async (idDocumento) => {
   await API.delete(`${ENDPOINT}/${idDocumento}`);
 };
+
+export const crearDocumentoPlantilla = async (data) => {
+  const response = await API.post(`${ENDPOINT}/plantilla`,data);
+  return response.data;
+};

@@ -32,3 +32,19 @@ export const getApartadosPorInstancia = async (idInstancia) => {
 export const desactivarApartado = async (id) => {
   await API.delete(`${ENDPOINT}/${id}`);
 };
+
+// ========================================
+// 🔹 LISTAR TODOS (SIN INSTANCIA)
+// ========================================
+export const getTodosApartados = async () => {
+  const response = await API.get(ENDPOINT); // ✅ coincide con backend
+  return response.data;
+};
+
+// ========================================
+// 🔹 CREAR GLOBAL (SIN INSTANCIA)
+// ========================================
+export const crearApartadoGlobal = async (data) => {
+  const response = await API.post(`${ENDPOINT}/global`, data);
+  return response.data;
+};

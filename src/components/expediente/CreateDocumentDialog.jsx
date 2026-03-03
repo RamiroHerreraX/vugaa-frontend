@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,206 +13,258 @@ import {
   Typography,
   MenuItem,
   InputAdornment,
-} from '@mui/material';
-import { Description as DescriptionIcon } from '@mui/icons-material';
+  CircularProgress,
+  Alert,
+} from "@mui/material";
+import { Description as DescriptionIcon } from "@mui/icons-material";
+import { crearDocumentoPlantilla } from "../../services/documentoExpediente";
 
 const institutionalColors = {
-  primary: '#133B6B',
-  secondary: '#1a4c7a',
-  warning: '#f39c12',
-  info: '#3498db',
-  textPrimary: '#2c3e50',
-  textSecondary: '#7f8c8d',
-  background: '#f5f7fa',
+  primary: "#133B6B",
+  secondary: "#1a4c7a",
+  warning: "#f39c12",
+  textPrimary: "#2c3e50",
+  textSecondary: "#7f8c8d",
 };
 
-const formatOptions = ['PDF', 'JPG', 'PNG', 'DOC', 'DOCX', 'XLS', 'XLSX', 'TXT'];
-const sizeOptions = ['1MB', '5MB', '10MB', '25MB', '50MB', '100MB'];
+const estadosOptions = ["PENDIENTE", "EN_REVISION", "APROBADO", "RECHAZADO"];
 
-const CreateDocumentDialog = ({ open, onClose, onSave, categoryId }) => {
-  const [document, setDocument] = useState({
-    id: Date.now(),
-    name: '',
-    description: '',
-    required: false,
-    format: 'PDF',
-    maxSize: '5MB',
-    validation: '',
-    tags: [],
-    order: 1,
-    periodicReview: '0',
-    committeeReview: false,
-    reviewDescription: ''
+const CreateDocumentDialog = ({
+  open,
+  onClose,
+  onSuccess,
+  apartadoId,
+  apartado,
+}) => {
+  const pendingSuccess = useRef(null); // Guardamos resultado mientras se cierra el modal
+
+  const [requiereHoras, setRequiereHoras] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [documento, setDocumento] = useState({
+    nombreArchivo: "",
+    horasRequeridas: 0,
+    periodoRevision: 0,
+    requiereValidacion: false,
+    observaciones: "",
+    estado: "PENDIENTE",
   });
 
+  // Resetear formulario cuando se abre
   useEffect(() => {
     if (open) {
-      setDocument({
-        id: Date.now(),
-        name: '',
-        description: '',
-        required: false,
-        format: 'PDF',
-        maxSize: '5MB',
-        validation: '',
-        tags: [],
-        order: 1,
-        periodicReview: '0',
-        committeeReview: false,
-        reviewDescription: ''
+      setRequiereHoras(false);
+      setDocumento({
+        nombreArchivo: "",
+        horasRequeridas: 0,
+        periodoRevision: 0,
+        requiereValidacion: false,
+        observaciones: "",
+        estado: "PENDIENTE",
       });
+      setError(null);
     }
   }, [open]);
 
-  const handleSave = () => {
-    if (!document.name) return;
-    onSave(categoryId, document);
+  const handleClose = () => {
+    onClose(); // Cerramos modal inmediatamente
+  };
+
+  const handleSave = async () => {
+    if (!documento.nombreArchivo?.trim()) {
+      setError("El nombre del archivo es requerido");
+      return;
+    }
+
+    if (!apartadoId) {
+      setError("No se puede crear el documento: falta ID de apartado.");
+      console.log(apartadoId);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload = {
+        nombreArchivo: documento.nombreArchivo,
+        horas_requeridas: requiereHoras ? documento.horasRequeridas : 0,
+        periodo_revision: documento.periodoRevision,
+        requiere_validacion: documento.requiereValidacion,
+        observaciones: documento.observaciones || "",
+        estado: documento.estado,
+        id_apartado: apartadoId,
+
+        fecha_carga: new Date().toISOString(), // Aseguramos fecha si el backend lo requiere
+      };
+      console.log(payload)
+      const response = await crearDocumentoPlantilla(payload);
+
+      // Guardamos el resultado mientras el modal se cierra
+      pendingSuccess.current = {
+        id_documento: response.id_documento || response.id,
+        ...payload,
+      };
+
+      // Cerramos modal
+      handleClose();
+    } catch (err) {
+      console.error("Error al crear documento:", err);
+      setError(err.response?.data?.message || "Error al crear el documento");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="sm" 
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: '12px' } }}
+      PaperProps={{ sx: { borderRadius: "12px" } }}
+      disableEscapeKeyDown={loading}
+      TransitionProps={{
+        onExited: () => {
+          // Ejecutamos onSuccess después de cerrar el modal
+          if (pendingSuccess.current && onSuccess) {
+            onSuccess(apartadoId, pendingSuccess.current);
+            pendingSuccess.current = null;
+          }
+        },
+      }}
     >
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <DescriptionIcon sx={{ color: institutionalColors.primary }} />
-          <Typography variant="h6" sx={{ color: institutionalColors.textPrimary }}>
-            Nuevo Documento
-          </Typography>
+          <Typography variant="h6">Nuevo Documento</Typography>
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          {error && <Alert severity="error">{error}</Alert>}
+
           <TextField
             fullWidth
-            label="Nombre del Documento *"
-            value={document.name}
-            onChange={(e) => setDocument({...document, name: e.target.value})}
+            label="Nombre del Archivo *"
+            value={documento.nombreArchivo}
+            onChange={(e) =>
+              setDocumento({ ...documento, nombreArchivo: e.target.value })
+            }
+            error={!documento.nombreArchivo && error}
+            helperText={
+              !documento.nombreArchivo && error ? "Campo requerido" : ""
+            }
           />
-          
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={requiereHoras}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setRequiereHoras(checked);
+                  if (!checked)
+                    setDocumento({ ...documento, horasRequeridas: 0 });
+                }}
+              />
+            }
+            label="¿Requiere cumplir horas?"
+          />
+
+          {requiereHoras && (
+            <TextField
+              fullWidth
+              type="number"
+              label="Horas Requeridas"
+              value={documento.horasRequeridas}
+              onChange={(e) =>
+                setDocumento({
+                  ...documento,
+                  horasRequeridas: parseInt(e.target.value) || 0,
+                })
+              }
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">hrs</InputAdornment>
+                ),
+              }}
+            />
+          )}
+
           <TextField
             fullWidth
-            label="Descripción"
+            type="number"
+            label="Periodo de Revisión"
+            value={documento.periodoRevision}
+            onChange={(e) =>
+              setDocumento({
+                ...documento,
+                periodoRevision: parseInt(e.target.value) || 0,
+              })
+            }
+            helperText="Días (0 = sin revisión)"
+          />
+
+          <TextField
+            fullWidth
+            select
+            label="Estado"
+            value={documento.estado}
+            onChange={(e) =>
+              setDocumento({ ...documento, estado: e.target.value })
+            }
+          >
+            {estadosOptions.map((estado) => (
+              <MenuItem key={estado} value={estado}>
+                {estado}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            fullWidth
             multiline
             rows={2}
-            value={document.description}
-            onChange={(e) => setDocument({...document, description: e.target.value})}
+            label="Observaciones"
+            value={documento.observaciones}
+            onChange={(e) =>
+              setDocumento({ ...documento, observaciones: e.target.value })
+            }
           />
-          
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              fullWidth
-              select
-              label="Formato"
-              value={document.format}
-              onChange={(e) => setDocument({...document, format: e.target.value})}
-            >
-              {formatOptions.map(format => (
-                <MenuItem key={format} value={format}>{format}</MenuItem>
-              ))}
-            </TextField>
-            
-            <TextField
-              fullWidth
-              select
-              label="Tamaño Máximo"
-              value={document.maxSize}
-              onChange={(e) => setDocument({...document, maxSize: e.target.value})}
-            >
-              {sizeOptions.map(size => (
-                <MenuItem key={size} value={size}>{size}</MenuItem>
-              ))}
-            </TextField>
-          </Box>
-          
-          <TextField
-            fullWidth
-            label="Revisión Periódica"
-            value={document.periodicReview}
-            onChange={(e) => setDocument({...document, periodicReview: e.target.value})}
-            helperText="Ej: 30, 90, 180, 365, 730 días (0 = sin revisión)"
-            InputProps={{
-              endAdornment: <InputAdornment position="end">días</InputAdornment>,
-            }}
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={documento.requiereValidacion}
+                onChange={(e) =>
+                  setDocumento({
+                    ...documento,
+                    requiereValidacion: e.target.checked,
+                  })
+                }
+              />
+            }
+            label="Requiere Validación"
           />
-          
-          <TextField
-            fullWidth
-            label="Validación Requerida"
-            value={document.validation}
-            onChange={(e) => setDocument({...document, validation: e.target.value})}
-            helperText="Ej: OCR, Vigencia, Firma, etc."
-          />
-          
-          <TextField
-            fullWidth
-            label="Etiquetas"
-            value={document.tags?.join(', ') || ''}
-            onChange={(e) => setDocument({...document, tags: e.target.value.split(',').map(t => t.trim())})}
-            helperText="Separar por comas"
-          />
-          
-          <TextField
-            fullWidth
-            label="Orden"
-            type="number"
-            value={document.order}
-            onChange={(e) => setDocument({...document, order: parseInt(e.target.value)})}
-          />
-          
-          <Stack spacing={1}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={document.required}
-                  onChange={(e) => setDocument({...document, required: e.target.checked})}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: institutionalColors.primary,
-                    }
-                  }}
-                />
-              }
-              label="Documento Obligatorio"
-            />
-            
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={document.committeeReview}
-                  onChange={(e) => setDocument({...document, committeeReview: e.target.checked})}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: institutionalColors.warning,
-                    }
-                  }}
-                />
-              }
-              label="Requiere revisión por comité"
-            />
-          </Stack>
         </Stack>
       </DialogContent>
-      
+
       <DialogActions>
-        <Button onClick={onClose} sx={{ color: institutionalColors.textSecondary }}>
+        <Button onClick={handleClose} disabled={loading}>
           Cancelar
         </Button>
-        <Button 
-          onClick={handleSave} 
+        <Button
+          onClick={handleSave}
           variant="contained"
-          disabled={!document.name}
+          disabled={!documento.nombreArchivo?.trim() || loading}
           sx={{
             bgcolor: institutionalColors.primary,
-            '&:hover': { bgcolor: institutionalColors.secondary }
+            "&:hover": { bgcolor: institutionalColors.secondary },
           }}
         >
-          Crear Documento
+          {loading ? <CircularProgress size={24} /> : "Crear Documento"}
         </Button>
       </DialogActions>
     </Dialog>
