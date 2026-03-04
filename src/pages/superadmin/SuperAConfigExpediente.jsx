@@ -6,8 +6,6 @@ import {
   Card,
   CardContent,
   Button,
-  Switch,
-  FormControlLabel,
   Chip,
   IconButton,
   List,
@@ -58,7 +56,7 @@ import {
   institutionalColors,
   getDefaultIcon,
   getCategoryColor,
-} from "../../utils/iconosUtils"; // Ajusta la ruta según donde hayas guardado el archivo
+} from "../../utils/iconosUtils";
 
 const ConfigExpediente = () => {
   const [apartados, setApartados] = useState([]);
@@ -94,8 +92,7 @@ const ConfigExpediente = () => {
 
       // Obtener TODOS los apartados (sin filtrar por instancia)
       const apartadosData = await getTodosApartados();
-      console.log(apartadosData)
-      // Para cada apartado, cargar sus documentos
+    
       const apartadosConDocumentos = await Promise.all(
         apartadosData.map(async (apartado) => {
           try {
@@ -106,6 +103,7 @@ const ConfigExpediente = () => {
               ...apartado,
               documentos: documentos || [],
             };
+           
           } catch (error) {
             console.error(
               `Error cargando documentos para apartado ${apartado.idApartado}:`,
@@ -130,6 +128,7 @@ const ConfigExpediente = () => {
       if (apartadosActivos.length > 0) {
         setExpandedCategory(apartadosActivos[0].idApartado);
       }
+      
     } catch (error) {
       console.error("Error cargando apartados:", error);
       setError("Error al cargar las categorías. Por favor, intente de nuevo.");
@@ -137,10 +136,6 @@ const ConfigExpediente = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getFileExtension = (filename) => {
-    return filename?.split(".").pop()?.toUpperCase() || "PDF";
   };
 
   const showSnackbar = (message, severity = "success") => {
@@ -151,26 +146,14 @@ const ConfigExpediente = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Calcular estadísticas
+  // Calcular estadísticas (quitando requiredDocuments)
   const stats = {
     totalCategories: apartados.length,
     totalDocuments: apartados.reduce(
       (total, ap) => total + (ap.documentos?.length || 0),
       0,
     ),
-    requiredDocuments: apartados.reduce(
-      (total, ap) =>
-        total +
-        (ap.documentos?.filter((doc) => doc.requiere_validacion)?.length || 0),
-      0,
-    ),
     requiredCategories: apartados.filter((ap) => ap.obligatorio).length,
-    committeeReviewDocuments: apartados.reduce(
-      (total, ap) =>
-        total +
-        (ap.documentos?.filter((doc) => doc.requiere_validacion)?.length || 0),
-      0,
-    ),
   };
 
   // Handlers para categorías
@@ -258,7 +241,7 @@ const ConfigExpediente = () => {
           return {
             ...apartado,
             documentos: (apartado.documentos || []).map((doc) =>
-              doc.id_documento === documentoActualizado.id_documento
+              doc.idDocumento === documentoActualizado.idDocumento
                 ? documentoActualizado
                 : doc,
             ),
@@ -274,60 +257,44 @@ const ConfigExpediente = () => {
   };
 
   const handleDeleteDocument = async (apartadoId, documentoId) => {
+    // Buscar el documento completo en el estado local
+    const documento = (apartados.find(a => a.idApartado === apartadoId)?.documentos || [])
+                      .find(doc => doc.idDocumento === documentoId);
+
+    console.log("Intentando eliminar documento:");
+    console.log("apartadoId:", apartadoId);
+    console.log("documentoId:", documentoId);
+    console.log("Documento completo:", documento);
+
+    if (!documentoId || !documento) {
+      console.error("Error: documento no encontrado o ID indefinido");
+      showSnackbar("No se puede eliminar: documento no encontrado", "error");
+      return;
+    }
+
     if (window.confirm("¿Está seguro de eliminar este documento?")) {
       try {
         await eliminarDocumento(documentoId);
+
         setApartados(
           apartados.map((apartado) => {
             if (apartado.idApartado === apartadoId) {
               return {
                 ...apartado,
                 documentos: (apartado.documentos || []).filter(
-                  (doc) => doc.id_documento !== documentoId,
+                  (doc) => doc.idDocumento !== documentoId
                 ),
               };
             }
             return apartado;
-          }),
+          })
         );
+
         showSnackbar("Documento eliminado exitosamente");
       } catch (error) {
         console.error("Error eliminando documento:", error);
         showSnackbar("Error al eliminar el documento", "error");
       }
-    }
-  };
-
-  const handleToggleRequired = async (apartadoId, documentoId) => {
-    try {
-      const apartado = apartados.find((ap) => ap.idApartado === apartadoId);
-      const documento = apartado.documentos?.find(
-        (doc) => doc.id_documento === documentoId,
-      );
-      const updatedRequired = !documento?.requiere_validacion;
-
-      await editarDocumento(documentoId, {
-        requiere_validacion: updatedRequired,
-      });
-
-      setApartados(
-        apartados.map((apartado) => {
-          if (apartado.idApartado === apartadoId) {
-            return {
-              ...apartado,
-              documentos: (apartado.documentos || []).map((doc) =>
-                doc.id_documento === documentoId
-                  ? { ...doc, requiere_validacion: updatedRequired }
-                  : doc,
-              ),
-            };
-          }
-          return apartado;
-        }),
-      );
-    } catch (error) {
-      console.error("Error actualizando requerimiento:", error);
-      showSnackbar("Error al actualizar el documento", "error");
     }
   };
 
@@ -452,18 +419,18 @@ const ConfigExpediente = () => {
           </Alert>
         )}
 
-        {/* 4 CARDS CON ESTADÍSTICAS */}
+        {/* 3 CARDS CON ESTADÍSTICAS (quitamos la de Rev. Comité) */}
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(3, 1fr)",
             gap: 2,
             mb: 3,
             width: "100%",
-            "@media (max-width: 1200px)": {
+            "@media (max-width: 900px)": {
               gridTemplateColumns: "repeat(2, 1fr)",
             },
-            "@media (max-width: 768px)": {
+            "@media (max-width: 600px)": {
               gridTemplateColumns: "1fr",
             },
           }}
@@ -610,118 +577,6 @@ const ConfigExpediente = () => {
                   {stats.totalDocuments}
                 </Typography>
               </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-end",
-                  gap: 0.5,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: institutionalColors.textSecondary,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.2,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                  }}
-                >
-                  {stats.requiredDocuments} obligatorios
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card
-            sx={{
-              borderLeft: `4px solid ${institutionalColors.warning}`,
-              height: 120,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 1.5,
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                height: "100%",
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  mb: 1,
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ color: institutionalColors.warning }}>
-                    <PeopleIcon />
-                  </Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: institutionalColors.textSecondary,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Rev. Comité
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    color: institutionalColors.textPrimary,
-                    fontWeight: "bold",
-                    fontSize: "1.5rem",
-                    lineHeight: 1,
-                    textAlign: "right",
-                  }}
-                >
-                  {stats.committeeReviewDocuments}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-end",
-                  gap: 0.5,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: institutionalColors.textSecondary,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.2,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                  }}
-                >
-                  {stats.totalDocuments > 0
-                    ? `${Math.round((stats.committeeReviewDocuments / stats.totalDocuments) * 100)}% del total`
-                    : "0% del total"}
-                </Typography>
-              </Box>
             </CardContent>
           </Card>
 
@@ -766,7 +621,7 @@ const ConfigExpediente = () => {
                       lineHeight: 1.2,
                     }}
                   >
-                    Obligatorias
+                    Categorías Obligatorias
                   </Typography>
                 </Box>
                 <Typography
@@ -804,7 +659,7 @@ const ConfigExpediente = () => {
                     WebkitBoxOrient: "vertical",
                   }}
                 >
-                  De {stats.totalCategories} categorías
+                  De {stats.totalCategories} categorías totales
                 </Typography>
               </Box>
             </CardContent>
@@ -1045,13 +900,13 @@ const ConfigExpediente = () => {
                             .sort((a, b) => (a.orden || 0) - (b.orden || 0))
                             .map((documento) => (
                               <ListItem
-                                key={documento.id_documento}
+                                key={documento.idDocumento}
                                 sx={{
                                   p: 1.5,
                                   mb: 1,
                                   borderRadius: "6px",
                                   bgcolor: institutionalColors.background,
-                                  borderLeft: `3px solid ${documento.requiere_validacion ? institutionalColors.error : institutionalColors.textSecondary}`,
+                                  borderLeft: `3px solid ${institutionalColors.textSecondary}`,
                                 }}
                               >
                                 <ListItemIcon sx={{ minWidth: 36 }}>
@@ -1065,9 +920,7 @@ const ConfigExpediente = () => {
                                 <ListItemIcon sx={{ minWidth: 36 }}>
                                   <DescriptionIcon
                                     sx={{
-                                      color: documento.requiere_validacion
-                                        ? institutionalColors.error
-                                        : institutionalColors.textSecondary,
+                                      color: institutionalColors.textSecondary,
                                     }}
                                   />
                                 </ListItemIcon>
@@ -1078,50 +931,26 @@ const ConfigExpediente = () => {
                                       display: "flex",
                                       alignItems: "center",
                                       gap: 1,
-                                      mb: 0.5,
+                                      mb: 1,
                                     }}
                                   >
                                     <Typography
-                                      variant="body2"
+                                      variant="body1"
                                       sx={{
                                         fontWeight: "bold",
                                         color: institutionalColors.textPrimary,
+                                        fontSize: "1rem",
                                       }}
                                     >
                                       {documento.nombre_archivo}
                                     </Typography>
-                                    {documento.requiere_validacion ? (
-                                      <Chip
-                                        label="OBLIGATORIO"
-                                        size="small"
-                                        color="error"
-                                        sx={{ height: 18, fontSize: "0.6rem" }}
-                                      />
-                                    ) : (
-                                      <Chip
-                                        label="OPCIONAL"
-                                        size="small"
-                                        color="default"
-                                        sx={{ height: 18, fontSize: "0.6rem" }}
-                                      />
-                                    )}
-                                    {documento.requiere_validacion && (
-                                      <Tooltip title="Requiere revisión por comité">
-                                        <PeopleIcon
-                                          sx={{
-                                            fontSize: 16,
-                                            color: institutionalColors.warning,
-                                          }}
-                                        />
-                                      </Tooltip>
-                                    )}
                                     {documento.periodo_revision > 0 && (
                                       <Tooltip
                                         title={getReviewDescription(documento)}
                                       >
                                         <TimerIcon
                                           sx={{
-                                            fontSize: 16,
+                                            fontSize: 18,
                                             color: institutionalColors.info,
                                           }}
                                         />
@@ -1130,11 +959,10 @@ const ConfigExpediente = () => {
                                   </Box>
 
                                   <Typography
-                                    variant="caption"
+                                    variant="body2"
                                     sx={{
                                       color: institutionalColors.textSecondary,
-                                      display: "block",
-                                      mb: 1,
+                                      mb: 1.5,
                                     }}
                                   >
                                     {documento.descripcion || "Sin descripción"}
@@ -1148,34 +976,17 @@ const ConfigExpediente = () => {
                                       flexWrap: "wrap",
                                     }}
                                   >
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color:
-                                          institutionalColors.textSecondary,
-                                      }}
-                                    >
-                                      <strong>Formato:</strong>{" "}
-                                      {getFileExtension(
-                                        documento.nombre_archivo,
-                                      )}
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color:
-                                          institutionalColors.textSecondary,
-                                      }}
-                                    >
-                                      <strong>Estado:</strong>{" "}
-                                      {documento.estado || "pendiente"}
-                                    </Typography>
                                     {documento.periodo_revision > 0 && (
                                       <Typography
                                         variant="caption"
-                                        sx={{ color: institutionalColors.info }}
+                                        sx={{ 
+                                          color: institutionalColors.info,
+                                          bgcolor: `${institutionalColors.info}10`,
+                                          px: 1,
+                                          py: 0.5,
+                                          borderRadius: "4px",
+                                        }}
                                       >
-                                        <strong>Revisión:</strong>{" "}
                                         {getReviewDescription(documento)}
                                       </Typography>
                                     )}
@@ -1184,10 +995,13 @@ const ConfigExpediente = () => {
                                         variant="caption"
                                         sx={{
                                           color: institutionalColors.success,
+                                          bgcolor: `${institutionalColors.success}10`,
+                                          px: 1,
+                                          py: 0.5,
+                                          borderRadius: "4px",
                                         }}
                                       >
-                                        <strong>Horas requeridas:</strong>{" "}
-                                        {documento.horas_requeridas}
+                                        {documento.horas_requeridas} horas requeridas
                                       </Typography>
                                     )}
                                   </Box>
@@ -1195,43 +1009,6 @@ const ConfigExpediente = () => {
 
                                 <ListItemSecondaryAction>
                                   <Stack direction="row" spacing={0.5}>
-                                    <Tooltip
-                                      title={
-                                        documento.requiere_validacion
-                                          ? "Marcar como opcional"
-                                          : "Marcar como obligatorio"
-                                      }
-                                    >
-                                      <FormControlLabel
-                                        control={
-                                          <Switch
-                                            size="small"
-                                            checked={
-                                              documento.requiere_validacion
-                                            }
-                                            onChange={() =>
-                                              handleToggleRequired(
-                                                apartado.idApartado,
-                                                documento.id_documento,
-                                              )
-                                            }
-                                            sx={{
-                                              "& .MuiSwitch-switchBase.Mui-checked":
-                                                {
-                                                  color:
-                                                    institutionalColors.primary,
-                                                },
-                                              "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                                                {
-                                                  backgroundColor:
-                                                    institutionalColors.primary,
-                                                },
-                                            }}
-                                          />
-                                        }
-                                        label=""
-                                      />
-                                    </Tooltip>
                                     <Tooltip title="Editar documento">
                                       <IconButton
                                         size="small"
@@ -1254,7 +1031,7 @@ const ConfigExpediente = () => {
                                         onClick={() =>
                                           handleDeleteDocument(
                                             apartado.idApartado,
-                                            documento.id_documento,
+                                            documento.idDocumento,
                                           )
                                         }
                                         sx={{
@@ -1297,7 +1074,7 @@ const ConfigExpediente = () => {
       <CreateCategoryDialog
         open={openCreateCategory}
         onClose={() => setOpenCreateCategory(false)}
-        onSuccess={handleCreateCategorySuccess} // Cambiado de onCreated a onSuccess
+        onSuccess={handleCreateCategorySuccess}
         isSuperAdmin={true}
       />
 
@@ -1318,7 +1095,7 @@ const ConfigExpediente = () => {
           setOpenCreateDocument(false);
           setCurrentApartado(null);
         }}
-        onSuccess={handleCreateDocumentSuccess} // Asegúrate que sea onSuccess, no onCreated
+        onSuccess={handleCreateDocumentSuccess}
         apartadoId={selectedApartadoId}
         apartado={currentApartado}
       />

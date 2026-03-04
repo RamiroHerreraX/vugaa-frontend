@@ -53,3 +53,16 @@ export const crearDocumentoPlantilla = async (data) => {
   const response = await API.post(`${ENDPOINT}/plantilla`,data);
   return response.data;
 };
+
+
+// ========================================
+// 🔹 ACTUALIZAR SOLO REQUIERE_VALIDACION
+// ========================================
+export const actualizarRequiereValidacion = async (idDocumento, requiereValidacion) => {
+  const response = await API.patch(
+    `${ENDPOINT}/${idDocumento}/requiere-validacion`,
+    null, // PATCH no envía body completo, solo params
+    { params: { requiereValidacion } }
+  );
+  return response.data;
+};

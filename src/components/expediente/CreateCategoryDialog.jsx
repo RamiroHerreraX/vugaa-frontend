@@ -38,7 +38,7 @@ const CreateCategoryDialog = ({
     description: "",
     icon: "📁",
     required: false,
-    order: 1,
+    
   });
 
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,6 @@ const CreateCategoryDialog = ({
         descripcion: category.description,
         icono: category.icon,
         obligatorio: category.required,
-        orden: category.order,
       };
 
       const newCategory = await crearApartadoGlobal(payload);
@@ -171,19 +170,6 @@ const CreateCategoryDialog = ({
             disabled={loading}
           />
           <IconPreview icon={category.icon} />
-
-          <TextField
-            fullWidth
-            label="Orden"
-            type="number"
-            value={category.order}
-            onChange={(e) =>
-              setCategory({ ...category, order: parseInt(e.target.value) || 1 })
-            }
-            helperText="Número de orden en la lista"
-            inputProps={{ min: 1 }}
-            disabled={loading}
-          />
 
           <FormControlLabel
             control={

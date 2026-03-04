@@ -11,7 +11,6 @@ import {
   FormControlLabel,
   Switch,
   Typography,
-  MenuItem,
   InputAdornment,
   CircularProgress,
   Alert,
@@ -27,7 +26,6 @@ const institutionalColors = {
   textSecondary: "#7f8c8d",
 };
 
-const estadosOptions = ["PENDIENTE", "EN_REVISION", "APROBADO", "RECHAZADO"];
 
 const CreateDocumentDialog = ({
   open,
@@ -48,7 +46,7 @@ const CreateDocumentDialog = ({
     periodoRevision: 0,
     requiereValidacion: false,
     observaciones: "",
-    estado: "PENDIENTE",
+   
   });
 
   // Resetear formulario cuando se abre
@@ -61,7 +59,7 @@ const CreateDocumentDialog = ({
         periodoRevision: 0,
         requiereValidacion: false,
         observaciones: "",
-        estado: "PENDIENTE",
+       
       });
       setError(null);
     }
@@ -88,14 +86,12 @@ const CreateDocumentDialog = ({
     try {
       const payload = {
         nombreArchivo: documento.nombreArchivo,
-        horas_requeridas: requiereHoras ? documento.horasRequeridas : 0,
-        periodo_revision: documento.periodoRevision,
-        requiere_validacion: documento.requiereValidacion,
+        horasRequeridas: requiereHoras ? documento.horasRequeridas : 0,
+        periodoRevision: documento.periodoRevision,
+        requiereValidacion: documento.requiereValidacion,
         observaciones: documento.observaciones || "",
-        estado: documento.estado,
-        id_apartado: apartadoId,
-
-        fecha_carga: new Date().toISOString(), // Aseguramos fecha si el backend lo requiere
+        idApartado: apartadoId,
+        fechaCarga: new Date().toISOString(), // Aseguramos fecha si el backend lo requiere
       };
       console.log(payload)
       const response = await crearDocumentoPlantilla(payload);
@@ -206,22 +202,6 @@ const CreateDocumentDialog = ({
             }
             helperText="Días (0 = sin revisión)"
           />
-
-          <TextField
-            fullWidth
-            select
-            label="Estado"
-            value={documento.estado}
-            onChange={(e) =>
-              setDocumento({ ...documento, estado: e.target.value })
-            }
-          >
-            {estadosOptions.map((estado) => (
-              <MenuItem key={estado} value={estado}>
-                {estado}
-              </MenuItem>
-            ))}
-          </TextField>
 
           <TextField
             fullWidth
