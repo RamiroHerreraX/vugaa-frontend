@@ -1,13 +1,13 @@
-import API from './api';
+import API from "./api";
 
 class UsuarioService {
   async findAll() {
     try {
-      const response = await API.get('/usuarios');
+      const response = await API.get("/usuarios");
       return response.data;
     } catch (error) {
-      console.error('Error en findAll:', error);
-      throw error.response?.data || { error: 'Error al obtener usuarios' };
+      console.error("Error en findAll:", error);
+      throw error.response?.data || { error: "Error al obtener usuarios" };
     }
   }
 
@@ -16,19 +16,19 @@ class UsuarioService {
       const response = await API.get(`/usuarios/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error en findById:', error);
-      throw error.response?.data || { error: 'Usuario no encontrado' };
+      console.error("Error en findById:", error);
+      throw error.response?.data || { error: "Usuario no encontrado" };
     }
   }
 
   async create(usuarioDTO) {
     try {
-      console.log('Creando usuario con datos:', JSON.stringify(usuarioDTO));
-      const response = await API.post('/usuarios', usuarioDTO);
+      console.log("Creando usuario con datos:", JSON.stringify(usuarioDTO));
+      const response = await API.post("/usuarios", usuarioDTO);
       return response.data;
     } catch (error) {
-      console.error('Error en create:', error);
-      throw error.response?.data || { error: 'Error al crear el usuario' };
+      console.error("Error en create:", error);
+      throw error.response?.data || { error: "Error al crear el usuario" };
     }
   }
 
@@ -38,30 +38,38 @@ class UsuarioService {
       const response = await API.put(`/usuarios/${id}`, usuarioDTO);
       return response.data;
     } catch (error) {
-      console.error('Error en update:', error);
-      throw error.response?.data || { error: 'Error al actualizar el usuario' };
+      console.error("Error en update:", error);
+      throw error.response?.data || { error: "Error al actualizar el usuario" };
     }
   }
 
   async cambiarEstadoActivo(id, activo) {
     try {
       const response = await API.patch(`/usuarios/${id}/estado`, null, {
-        params: { activo }
+        params: { activo },
       });
       return response.data;
     } catch (error) {
-      console.error('Error en cambiarEstadoActivo:', error);
-      throw error.response?.data || { error: 'Error al cambiar el estado del usuario' };
+      console.error("Error en cambiarEstadoActivo:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al cambiar el estado del usuario",
+        }
+      );
     }
   }
 
   async findAllForTable() {
     try {
-      const response = await API.get('/usuarios/tabla');
+      const response = await API.get("/usuarios/tabla");
       return response.data;
     } catch (error) {
-      console.error('Error en findAllForTable:', error);
-      throw error.response?.data || { error: 'Error al obtener usuarios para la tabla' };
+      console.error("Error en findAllForTable:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios para la tabla",
+        }
+      );
     }
   }
 
@@ -70,47 +78,73 @@ class UsuarioService {
       const response = await API.get(`/usuarios/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error en findByIdForTable:', error);
-      throw error.response?.data || { error: 'Usuario no encontrado' };
+      console.error("Error en findByIdForTable:", error);
+      throw error.response?.data || { error: "Usuario no encontrado" };
     }
   }
 
   formatUltimoAcceso(ultimoAcceso) {
-    if (!ultimoAcceso) return 'Nunca';
+    if (!ultimoAcceso) return "Nunca";
     try {
       const fecha = new Date(ultimoAcceso);
       const ahora = new Date();
       const diffHoras = Math.floor((ahora - fecha) / (1000 * 60 * 60));
       if (diffHoras < 1) {
         const diffMinutos = Math.floor((ahora - fecha) / (1000 * 60));
-        return diffMinutos < 1 ? 'Hace unos segundos' : `Hace ${diffMinutos} minutos`;
+        return diffMinutos < 1
+          ? "Hace unos segundos"
+          : `Hace ${diffMinutos} minutos`;
       }
       if (diffHoras < 24) return `Hace ${diffHoras} horas`;
-      if (diffHoras < 48) return 'Ayer';
-      return fecha.toLocaleDateString('es-ES', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+      if (diffHoras < 48) return "Ayer";
+      return fecha.toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       });
     } catch {
-      return 'Fecha inválida';
+      return "Fecha inválida";
     }
   }
 
   getEstadoClass(estado) {
     switch (estado?.toLowerCase()) {
-      case 'activo': return 'badge-success';
-      case 'inactivo': return 'badge-warning';
-      case 'bloqueado': return 'badge-danger';
-      default: return 'badge-secondary';
+      case "activo":
+        return "badge-success";
+      case "inactivo":
+        return "badge-warning";
+      case "bloqueado":
+        return "badge-danger";
+      default:
+        return "badge-secondary";
     }
   }
 
   getEstadoTexto(estado) {
     switch (estado?.toLowerCase()) {
-      case 'activo': return 'Activo';
-      case 'inactivo': return 'Inactivo';
-      case 'bloqueado': return 'Bloqueado';
-      default: return 'Desconocido';
+      case "activo":
+        return "Activo";
+      case "inactivo":
+        return "Inactivo";
+      case "bloqueado":
+        return "Bloqueado";
+      default:
+        return "Desconocido";
+    }
+  }
+  async findAgrupadosPorInstancia() {
+    try {
+      const response = await API.get("/usuarios/agrupados");
+      return response.data; // Esto será un objeto { instanciaId: [usuarios...] }
+    } catch (error) {
+      console.error("Error en findAgrupadosPorInstancia:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios agrupados por instancia",
+        }
+      );
     }
   }
 }
