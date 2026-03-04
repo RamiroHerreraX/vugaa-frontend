@@ -20,6 +20,11 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Divider,
+  Avatar,
+  Badge,
+  Zoom,
+  Fade,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -34,14 +39,22 @@ import {
   People as PeopleIcon,
   AdminPanelSettings as AdminPanelSettingsIcon,
   Refresh as RefreshIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Schedule as ScheduleIcon,
+  Category as CategoryIcon,
+  Visibility as VisibilityIcon,
+  CloudUpload as CloudUploadIcon,
+  AttachFile as AttachFileIcon,
+  Info as InfoIcon,
 } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 
 // Importar servicios de API
 import { getTodosApartados, desactivarApartado } from "../../services/apartado";
 
 import {
   getDocumentosPorApartado,
-  editarDocumento,
   eliminarDocumento,
 } from "../../services/documentoExpediente";
 
@@ -90,25 +103,38 @@ const ConfigExpediente = () => {
       setLoading(true);
       setError(null);
 
-      // Obtener TODOS los apartados (sin filtrar por instancia)
+      console.log("🔵 Iniciando carga de apartados...");
+
+      // 1️⃣ Obtener TODOS los apartados
       const apartadosData = await getTodosApartados();
-    
+      console.log("📂 Apartados obtenidos del backend:", apartadosData);
+
       const apartadosConDocumentos = await Promise.all(
         apartadosData.map(async (apartado) => {
           try {
             const documentos = await getDocumentosPorApartado(
               apartado.idApartado,
             );
+
+            console.log(
+              `📄 Documentos del apartado ${apartado.nombre} (ID: ${apartado.idApartado}):`,
+              documentos,
+            );
+            console.log(
+              "📄 Documentos completos:",
+              JSON.stringify(documentos, null, 2),
+            );
+
             return {
               ...apartado,
               documentos: documentos || [],
             };
-           
           } catch (error) {
             console.error(
-              `Error cargando documentos para apartado ${apartado.idApartado}:`,
+              `❌ Error cargando documentos para apartado ${apartado.idApartado}:`,
               error,
             );
+
             return {
               ...apartado,
               documentos: [],
@@ -117,20 +143,28 @@ const ConfigExpediente = () => {
         }),
       );
 
-      // Filtrar solo apartados activos y ordenar
+      console.log(
+        "🟣 Apartados con documentos incluidos:",
+        apartadosConDocumentos,
+      );
+
+      // 2️⃣ Filtrar activos y ordenar
       const apartadosActivos = apartadosConDocumentos
         .filter((ap) => ap.activo !== false)
         .sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
+      console.log("🟢 Apartados activos y ordenados:", apartadosActivos);
+
       setApartados(apartadosActivos);
 
-      // Expandir primera categoría por defecto si existe
+      // Expandir primera categoría
       if (apartadosActivos.length > 0) {
         setExpandedCategory(apartadosActivos[0].idApartado);
       }
-      
+
+      console.log("✅ Carga completada correctamente");
     } catch (error) {
-      console.error("Error cargando apartados:", error);
+      console.error("🔥 Error general cargando apartados:", error);
       setError("Error al cargar las categorías. Por favor, intente de nuevo.");
       showSnackbar("Error al cargar datos", "error");
     } finally {
@@ -258,8 +292,9 @@ const ConfigExpediente = () => {
 
   const handleDeleteDocument = async (apartadoId, documentoId) => {
     // Buscar el documento completo en el estado local
-    const documento = (apartados.find(a => a.idApartado === apartadoId)?.documentos || [])
-                      .find(doc => doc.idDocumento === documentoId);
+    const documento = (
+      apartados.find((a) => a.idApartado === apartadoId)?.documentos || []
+    ).find((doc) => doc.idDocumento === documentoId);
 
     console.log("Intentando eliminar documento:");
     console.log("apartadoId:", apartadoId);
@@ -282,12 +317,12 @@ const ConfigExpediente = () => {
               return {
                 ...apartado,
                 documentos: (apartado.documentos || []).filter(
-                  (doc) => doc.idDocumento !== documentoId
+                  (doc) => doc.idDocumento !== documentoId,
                 ),
               };
             }
             return apartado;
-          })
+          }),
         );
 
         showSnackbar("Documento eliminado exitosamente");
@@ -308,18 +343,24 @@ const ConfigExpediente = () => {
 
   const getReviewDescription = (documento) => {
     if (
-      !documento.periodo_revision ||
-      parseInt(documento.periodo_revision) === 0
+      !documento.periodoRevision ||
+      parseInt(documento.periodoRevision) === 0
     )
       return "No requiere revisión periódica";
-    const days = parseInt(documento.periodo_revision);
+    const days = parseInt(documento.periodoRevision);
     if (days === 30) return "Revisión mensual";
     if (days === 60) return "Revisión bimestral";
     if (days === 90) return "Revisión trimestral";
     if (days === 180) return "Revisión semestral";
     if (days === 365) return "Revisión anual";
     if (days === 730) return "Revisión bianual";
-    return `Revisión cada ${documento.periodo_revision} días`;
+    return `Revisión cada ${documento.periodoRevision} días`;
+  };
+
+  const getReviewIcon = (days) => {
+    if (days <= 30) return <ScheduleIcon fontSize="small" />;
+    if (days <= 90) return <TimerIcon fontSize="small" />;
+    return <ScheduleIcon fontSize="small" />;
   };
 
   if (loading) {
@@ -330,9 +371,25 @@ const ConfigExpediente = () => {
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
+          background: `linear-gradient(135deg, ${alpha(institutionalColors.background, 0.5)} 0%, ${institutionalColors.background} 100%)`,
         }}
       >
-        <CircularProgress />
+        <Paper
+          elevation={3}
+          sx={{
+            p: 4,
+            borderRadius: 2,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={60} thickness={4} />
+          <Typography variant="h6" color="textSecondary">
+            Cargando configuración...
+          </Typography>
+        </Paper>
       </Box>
     );
   }
@@ -345,8 +402,7 @@ const ConfigExpediente = () => {
         flexDirection: "column",
         backgroundColor: institutionalColors.background,
       }}
-    >
-      {/* Header */}
+    >{/* Header */}
       <Box sx={{ mb: 3, p: 2.5 }}>
         <Box
           sx={{
@@ -674,26 +730,25 @@ const ConfigExpediente = () => {
           display: "flex",
           flexDirection: "column",
           minHeight: 0,
-          p: 2.5,
-          pt: 0,
+          px: 3,
+          pb: 3,
         }}
       >
         <Paper
-          elevation={1}
+          elevation={3}
           sx={{
             flex: 1,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            borderRadius: "8px",
+            borderRadius: 3,
             height: "100%",
-            border: `1px solid #e5e7eb`,
           }}
         >
           <Box
             sx={{
-              p: 2,
-              borderBottom: `1px solid #e5e7eb`,
+              p: 2.5,
+              borderBottom: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
@@ -702,8 +757,15 @@ const ConfigExpediente = () => {
           >
             <Typography
               variant="h6"
-              sx={{ color: institutionalColors.primary, fontWeight: "bold" }}
+              sx={{ 
+                color: institutionalColors.primary, 
+                fontWeight: "bold",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
             >
+              <CategoryIcon />
               Estructura Global del Expediente
             </Typography>
           </Box>
@@ -713,357 +775,448 @@ const ConfigExpediente = () => {
             sx={{
               flex: 1,
               overflowY: "auto",
-              p: 2,
+              p: 2.5,
               bgcolor: institutionalColors.background,
             }}
           >
             {apartados.length === 0 ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  p: 4,
-                }}
-              >
-                <FolderIcon
+              <Fade in={true}>
+                <Box
                   sx={{
-                    fontSize: 48,
-                    color: institutionalColors.textSecondary,
-                    mb: 2,
-                  }}
-                />
-                <Typography
-                  variant="h6"
-                  sx={{ color: institutionalColors.textSecondary, mb: 1 }}
-                >
-                  No hay categorías configuradas
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ color: institutionalColors.textSecondary, mb: 3 }}
-                >
-                  Comience creando una nueva categoría global para organizar los
-                  documentos del expediente
-                </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={handleAddCategory}
-                  sx={{
-                    bgcolor: institutionalColors.primary,
-                    "&:hover": { bgcolor: institutionalColors.secondary },
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "100%",
+                    p: 4,
                   }}
                 >
-                  Crear primera categoría
-                </Button>
-              </Box>
+                  <Avatar
+                    sx={{
+                      width: 120,
+                      height: 120,
+                      bgcolor: alpha(institutionalColors.primary, 0.1),
+                      color: institutionalColors.primary,
+                      mb: 3,
+                    }}
+                  >
+                    <FolderIcon sx={{ fontSize: 60 }} />
+                  </Avatar>
+                  <Typography
+                    variant="h5"
+                    sx={{ color: institutionalColors.textPrimary, mb: 1, fontWeight: "bold" }}
+                  >
+                    No hay categorías configuradas
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    sx={{ color: institutionalColors.textSecondary, mb: 3, textAlign: "center" }}
+                  >
+                    Comience creando una nueva categoría global para organizar los
+                    documentos del expediente
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<AddIcon />}
+                    onClick={handleAddCategory}
+                    sx={{
+                      bgcolor: institutionalColors.primary,
+                      "&:hover": { 
+                        bgcolor: institutionalColors.secondary,
+                        transform: "translateY(-2px)",
+                      },
+                      transition: "all 0.2s",
+                      boxShadow: 2,
+                    }}
+                  >
+                    Crear primera categoría
+                  </Button>
+                </Box>
+              </Fade>
             ) : (
               apartados
                 .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-                .map((apartado) => (
-                  <Accordion
+                .map((apartado, index) => (
+                  <Zoom
                     key={apartado.idApartado}
-                    expanded={expandedCategory === apartado.idApartado}
-                    onChange={() => handleCategoryExpand(apartado.idApartado)}
-                    sx={{
-                      mb: 2,
-                      borderRadius: "8px !important",
-                      overflow: "hidden",
-                      border: `1px solid #e5e7eb`,
-                    }}
+                    in={true}
+                    style={{ transitionDelay: `${index * 50}ms` }}
                   >
-                    <AccordionSummary
-                      expandIcon={<ExpandMoreIcon />}
-                      sx={{ bgcolor: "#fff" }}
+                    <Accordion
+                      expanded={expandedCategory === apartado.idApartado}
+                      onChange={() => handleCategoryExpand(apartado.idApartado)}
+                      sx={{
+                        mb: 2,
+                        borderRadius: "12px !important",
+                        overflow: "hidden",
+                        border: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
+                        boxShadow: 2,
+                        "&:before": { display: "none" },
+                        transition: "all 0.2s",
+                        "&:hover": {
+                          boxShadow: 4,
+                        },
+                      }}
                     >
-                      <Box
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreIcon />}
                         sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          width: "100%",
+                          bgcolor: "#fff",
+                          "&:hover": {
+                            bgcolor: alpha(institutionalColors.primary, 0.02),
+                          },
                         }}
                       >
                         <Box
                           sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: "8px",
-                            bgcolor: `${getCategoryColor(apartado.nombre)}20`,
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center",
-                            mr: 2,
+                            width: "100%",
                           }}
                         >
-                          <Typography
-                            variant="h5"
-                            sx={{ color: getCategoryColor(apartado.nombre) }}
+                          <Badge
+                            badgeContent={apartado.documentos?.length || 0}
+                            color="primary"
+                            sx={{ mr: 2 }}
                           >
-                            {apartado.icono || getDefaultIcon(apartado.nombre)}
-                          </Typography>
-                        </Box>
-
-                        <Box sx={{ flex: 1 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 0.5,
-                            }}
-                          >
-                            <Typography
-                              variant="subtitle1"
+                            <Avatar
                               sx={{
-                                fontWeight: "bold",
-                                color: institutionalColors.textPrimary,
+                                width: 48,
+                                height: 48,
+                                bgcolor: alpha(getCategoryColor(apartado.nombre), 0.1),
+                                color: getCategoryColor(apartado.nombre),
                               }}
                             >
-                              {apartado.nombre}
-                            </Typography>
-                            {apartado.obligatorio && (
-                              <Chip
-                                label="OBLIGATORIO"
-                                size="small"
-                                color="error"
-                                sx={{ height: 20, fontSize: "0.65rem" }}
-                              />
-                            )}
-                            <Chip
-                              label={`${apartado.documentos?.length || 0} docs`}
-                              size="small"
-                              variant="outlined"
-                              sx={{
-                                height: 20,
-                                fontSize: "0.65rem",
-                                borderColor: institutionalColors.textSecondary,
-                                color: institutionalColors.textSecondary,
-                              }}
-                            />
-                          </Box>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: institutionalColors.textSecondary }}
-                          >
-                            {apartado.descripcion}
-                          </Typography>
-                          {apartado.id_instancia && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: institutionalColors.info,
-                                display: "block",
-                                mt: 0.5,
-                              }}
-                            >
-                              Instancia ID: {apartado.id_instancia}
-                            </Typography>
-                          )}
-                        </Box>
+                              <Typography variant="h5">
+                                {apartado.icono || getDefaultIcon(apartado.nombre)}
+                              </Typography>
+                            </Avatar>
+                          </Badge>
 
-                        <Stack direction="row" spacing={0.5}>
-                          <Tooltip title="Editar categoría">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditCategory(apartado);
+                          <Box sx={{ flex: 1 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 0.5,
                               }}
-                              sx={{ color: institutionalColors.primary }}
                             >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Eliminar categoría">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteCategory(apartado.idApartado);
-                              }}
-                              sx={{ color: institutionalColors.error }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </Box>
-                    </AccordionSummary>
-
-                    <AccordionDetails sx={{ bgcolor: "#fff" }}>
-                      <Box sx={{ pl: 6 }}>
-                        <List sx={{ p: 0 }}>
-                          {(apartado.documentos || [])
-                            .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-                            .map((documento) => (
-                              <ListItem
-                                key={documento.idDocumento}
+                              <Typography
+                                variant="h6"
                                 sx={{
-                                  p: 1.5,
-                                  mb: 1,
-                                  borderRadius: "6px",
-                                  bgcolor: institutionalColors.background,
-                                  borderLeft: `3px solid ${institutionalColors.textSecondary}`,
+                                  fontWeight: "bold",
+                                  color: institutionalColors.textPrimary,
                                 }}
                               >
-                                <ListItemIcon sx={{ minWidth: 36 }}>
-                                  <DragIndicatorIcon
-                                    sx={{
-                                      color: institutionalColors.textSecondary,
-                                    }}
-                                  />
-                                </ListItemIcon>
+                                {apartado.nombre}
+                              </Typography>
+                              {apartado.obligatorio && (
+                                <Chip
+                                  label="OBLIGATORIO"
+                                  size="small"
+                                  color="error"
+                                  sx={{ 
+                                    height: 22, 
+                                    fontSize: "0.7rem",
+                                    fontWeight: "bold",
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            <Typography
+                              variant="body2"
+                              sx={{ color: institutionalColors.textSecondary }}
+                            >
+                              {apartado.descripcion}
+                            </Typography>
+                          </Box>
 
-                                <ListItemIcon sx={{ minWidth: 36 }}>
-                                  <DescriptionIcon
-                                    sx={{
-                                      color: institutionalColors.textSecondary,
-                                    }}
-                                  />
-                                </ListItemIcon>
+                          <Stack direction="row" spacing={1}>
+                            
+                            <Tooltip title="Editar categoría" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditCategory(apartado);
+                                }}
+                                sx={{
+                                  color: institutionalColors.primary,
+                                  "&:hover": {
+                                    bgcolor: alpha(institutionalColors.primary, 0.1),
+                                  },
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
 
-                                <Box sx={{ flex: 1 }}>
-                                  <Box
+
+
+                            </Tooltip>
+                            <Tooltip title="Eliminar categoría" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteCategory(apartado.idApartado);
+                                }}
+                                sx={{
+                                  color: institutionalColors.error,
+                                  "&:hover": {
+                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                  },
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </Box>
+                      </AccordionSummary>
+
+                      <AccordionDetails sx={{ bgcolor: "#fff", p: 3 }}>
+                        <Box sx={{ pl: 7 }}>
+                          <List sx={{ p: 0 }}>
+                            {(apartado.documentos || [])
+                              .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+                              .map((documento, docIndex) => (
+                                <Fade
+                                  key={documento.idDocumento}
+                                  in={true}
+                                  style={{ transitionDelay: `${docIndex * 30}ms` }}
+                                >
+                                  <ListItem
                                     sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                      mb: 1,
+                                      p: 2,
+                                      mb: 2,
+                                      borderRadius: 2,
+                                      bgcolor: institutionalColors.background,
+                                      border: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
+                                      borderLeft: `4px solid ${institutionalColors.primary}`,
+                                      alignItems: "flex-start",
+                                      transition: "all 0.2s",
+                                      "&:hover": {
+                                        transform: "translateX(4px)",
+                                        boxShadow: 2,
+                                      },
                                     }}
                                   >
-                                    <Typography
-                                      variant="body1"
-                                      sx={{
-                                        fontWeight: "bold",
-                                        color: institutionalColors.textPrimary,
-                                        fontSize: "1rem",
-                                      }}
-                                    >
-                                      {documento.nombre_archivo}
-                                    </Typography>
-                                    {documento.periodo_revision > 0 && (
-                                      <Tooltip
-                                        title={getReviewDescription(documento)}
-                                      >
-                                        <TimerIcon
-                                          sx={{
-                                            fontSize: 18,
-                                            color: institutionalColors.info,
-                                          }}
-                                        />
-                                      </Tooltip>
-                                    )}
-                                  </Box>
-
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      color: institutionalColors.textSecondary,
-                                      mb: 1.5,
-                                    }}
-                                  >
-                                    {documento.descripcion || "Sin descripción"}
-                                  </Typography>
-
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 2,
-                                      flexWrap: "wrap",
-                                    }}
-                                  >
-                                    {documento.periodo_revision > 0 && (
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ 
-                                          color: institutionalColors.info,
-                                          bgcolor: `${institutionalColors.info}10`,
-                                          px: 1,
-                                          py: 0.5,
-                                          borderRadius: "4px",
-                                        }}
-                                      >
-                                        {getReviewDescription(documento)}
-                                      </Typography>
-                                    )}
-                                    {documento.horas_requeridas > 0 && (
-                                      <Typography
-                                        variant="caption"
+                                    <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
+                                      <Avatar
                                         sx={{
-                                          color: institutionalColors.success,
-                                          bgcolor: `${institutionalColors.success}10`,
-                                          px: 1,
-                                          py: 0.5,
-                                          borderRadius: "4px",
-                                        }}
-                                      >
-                                        {documento.horas_requeridas} horas requeridas
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                </Box>
-
-                                <ListItemSecondaryAction>
-                                  <Stack direction="row" spacing={0.5}>
-                                    <Tooltip title="Editar documento">
-                                      <IconButton
-                                        size="small"
-                                        onClick={() =>
-                                          handleEditDocument(
-                                            apartado,
-                                            documento,
-                                          )
-                                        }
-                                        sx={{
+                                          width: 32,
+                                          height: 32,
+                                          bgcolor: alpha(institutionalColors.primary, 0.1),
                                           color: institutionalColors.primary,
                                         }}
                                       >
-                                        <EditIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Eliminar documento">
-                                      <IconButton
-                                        size="small"
-                                        onClick={() =>
-                                          handleDeleteDocument(
-                                            apartado.idApartado,
-                                            documento.idDocumento,
-                                          )
-                                        }
+                                        <DescriptionIcon fontSize="small" />
+                                      </Avatar>
+                                    </ListItemIcon>
+
+                                    <Box sx={{ flex: 1 }}>
+                                      {/* Título con badges */}
+                                      <Box
                                         sx={{
-                                          color: institutionalColors.error,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          flexWrap: "wrap",
+                                          gap: 1,
+                                          mb: 1,
                                         }}
                                       >
-                                        <DeleteIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Stack>
-                                </ListItemSecondaryAction>
-                              </ListItem>
-                            ))}
-                        </List>
+                                        <Typography
+                                          variant="subtitle1"
+                                          sx={{
+                                            fontWeight: "bold",
+                                            color: institutionalColors.textPrimary,
+                                          }}
+                                        >
+                                          {documento.nombreArchivo}
+                                        </Typography>
 
-                        <Button
-                          startIcon={<AddIcon />}
-                          size="small"
-                          onClick={() => handleAddDocument(apartado.idApartado)}
-                          sx={{
-                            mt: 2,
-                            color: institutionalColors.primary,
-                            "&:hover": {
-                              bgcolor: institutionalColors.lightBlue,
-                            },
-                          }}
-                        >
-                          Agregar Documento a esta Categoría
-                        </Button>
-                      </Box>
-                    </AccordionDetails>
-                  </Accordion>
+                                        {documento.periodoRevision > 0 && (
+                                          <Tooltip
+                                            title={getReviewDescription(documento)}
+                                            arrow
+                                          >
+                                            <Chip
+                                              size="small"
+                                              icon={getReviewIcon(documento.periodoRevision)}
+                                              label={getReviewDescription(documento)}
+                                              sx={{
+                                                height: 24,
+                                                bgcolor: alpha(institutionalColors.info, 0.1),
+                                                color: institutionalColors.info,
+                                                "& .MuiChip-icon": {
+                                                  color: institutionalColors.info,
+                                                },
+                                              }}
+                                            />
+                                          </Tooltip>
+                                        )}
+                                      </Box>
+
+                                      {/* Descripción */}
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          color: institutionalColors.textSecondary,
+                                          mb: 1.5,
+                                        }}
+                                      >
+                                        {documento.descripcion || "Sin descripción"}
+                                      </Typography>
+
+                                      {/* Chips informativos mejorados */}
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          gap: 1,
+                                          flexWrap: "wrap",
+                                          mb: 2,
+                                        }}
+                                      >
+                                        {documento.formatoEsperado && (
+                                          <Chip
+                                            size="small"
+                                            icon={<AttachFileIcon />}
+                                            label={`Formato: ${documento.formatoEsperado}`}
+                                            sx={{
+                                              height: 24,
+                                              bgcolor: alpha(institutionalColors.success, 0.1),
+                                              color: institutionalColors.success,
+                                            }}
+                                          />
+                                        )}
+
+                                        {documento.etiquetas && (
+                                          <Chip
+                                            size="small"
+                                            icon={<InfoIcon />}
+                                            label={documento.etiquetas}
+                                            sx={{
+                                              height: 24,
+                                              bgcolor: alpha(institutionalColors.warning, 0.1),
+                                              color: institutionalColors.warning,
+                                            }}
+                                          />
+                                        )}
+                                      </Box>
+
+                                      {/* Información técnica mejorada */}
+                                      <Box
+                                        sx={{
+                                          display: "grid",
+                                          gridTemplateColumns: "repeat(3, 1fr)",
+                                          gap: 1,
+                                          mt: 1,
+                                          p: 1.5,
+                                          borderRadius: 2,
+                                          bgcolor: alpha(institutionalColors.primary, 0.03),
+                                          fontSize: "0.75rem",
+                                        }}
+                                      >
+                                        <Box>
+                                          <Typography variant="caption" color="textSecondary" display="block">
+                                            Fecha Carga
+                                          </Typography>
+                                          <Typography variant="body2" fontWeight="medium">
+                                            {documento.fechaCarga || "N/A"}
+                                          </Typography>
+                                        </Box>
+
+                                        <Box>
+                                          <Typography variant="caption" color="textSecondary" display="block">
+                                            Última Modificación
+                                          </Typography>
+                                          <Typography variant="body2" fontWeight="medium">
+                                            {documento.fechaModificacion || "N/A"}
+                                          </Typography>
+                                        </Box>
+
+                                        <Box>
+                                          <Typography variant="caption" color="textSecondary" display="block">
+                                            ID Documento
+                                          </Typography>
+                                          <Typography variant="body2" fontWeight="medium" sx={{ fontFamily: "monospace" }}>
+                                            #{documento.idDocumento}
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    </Box>
+
+                                    <ListItemSecondaryAction>
+                                      <Stack direction="row" spacing={1}>
+                                        <Tooltip title="Editar documento" arrow>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() =>
+                                              handleEditDocument(
+                                                apartado,
+                                                documento,
+                                              )
+                                            }
+                                            sx={{
+                                              color: institutionalColors.primary,
+                                              "&:hover": {
+                                                bgcolor: alpha(institutionalColors.primary, 0.1),
+                                              },
+                                            }}
+                                          >
+                                            <EditIcon fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+
+                                        <Tooltip title="Eliminar documento" arrow>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() =>
+                                              handleDeleteDocument(
+                                                apartado.idApartado,
+                                                documento.idDocumento,
+                                              )
+                                            }
+                                            sx={{
+                                              color: institutionalColors.error,
+                                              "&:hover": {
+                                                bgcolor: alpha(institutionalColors.error, 0.1),
+                                              },
+                                            }}
+                                          >
+                                            <DeleteIcon fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      </Stack>
+                                    </ListItemSecondaryAction>
+                                  </ListItem>
+                                </Fade>
+                              ))}
+                          </List>
+
+                          <Button
+                            variant="outlined"
+                            startIcon={<AddIcon />}
+                            size="medium"
+                            onClick={() => handleAddDocument(apartado.idApartado)}
+                            sx={{
+                              mt: 2,
+                              color: institutionalColors.primary,
+                              borderColor: institutionalColors.primary,
+                              "&:hover": {
+                                borderColor: institutionalColors.secondary,
+                                bgcolor: alpha(institutionalColors.primary, 0.04),
+                              },
+                            }}
+                          >
+                            Agregar Documento a esta Categoría
+                          </Button>
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  </Zoom>
                 ))
             )}
           </Box>
@@ -1113,17 +1266,25 @@ const ConfigExpediente = () => {
         apartado={currentApartado}
       />
 
-      {/* Snackbar para notificaciones */}
+      {/* Snackbar mejorado */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        TransitionComponent={Zoom}
       >
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            borderRadius: 2,
+            boxShadow: 3,
+            "& .MuiAlert-icon": { fontSize: 24 },
+          }}
+          elevation={6}
+          variant="filled"
         >
           {snackbar.message}
         </Alert>

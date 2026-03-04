@@ -11,46 +11,80 @@ import {
   FormControlLabel,
   Switch,
   Typography,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { Edit as EditIcon } from "@mui/icons-material";
-import { editarApartado } from "../../services/apartado"; // 🔹 IMPORTANTE
+import { IconSelector, IconPreview } from "./IconComponents";
+import { editarApartadoGlobal } from "../../services/apartado";
 
 const institutionalColors = {
   primary: "#133B6B",
   secondary: "#1a4c7a",
-  textPrimary: "#2c3e50",
-  textSecondary: "#7f8c8d",
-  background: "#f5f7fa",
-  lightBlue: "rgba(19, 59, 107, 0.08)",
 };
 
 const EditCategoryDialog = ({ open, onClose, category, onUpdated }) => {
   const [editedCategory, setEditedCategory] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 🔥 estados para alertas bonitas
+  const [alertState, setAlertState] = useState({
+    open: false,
+    type: "success",
+    message: "",
+  });
+
   useEffect(() => {
     if (category) {
-      setEditedCategory({ ...category });
+      setEditedCategory({
+        idApartado: category.idApartado,
+        nombre: category.nombre || "",
+        descripcion: category.descripcion || "",
+        icono: category.icono || "📁",
+        obligatorio: category.obligatorio || false,
+      });
     }
   }, [category]);
 
   const handleUpdate = async () => {
-    if (!editedCategory?.name) return;
+    if (!editedCategory?.nombre.trim()) return;
 
     setLoading(true);
     try {
-      const updated = await editarApartado(
-        editedCategory.id, // 🔹 ID del apartado
-        editedCategory     // 🔹 datos actualizados
+      const payload = {
+        nombre: editedCategory.nombre,
+        descripcion: editedCategory.descripcion,
+        icono: editedCategory.icono,
+        obligatorio: editedCategory.obligatorio,
+        activo: true,
+      };
+
+      const updated = await editarApartadoGlobal(
+        editedCategory.idApartado,
+        payload
       );
 
-      // 🔹 Actualiza la lista en el componente padre
       if (onUpdated) onUpdated(updated);
 
-      onClose();
+      setAlertState({
+        open: true,
+        type: "success",
+        message: "Categoría actualizada correctamente 🎉",
+      });
+
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+
     } catch (error) {
       console.error("Error al actualizar categoría:", error);
-      alert("Ocurrió un error al actualizar la categoría.");
+
+      setAlertState({
+        open: true,
+        type: "error",
+        message: "Ocurrió un error al actualizar la categoría.",
+      });
     } finally {
       setLoading(false);
     }
@@ -59,126 +93,110 @@ const EditCategoryDialog = ({ open, onClose, category, onUpdated }) => {
   if (!editedCategory) return null;
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: "12px" } }}
-    >
-      <DialogTitle>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <EditIcon sx={{ color: institutionalColors.primary }} />
-          <Typography variant="h6" sx={{ color: institutionalColors.textPrimary }}>
-            Editar Categoría
-          </Typography>
-        </Box>
-      </DialogTitle>
-
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            fullWidth
-            label="Nombre de la Categoría *"
-            value={editedCategory.name}
-            onChange={(e) =>
-              setEditedCategory({ ...editedCategory, name: e.target.value })
-            }
-          />
-
-          <TextField
-            fullWidth
-            label="Descripción"
-            multiline
-            rows={2}
-            value={editedCategory.description}
-            onChange={(e) =>
-              setEditedCategory({ ...editedCategory, description: e.target.value })
-            }
-          />
-
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <TextField
-              fullWidth
-              label="Ícono"
-              value={editedCategory.icon}
-              onChange={(e) =>
-                setEditedCategory({ ...editedCategory, icon: e.target.value })
-              }
-            />
-
-            <TextField
-              fullWidth
-              type="color"
-              label="Color"
-              value={editedCategory.color || "#133B6B"}
-              onChange={(e) =>
-                setEditedCategory({ ...editedCategory, color: e.target.value })
-              }
-              InputLabelProps={{ shrink: true }}
-            />
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <EditIcon sx={{ color: institutionalColors.primary }} />
+            <Typography variant="h6">
+              Editar Categoría
+            </Typography>
           </Box>
+        </DialogTitle>
 
-          <TextField
-            fullWidth
-            label="Orden"
-            type="number"
-            value={editedCategory.order}
-            onChange={(e) =>
-              setEditedCategory({
-                ...editedCategory,
-                order: parseInt(e.target.value),
-              })
-            }
-            inputProps={{ min: 1 }}
-          />
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editedCategory.obligatorio}
+                  onChange={(e) =>
+                    setEditedCategory({
+                      ...editedCategory,
+                      obligatorio: e.target.checked,
+                    })
+                  }
+                />
+              }
+              label="Categoría Obligatoria"
+            />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={editedCategory.required}
-                onChange={(e) =>
-                  setEditedCategory({
-                    ...editedCategory,
-                    required: e.target.checked,
-                  })
-                }
-                sx={{
-                  "& .MuiSwitch-switchBase.Mui-checked": {
-                    color: institutionalColors.primary,
-                  },
-                  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                    backgroundColor: institutionalColors.primary,
-                  },
-                }}
-              />
-            }
-            label="Categoría Obligatoria"
-          />
-        </Stack>
-      </DialogContent>
+            <TextField
+              fullWidth
+              label="Nombre de la Categoría *"
+              value={editedCategory.nombre}
+              onChange={(e) =>
+                setEditedCategory({
+                  ...editedCategory,
+                  nombre: e.target.value,
+                })
+              }
+            />
 
-      <DialogActions>
-        <Button
-          onClick={onClose}
-          sx={{ color: institutionalColors.textSecondary }}
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Descripción"
+              value={editedCategory.descripcion}
+              onChange={(e) =>
+                setEditedCategory({
+                  ...editedCategory,
+                  descripcion: e.target.value,
+                })
+              }
+            />
+
+            <IconSelector
+              value={editedCategory.icono}
+              onChange={(newIcon) =>
+                setEditedCategory({
+                  ...editedCategory,
+                  icono: newIcon,
+                })
+              }
+            />
+
+            <IconPreview icon={editedCategory.icono} />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={onClose}>
+            Cancelar
+          </Button>
+
+          <Button
+            onClick={handleUpdate}
+            variant="contained"
+            disabled={!editedCategory.nombre.trim() || loading}
+            sx={{
+              bgcolor: institutionalColors.primary,
+              "&:hover": { bgcolor: institutionalColors.secondary },
+            }}
+          >
+            {loading ? <CircularProgress size={22} /> : "Guardar Cambios"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 🔥 Snackbar bonito */}
+      <Snackbar
+        open={alertState.open}
+        autoHideDuration={4000}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          severity={alertState.type}
+          variant="filled"
+          onClose={() => setAlertState({ ...alertState, open: false })}
+          sx={{ borderRadius: 2 }}
         >
-          Cancelar
-        </Button>
-
-        <Button
-          onClick={handleUpdate}
-          variant="contained"
-          disabled={!editedCategory.name || loading}
-          sx={{
-            bgcolor: institutionalColors.primary,
-            "&:hover": { bgcolor: institutionalColors.secondary },
-          }}
-        >
-          {loading ? "Guardando..." : "Guardar Cambios"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          {alertState.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

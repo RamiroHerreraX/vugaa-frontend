@@ -21,41 +21,32 @@ import { crearApartadoGlobal } from "../../services/apartado";
 const institutionalColors = {
   primary: "#133B6B",
   secondary: "#1a4c7a",
-  textPrimary: "#2c3e50",
-  textSecondary: "#7f8c8d",
-  background: "#f5f7fa",
-  lightBlue: "rgba(19, 59, 107, 0.08)",
 };
 
 const CreateCategoryDialog = ({
   open,
   onClose,
-  onSuccess, // Cambiado de onCreated a onSuccess
+  onSuccess,
   isSuperAdmin,
 }) => {
   const [category, setCategory] = useState({
-    name: "",
-    description: "",
-    icon: "📁",
-    required: false,
-    
+    nombre: "",
+    descripcion: "",
+    icono: "📁",
+    obligatorio: false,
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Ref para guardar el success temporalmente
   const pendingSuccess = useRef(null);
 
-  // Resetear el formulario cuando se abre el diálogo
   useEffect(() => {
     if (open) {
       setCategory({
-        name: "",
-        description: "",
-        icon: "📁",
-        required: false,
-        order: 1,
+        nombre: "",
+        descripcion: "",
+        icono: "📁",
+        obligatorio: false,
       });
       setError(null);
     }
@@ -66,7 +57,7 @@ const CreateCategoryDialog = ({
   };
 
   const handleSave = async () => {
-    if (!category.name.trim()) {
+    if (!category.nombre.trim()) {
       setError("El nombre de la categoría es requerido");
       return;
     }
@@ -76,23 +67,22 @@ const CreateCategoryDialog = ({
 
     try {
       const payload = {
-        nombre: category.name,
-        descripcion: category.description,
-        icono: category.icon,
-        obligatorio: category.required,
+        nombre: category.nombre,
+        descripcion: category.descripcion,
+        icono: category.icono,
+        obligatorio: category.obligatorio,
+        activo: true, // Siempre activo al crear
       };
 
       const newCategory = await crearApartadoGlobal(payload);
 
-      // Guardamos el resultado para usarlo después de cerrar el modal
       pendingSuccess.current = newCategory;
-
-      // Cerramos el modal
       handleClose();
     } catch (error) {
       console.error("Error al crear categoría:", error);
       setError(
-        error.response?.data?.message || "Ocurrió un error al crear la categoría."
+        error.response?.data?.message ||
+          "Ocurrió un error al crear la categoría."
       );
     } finally {
       setLoading(false);
@@ -105,11 +95,9 @@ const CreateCategoryDialog = ({
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: "12px" } }}
       disableEscapeKeyDown={loading}
       TransitionProps={{
         onExited: () => {
-          // Esto se ejecuta después de que el modal se cierre completamente
           if (pendingSuccess.current) {
             onSuccess(pendingSuccess.current);
             pendingSuccess.current = null;
@@ -120,10 +108,7 @@ const CreateCategoryDialog = ({
       <DialogTitle>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <FolderIcon sx={{ color: institutionalColors.primary }} />
-          <Typography
-            variant="h6"
-            sx={{ color: institutionalColors.textPrimary }}
-          >
+          <Typography variant="h6">
             Nueva Categoría {isSuperAdmin ? "Global" : ""}
           </Typography>
         </Box>
@@ -131,88 +116,76 @@ const CreateCategoryDialog = ({
 
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+          {error && <Alert severity="error">{error}</Alert>}
 
-          <TextField
-            fullWidth
-            label="Nombre de la Categoría *"
-            value={category.name}
-            onChange={(e) =>
-              setCategory({ ...category, name: e.target.value })
-            }
-            helperText="Ej: Documentación Personal"
-            error={!category.name && error}
-            disabled={loading}
-          />
-
-          <TextField
-            fullWidth
-            label="Descripción"
-            multiline
-            rows={2}
-            value={category.description}
-            onChange={(e) =>
-              setCategory({ ...category, description: e.target.value })
-            }
-            helperText="Describe el propósito de esta categoría"
-            disabled={loading}
-          />
-
-          <IconSelector
-            value={category.icon}
-            onChange={(newIcon) =>
-              setCategory({ ...category, icon: newIcon })
-            }
-            disabled={loading}
-          />
-          <IconPreview icon={category.icon} />
-
+          {/* Obligatorio arriba */}
           <FormControlLabel
             control={
               <Switch
-                checked={category.required}
+                checked={category.obligatorio}
                 onChange={(e) =>
-                  setCategory({ ...category, required: e.target.checked })
+                  setCategory({
+                    ...category,
+                    obligatorio: e.target.checked,
+                  })
                 }
-                sx={{
-                  "& .MuiSwitch-switchBase.Mui-checked": {
-                    color: institutionalColors.primary,
-                  },
-                  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                    backgroundColor: institutionalColors.primary,
-                  },
-                }}
                 disabled={loading}
               />
             }
             label="Categoría Obligatoria"
           />
+
+          {/* Nombre */}
+          <TextField
+            fullWidth
+            label="Nombre de la Categoría *"
+            value={category.nombre}
+            onChange={(e) =>
+              setCategory({ ...category, nombre: e.target.value })
+            }
+            disabled={loading}
+          />
+
+          {/* Descripción */}
+          <TextField
+            fullWidth
+            multiline
+            rows={2}
+            label="Descripción"
+            value={category.descripcion}
+            onChange={(e) =>
+              setCategory({ ...category, descripcion: e.target.value })
+            }
+            disabled={loading}
+          />
+
+          {/* Icono */}
+          <IconSelector
+            value={category.icono}
+            onChange={(newIcon) =>
+              setCategory({ ...category, icono: newIcon })
+            }
+            disabled={loading}
+          />
+          <IconPreview icon={category.icono} />
         </Stack>
       </DialogContent>
 
       <DialogActions>
-        <Button
-          onClick={handleClose}
-          sx={{ color: institutionalColors.textSecondary }}
-          disabled={loading}
-        >
+        <Button onClick={handleClose} disabled={loading}>
           Cancelar
         </Button>
+
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={!category.name.trim() || loading}
+          disabled={!category.nombre.trim() || loading}
           sx={{
             bgcolor: institutionalColors.primary,
             "&:hover": { bgcolor: institutionalColors.secondary },
-            minWidth: "120px",
           }}
         >
-          {loading ? <CircularProgress size={24} /> : "Crear Categoría"}
+          {loading ? <CircularProgress size={22} /> : "Crear Categoría"}
         </Button>
       </DialogActions>
     </Dialog>

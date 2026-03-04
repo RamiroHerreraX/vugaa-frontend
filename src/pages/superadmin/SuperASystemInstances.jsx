@@ -49,6 +49,7 @@ import {
   Book as BookIcon,
   Refresh as RefreshIcon,
 } from "@mui/icons-material";
+
 import CreateInstanceDialog from "../../components/Instancias/CreateInstanceDialog";
 import ViewInstanceDialog from "../../components/Instancias/ViewInstanceDialog";
 import EditInstanceDialog from "../../components/Instancias/EditInstanceDialog";
@@ -105,7 +106,7 @@ const SystemInstances = () => {
       }
       
       const data = await getInstancias();
-
+      
       // Mapear backend → formato tabla
       const mapped = data.map((instancia) => ({
         id: instancia.id,

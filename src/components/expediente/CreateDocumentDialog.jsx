@@ -8,12 +8,15 @@ import {
   TextField,
   Stack,
   Box,
-  FormControlLabel,
-  Switch,
   Typography,
-  InputAdornment,
   CircularProgress,
   Alert,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
+  Chip,
+  OutlinedInput,
 } from "@mui/material";
 import { Description as DescriptionIcon } from "@mui/icons-material";
 import { crearDocumentoPlantilla } from "../../services/documentoExpediente";
@@ -26,48 +29,64 @@ const institutionalColors = {
   textSecondary: "#7f8c8d",
 };
 
+// Opciones de renovación
+const renovacionOptions = [
+  { label: "30 días (mensual)", value: 30 },
+  { label: "90 días (trimestral)", value: 90 },
+  { label: "180 días (semestral)", value: 180 },
+  { label: "365 días (anual)", value: 365 },
+  { label: "730 días (bianual)", value: 730 },
+];
 
-const CreateDocumentDialog = ({
-  open,
-  onClose,
-  onSuccess,
-  apartadoId,
-  apartado,
-}) => {
-  const pendingSuccess = useRef(null); // Guardamos resultado mientras se cierra el modal
+// Opciones de Formato Esperado
+const formatosOptions = [
+  "PDF",
+  "DOCX",
+  "XLSX",
+  "PPTX",
+  "TXT",
+  "CSV",
+  "PNG",
+  "JPG",
+];
 
-  const [requiereHoras, setRequiereHoras] = useState(false);
+// Opciones de etiquetas
+const etiquetasOptions = [
+  "Finanzas",
+  "Legal",
+  "Académico",
+  "RRHH",
+  "Administrativo",
+  "Otro",
+];
+
+const CreateDocumentDialog = ({ open, onClose, onSuccess, apartadoId }) => {
+  const pendingSuccess = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [documento, setDocumento] = useState({
     nombreArchivo: "",
-    horasRequeridas: 0,
-    periodoRevision: 0,
-    requiereValidacion: false,
-    observaciones: "",
-   
+    renovacion: "",
+    descripcion: "",
+    etiquetas: [],
+    formatoEsperado: [],
   });
 
-  // Resetear formulario cuando se abre
   useEffect(() => {
     if (open) {
-      setRequiereHoras(false);
       setDocumento({
         nombreArchivo: "",
-        horasRequeridas: 0,
-        periodoRevision: 0,
-        requiereValidacion: false,
-        observaciones: "",
-       
+        renovacion: "",
+        descripcion: "",
+        etiquetas: [],
+        formatoEsperado: [],
       });
       setError(null);
     }
   }, [open]);
 
-  const handleClose = () => {
-    onClose(); // Cerramos modal inmediatamente
-  };
+  const handleClose = () => onClose();
 
   const handleSave = async () => {
     if (!documento.nombreArchivo?.trim()) {
@@ -77,36 +96,35 @@ const CreateDocumentDialog = ({
 
     if (!apartadoId) {
       setError("No se puede crear el documento: falta ID de apartado.");
-      console.log(apartadoId);
       return;
     }
+
     setLoading(true);
     setError(null);
 
     try {
       const payload = {
         nombreArchivo: documento.nombreArchivo,
-        horasRequeridas: requiereHoras ? documento.horasRequeridas : 0,
-        periodoRevision: documento.periodoRevision,
-        requiereValidacion: documento.requiereValidacion,
-        observaciones: documento.observaciones || "",
+        periodoRevision: documento.renovacion || 0,
+        descripcion: documento.descripcion || "",
+        etiquetas: documento.etiquetas.join(","), 
+        formatoEsperado: documento.formatoEsperado.join(","), 
         idApartado: apartadoId,
-        fechaCarga: new Date().toISOString(), // Aseguramos fecha si el backend lo requiere
       };
-      console.log(payload)
+
       const response = await crearDocumentoPlantilla(payload);
 
-      // Guardamos el resultado mientras el modal se cierra
       pendingSuccess.current = {
         id_documento: response.id_documento || response.id,
         ...payload,
       };
 
-      // Cerramos modal
       handleClose();
     } catch (err) {
       console.error("Error al crear documento:", err);
-      setError(err.response?.data?.message || "Error al crear el documento");
+      setError(
+        err.response?.data?.message || "Error al crear el documento"
+      );
     } finally {
       setLoading(false);
     }
@@ -122,7 +140,6 @@ const CreateDocumentDialog = ({
       disableEscapeKeyDown={loading}
       TransitionProps={{
         onExited: () => {
-          // Ejecutamos onSuccess después de cerrar el modal
           if (pendingSuccess.current && onSuccess) {
             onSuccess(apartadoId, pendingSuccess.current);
             pendingSuccess.current = null;
@@ -154,80 +171,95 @@ const CreateDocumentDialog = ({
             }
           />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={requiereHoras}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setRequiereHoras(checked);
-                  if (!checked)
-                    setDocumento({ ...documento, horasRequeridas: 0 });
-                }}
-              />
-            }
-            label="¿Requiere cumplir horas?"
-          />
-
-          {requiereHoras && (
-            <TextField
-              fullWidth
-              type="number"
-              label="Horas Requeridas"
-              value={documento.horasRequeridas}
+          {/* Renovación */}
+          <FormControl fullWidth>
+            <InputLabel id="renovacion-label">Renovación</InputLabel>
+            <Select
+              labelId="renovacion-label"
+              value={documento.renovacion}
+              label="Renovación"
               onChange={(e) =>
-                setDocumento({
-                  ...documento,
-                  horasRequeridas: parseInt(e.target.value) || 0,
-                })
+                setDocumento({ ...documento, renovacion: e.target.value })
               }
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">hrs</InputAdornment>
-                ),
-              }}
-            />
-          )}
-
-          <TextField
-            fullWidth
-            type="number"
-            label="Periodo de Revisión"
-            value={documento.periodoRevision}
-            onChange={(e) =>
-              setDocumento({
-                ...documento,
-                periodoRevision: parseInt(e.target.value) || 0,
-              })
-            }
-            helperText="Días (0 = sin revisión)"
-          />
+            >
+              {renovacionOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <TextField
             fullWidth
             multiline
             rows={2}
-            label="Observaciones"
-            value={documento.observaciones}
+            label="Descripción"
+            value={documento.descripcion}
             onChange={(e) =>
-              setDocumento({ ...documento, observaciones: e.target.value })
+              setDocumento({ ...documento, descripcion: e.target.value })
             }
           />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={documento.requiereValidacion}
-                onChange={(e) =>
-                  setDocumento({
-                    ...documento,
-                    requiereValidacion: e.target.checked,
-                  })
-                }
-              />
-            }
-            label="Requiere Validación"
-          />
+          {/* Etiquetas */}
+          <FormControl fullWidth>
+            <InputLabel id="etiquetas-label">Etiquetas</InputLabel>
+            <Select
+              labelId="etiquetas-label"
+              multiple
+              value={documento.etiquetas}
+              onChange={(e) =>
+                setDocumento({
+                  ...documento,
+                  etiquetas: e.target.value,
+                })
+              }
+              input={<OutlinedInput label="Etiquetas" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+            >
+              {etiquetasOptions.map((tag) => (
+                <MenuItem key={tag} value={tag}>
+                  {tag}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Formato Esperado */}
+          <FormControl fullWidth>
+            <InputLabel id="formato-label">Formato Esperado</InputLabel>
+            <Select
+              labelId="formato-label"
+              multiple
+              value={documento.formatoEsperado}
+              onChange={(e) =>
+                setDocumento({
+                  ...documento,
+                  formatoEsperado: e.target.value,
+                })
+              }
+              input={<OutlinedInput label="Formato Esperado" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+            >
+              {formatosOptions.map((formato) => (
+                <MenuItem key={formato} value={formato}>
+                  {formato}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
       </DialogContent>
 

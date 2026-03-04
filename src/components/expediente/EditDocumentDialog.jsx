@@ -8,12 +8,14 @@ import {
   TextField,
   Stack,
   Box,
-  FormControlLabel,
-  Switch,
   Typography,
-  MenuItem,
-  InputAdornment,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  OutlinedInput,
 } from "@mui/material";
 import { Edit as EditIcon } from "@mui/icons-material";
 import { editarDocumento } from "../../services/documentoExpediente";
@@ -21,54 +23,86 @@ import { editarDocumento } from "../../services/documentoExpediente";
 const institutionalColors = {
   primary: "#133B6B",
   secondary: "#1a4c7a",
-  warning: "#f39c12",
-  textPrimary: "#2c3e50",
-  textSecondary: "#7f8c8d",
 };
 
-const estadosOptions = ["PENDIENTE", "EN_REVISION", "APROBADO", "RECHAZADO"];
+// Renovación
+const renovacionOptions = [
+  { label: "30 días (mensual)", value: 30 },
+  { label: "90 días (trimestral)", value: 90 },
+  { label: "180 días (semestral)", value: 180 },
+  { label: "365 días (anual)", value: 365 },
+  { label: "730 días (bianual)", value: 730 },
+];
+
+// Formatos
+const formatosOptions = [
+  "PDF",
+  "DOCX",
+  "XLSX",
+  "PPTX",
+  "TXT",
+  "CSV",
+  "PNG",
+  "JPG",
+];
+
+// Etiquetas
+const etiquetasOptions = [
+  "Finanzas",
+  "Legal",
+  "Académico",
+  "RRHH",
+  "Administrativo",
+  "Otro",
+];
 
 const EditDocumentDialog = ({
   open,
   onClose,
-  onUpdated, // 🔥 para refrescar lista
+  onUpdated,
   documento,
-  expedienteId,
   apartadoId,
-  instanciaId,
 }) => {
   const [editedDocumento, setEditedDocumento] = useState(null);
-  const [requiereHoras, setRequiereHoras] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (documento) {
-      setEditedDocumento({ ...documento });
-      setRequiereHoras(documento.horasRequeridas > 0);
+      setEditedDocumento({
+        idDocumento: documento.idDocumento,
+        nombreArchivo: documento.nombreArchivo || "",
+        renovacion: documento.periodoRevision || "",
+        descripcion: documento.descripcion || "",
+        etiquetas: documento.etiquetas
+          ? documento.etiquetas.split(",").filter(Boolean)
+          : [],
+        formatoEsperado: documento.formatoEsperado
+          ? documento.formatoEsperado.split(",").filter(Boolean)
+          : [],
+      });
     }
   }, [documento]);
 
   if (!editedDocumento) return null;
 
   const handleUpdate = async () => {
-    if (!editedDocumento.nombreArchivo) return;
+    if (!editedDocumento.nombreArchivo?.trim()) return;
 
     try {
       setLoading(true);
 
       const payload = {
-        ...editedDocumento,
-        horasRequeridas: requiereHoras
-          ? editedDocumento.horasRequeridas
-          : 0,
-        expediente: { idExpediente: expedienteId },
-        apartado: apartadoId ? { idApartado: apartadoId } : null,
-        instancia: { idInstancia: instanciaId },
+        nombreArchivo: editedDocumento.nombreArchivo,
+        periodoRevision: editedDocumento.renovacion || 0,
+        descripcion: editedDocumento.descripcion || "",
+        etiquetas: editedDocumento.etiquetas.join(","),
+        formatoEsperado: editedDocumento.formatoEsperado.join(","),
+        idApartado: apartadoId,
       };
 
       await editarDocumento(editedDocumento.idDocumento, payload);
 
-      if (onUpdated) onUpdated(); // 🔥 refresca lista
+      if (onUpdated) onUpdated();
       onClose();
     } catch (error) {
       console.error("Error al actualizar documento:", error);
@@ -79,13 +113,7 @@ const EditDocumentDialog = ({
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: "12px" } }}
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <EditIcon sx={{ color: institutionalColors.primary }} />
@@ -97,6 +125,7 @@ const EditDocumentDialog = ({
 
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+
           {/* Nombre */}
           <TextField
             fullWidth
@@ -110,113 +139,100 @@ const EditDocumentDialog = ({
             }
           />
 
-          {/* Switch requiere horas */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={requiereHoras}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setRequiereHoras(checked);
-
-                  if (!checked) {
-                    setEditedDocumento({
-                      ...editedDocumento,
-                      horasRequeridas: 0,
-                    });
-                  }
-                }}
-              />
-            }
-            label="¿Requiere cumplir horas?"
-          />
-
-          {/* Campo horas */}
-          {requiereHoras && (
-            <TextField
-              fullWidth
-              type="number"
-              label="Horas Requeridas"
-              value={editedDocumento.horasRequeridas || 0}
+          {/* Renovación */}
+          <FormControl fullWidth>
+            <InputLabel>Renovación</InputLabel>
+            <Select
+              value={editedDocumento.renovacion}
+              label="Renovación"
               onChange={(e) =>
                 setEditedDocumento({
                   ...editedDocumento,
-                  horasRequeridas: parseInt(e.target.value) || 0,
+                  renovacion: e.target.value,
                 })
               }
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">hrs</InputAdornment>
-                ),
-              }}
-            />
-          )}
+            >
+              {renovacionOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          {/* Periodo revisión */}
-          <TextField
-            fullWidth
-            type="number"
-            label="Periodo de Revisión"
-            value={editedDocumento.periodoRevision || 0}
-            onChange={(e) =>
-              setEditedDocumento({
-                ...editedDocumento,
-                periodoRevision: parseInt(e.target.value) || 0,
-              })
-            }
-            helperText="Días (0 = sin revisión)"
-          />
-
-          {/* Estado */}
-          <TextField
-            fullWidth
-            select
-            label="Estado"
-            value={editedDocumento.estado || "PENDIENTE"}
-            onChange={(e) =>
-              setEditedDocumento({
-                ...editedDocumento,
-                estado: e.target.value,
-              })
-            }
-          >
-            {estadosOptions.map((estado) => (
-              <MenuItem key={estado} value={estado}>
-                {estado}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* Observaciones */}
+          {/* Descripción */}
           <TextField
             fullWidth
             multiline
             rows={2}
-            label="Observaciones"
-            value={editedDocumento.observaciones || ""}
+            label="Descripción"
+            value={editedDocumento.descripcion}
             onChange={(e) =>
               setEditedDocumento({
                 ...editedDocumento,
-                observaciones: e.target.value,
+                descripcion: e.target.value,
               })
             }
           />
 
-          {/* Requiere validación */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={editedDocumento.requiereValidacion || false}
-                onChange={(e) =>
-                  setEditedDocumento({
-                    ...editedDocumento,
-                    requiereValidacion: e.target.checked,
-                  })
-                }
-              />
-            }
-            label="Requiere Validación"
-          />
+          {/* Etiquetas */}
+          <FormControl fullWidth>
+            <InputLabel>Etiquetas</InputLabel>
+            <Select
+              multiple
+              value={editedDocumento.etiquetas}
+              onChange={(e) =>
+                setEditedDocumento({
+                  ...editedDocumento,
+                  etiquetas: e.target.value,
+                })
+              }
+              input={<OutlinedInput label="Etiquetas" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+            >
+              {etiquetasOptions.map((tag) => (
+                <MenuItem key={tag} value={tag}>
+                  {tag}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Formato Esperado */}
+          <FormControl fullWidth>
+            <InputLabel>Formato Esperado</InputLabel>
+            <Select
+              multiple
+              value={editedDocumento.formatoEsperado}
+              onChange={(e) =>
+                setEditedDocumento({
+                  ...editedDocumento,
+                  formatoEsperado: e.target.value,
+                })
+              }
+              input={<OutlinedInput label="Formato Esperado" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+            >
+              {formatosOptions.map((formato) => (
+                <MenuItem key={formato} value={formato}>
+                  {formato}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
         </Stack>
       </DialogContent>
 
@@ -229,12 +245,12 @@ const EditDocumentDialog = ({
           onClick={handleUpdate}
           variant="contained"
           disabled={!editedDocumento.nombreArchivo || loading}
+          sx={{
+            bgcolor: institutionalColors.primary,
+            "&:hover": { bgcolor: institutionalColors.secondary },
+          }}
         >
-          {loading ? (
-            <CircularProgress size={22} />
-          ) : (
-            "Guardar Cambios"
-          )}
+          {loading ? <CircularProgress size={22} /> : "Guardar Cambios"}
         </Button>
       </DialogActions>
     </Dialog>

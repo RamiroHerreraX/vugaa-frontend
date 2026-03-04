@@ -48,3 +48,14 @@ export const crearApartadoGlobal = async (data) => {
   const response = await API.post(`${ENDPOINT}/global`, data);
   return response.data;
 };
+
+
+// ========================================
+// 🔹 ACTUALIZAR GLOBAL (SIN INSTANCIA)
+// ========================================
+export const editarApartadoGlobal = async (id, data) => {
+  const response = await API.put(`${ENDPOINT}/global/${id}`, data);
+  return response.data;
+};
+
+
