@@ -1,4 +1,3 @@
-// src/components/admin/SystemConfig.jsx
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -11,7 +10,6 @@ import {
     Button,
     Switch,
     FormControlLabel,
-    Divider,
     Chip,
     Slider,
     InputAdornment,
@@ -42,8 +40,6 @@ import {
 } from '@mui/material';
 import {
     Security as SecurityIcon,
-    Timer as TimerIcon,
-    Assessment as AssessmentIcon,
     CheckCircle as CheckCircleIcon,
     Warning as WarningIcon,
     Error as ErrorIcon,
@@ -58,14 +54,24 @@ import {
     Public as PublicIcon,
     EmojiEvents as EmojiEventsIcon,
     Search as SearchIcon,
-    ChevronRight as ChevronRightIcon,
     Info as InfoIcon,
     PendingActions as PendingActionsIcon,
     AssignmentInd as AssignmentIndIcon,
     KeyboardArrowUp as KeyboardArrowUpIcon,
     KeyboardArrowDown as KeyboardArrowDownIcon,
-    Close as CloseIcon
+    Close as CloseIcon,
+    Person as PersonIcon,
+    LocationOn as LocationOnIcon,
+    Group as GroupIcon,
+    PersonAdd as PersonAddIcon,
+    PersonRemove as PersonRemoveIcon
 } from '@mui/icons-material';
+
+// Importar componentes separados
+import CreateRegion from './../../components/regionAdmin/CreateRegion';
+import EditRegion from './../../components/regionAdmin/EditRegion';
+import CreateAsociacion from './../../components/asociacionAdmin/CreateAsociacion';
+import AsigAsociacion from './../../components/asociacionAdmin/AsigAsociacion';
 
 import rolService from '../../services/rol';
 import asociacionService from '../../services/asociacion';
@@ -142,33 +148,36 @@ const SystemConfig = () => {
     const [errorAsociaciones, setErrorAsociaciones] = useState(null);
     const [asociacionFilter, setAsociacionFilter] = useState('todos');
     const [searchAsociaciones, setSearchAsociaciones] = useState('');
+    const [regiones, setRegiones] = useState([]);
 
+    // Estados para el diálogo de asociaciones
     const [asociacionDialogOpen, setAsociacionDialogOpen] = useState(false);
     const [editingAsociacion, setEditingAsociacion] = useState(null);
-    const [asociacionForm, setAsociacionForm] = useState({ nombre: '', region: '' });
     const [savingAsociacion, setSavingAsociacion] = useState(false);
     const [togglingAsociacion, setTogglingAsociacion] = useState(null);
+    const [loadingRegionesForSelect, setLoadingRegionesForSelect] = useState(false);
+
+    // ── Nuevo estado para gestión de usuarios de asociación ─────────────────
+    const [usuariosAsociacionDialogOpen, setUsuariosAsociacionDialogOpen] = useState(false);
+    const [selectedAsociacionForUsuarios, setSelectedAsociacionForUsuarios] = useState(null);
+    const [usuariosAsociacion, setUsuariosAsociacion] = useState([]);
+    const [loadingUsuariosAsociacion, setLoadingUsuariosAsociacion] = useState(false);
+    const [errorUsuariosAsociacion, setErrorUsuariosAsociacion] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
+    // Nuevo estado para controlar qué usuario se está desvinculando
+    const [desvinculandoUsuario, setDesvinculandoUsuario] = useState(null);
 
     // ── Estado Regiones ─────────────────────────────────────────────────────
-    const [regiones, setRegiones] = useState([]);
+    const [regionesList, setRegionesList] = useState([]);
     const [loadingRegiones, setLoadingRegiones] = useState(false);
     const [errorRegiones, setErrorRegiones] = useState(null);
     const [regionFilter, setRegionFilter] = useState('todos');
     const [searchRegiones, setSearchRegiones] = useState('');
-    
+
     const [regionDialogOpen, setRegionDialogOpen] = useState(false);
     const [editingRegion, setEditingRegion] = useState(null);
-    const [regionForm, setRegionForm] = useState({ 
-        nombre: '', 
-        pais: 'Chile', 
-        estado: '', 
-        activa: true,
-        idInstancia: 1 
-    });
     const [savingRegion, setSavingRegion] = useState(false);
     const [togglingRegion, setTogglingRegion] = useState(null);
-    const [checkingRegionNombre, setCheckingRegionNombre] = useState(false);
-    const [regionNombreExists, setRegionNombreExists] = useState(false);
 
     // ── Config General ──────────────────────────────────────────────────────
     const [config, setConfig] = useState({
@@ -196,11 +205,12 @@ const SystemConfig = () => {
     useEffect(() => {
         fetchRoles();
         fetchAsociaciones();
-        fetchRegiones(); // Cargar regiones
+        fetchRegionesList();
+        fetchRegiones();
     }, []);
 
     // ══════════════════════════════════════════════════════════════════════
-    // ROLES - CORREGIDO según la entidad proporcionada
+    // ROLES
     // ══════════════════════════════════════════════════════════════════════
     const fetchRoles = async () => {
         setLoadingRoles(true);
@@ -208,7 +218,6 @@ const SystemConfig = () => {
         try {
             const data = await rolService.findAll();
             const rolesArray = Array.isArray(data) ? data : [];
-            // Eliminado el filtro por idInstancia ya que la entidad no tiene ese campo
             const sorted = rolesArray.sort((a, b) => a.id - b.id);
             setRoles(sorted);
         } catch (error) {
@@ -257,9 +266,9 @@ const SystemConfig = () => {
 
     const handleOpenRolDialog = (rol = null) => {
         setEditingRol(rol);
-        setRolForm({ 
-            nombre: rol?.nombre || '', 
-            descripcion: rol?.descripcion || '' 
+        setRolForm({
+            nombre: rol?.nombre || '',
+            descripcion: rol?.descripcion || ''
         });
         setNombreExists(false);
         setRolDialogOpen(true);
@@ -287,11 +296,9 @@ const SystemConfig = () => {
         }
         try {
             if (editingRol) {
-                // Para actualización, mantenemos los valores existentes de activo y esGlobal
                 const payload = {
                     nombre: rolForm.nombre,
                     descripcion: rolForm.descripcion,
-                    // Mantenemos los valores originales
                     activo: editingRol.activo,
                     esGlobal: editingRol.esGlobal
                 };
@@ -304,12 +311,11 @@ const SystemConfig = () => {
                 );
                 notify('Rol actualizado exitosamente');
             } else {
-                // Para creación, usamos los valores por defecto según la entidad
                 const payload = {
                     nombre: rolForm.nombre,
                     descripcion: rolForm.descripcion,
-                    activo: true,        // @Builder.Default activo = true
-                    esGlobal: false       // @Builder.Default esGlobal = false
+                    activo: true,
+                    esGlobal: false
                 };
                 const newRol = await rolService.create(payload);
                 setRoles(prev =>
@@ -351,7 +357,16 @@ const SystemConfig = () => {
             const filtered = asociacionesArray
                 .filter(a => a.idInstancia === 1)
                 .sort((a, b) => (a.idAsociacion || 0) - (b.idAsociacion || 0));
-            setAsociaciones(filtered);
+
+            const regionesData = await regionesService.findAll();
+            const regionesMap = new Map(regionesData.map(r => [r.idRegion, r.nombre]));
+
+            const enriched = filtered.map(asoc => ({
+                ...asoc,
+                nombreRegion: regionesMap.get(asoc.idRegion) || 'No especificada'
+            }));
+
+            setAsociaciones(enriched);
         } catch (error) {
             console.error('Error al cargar asociaciones:', error);
             const errorMessage = error?.message || 'No se pudieron cargar las asociaciones';
@@ -362,12 +377,22 @@ const SystemConfig = () => {
         }
     };
 
+    const fetchRegiones = async () => {
+        setLoadingRegionesForSelect(true);
+        try {
+            const data = await regionesService.findAll();
+            const regionesArray = Array.isArray(data) ? data : [];
+            const activas = regionesArray.filter(r => r.activa).sort((a, b) => a.nombre.localeCompare(b.nombre));
+            setRegiones(activas);
+        } catch (error) {
+            console.error('Error al cargar regiones para selector:', error);
+        } finally {
+            setLoadingRegionesForSelect(false);
+        }
+    };
+
     const handleOpenAsociacionDialog = (asociacion = null) => {
         setEditingAsociacion(asociacion);
-        setAsociacionForm({
-            nombre: asociacion?.nombre || '',
-            region: asociacion?.region || ''
-        });
         setAsociacionDialogOpen(true);
     };
 
@@ -375,51 +400,51 @@ const SystemConfig = () => {
         if (savingAsociacion) return;
         setAsociacionDialogOpen(false);
         setEditingAsociacion(null);
-        setAsociacionForm({ nombre: '', region: '' });
         setSavingAsociacion(false);
     };
 
-    const handleAsociacionFormChange = (field) => (event) => {
-        setAsociacionForm(prev => ({ ...prev, [field]: event.target.value }));
-    };
-
-    const handleSaveAsociacion = async () => {
-        if (!asociacionForm.nombre.trim()) {
-            notify('El nombre de la asociación es obligatorio', 'error');
-            return;
-        }
-
+    const handleSaveAsociacion = async (formData) => {
         setSavingAsociacion(true);
         try {
+            const payload = {
+                nombre: formData.nombre.trim(),
+                idInstancia: 1,
+                idRegion: formData.idRegion || null,
+                codigo: formData.codigo?.trim() || null,
+                representanteLegal: formData.representanteLegal?.trim() || null
+            };
+
             if (editingAsociacion) {
-                const payload = {
-                    nombre: asociacionForm.nombre.trim(),
-                    region: asociacionForm.region.trim(),
-                    id_instancia: 1,
-                    activa: editingAsociacion.activa
-                };
+                payload.activa = editingAsociacion.activa;
                 const updatedAsociacion = await asociacionService.update(
                     editingAsociacion.idAsociacion,
                     payload
                 );
+
+                const region = regiones.find(r => r.idRegion === updatedAsociacion.idRegion);
                 setAsociaciones(prev =>
                     prev.map(a =>
                         a.idAsociacion === editingAsociacion.idAsociacion
-                            ? { ...a, ...updatedAsociacion }
+                            ? {
+                                ...a,
+                                ...updatedAsociacion,
+                                nombreRegion: region?.nombre || 'No especificada'
+                            }
                             : a
                     )
                 );
                 notify('Asociación actualizada exitosamente');
             } else {
-                const payload = {
-                    nombre: asociacionForm.nombre.trim(),
-                    region: asociacionForm.region.trim(),
-                    id_instancia: 1,
-                    activa: true
-                };
                 const newAsociacion = await asociacionService.create(payload);
+
+                const region = regiones.find(r => r.idRegion === newAsociacion.idRegion);
+                const enrichedAsociacion = {
+                    ...newAsociacion,
+                    nombreRegion: region?.nombre || 'No especificada'
+                };
+
                 setAsociaciones(prev =>
-                    [...prev, newAsociacion].sort((a, b) => a.idAsociacion - b.idAsociacion)
+                    [...prev, enrichedAsociacion].sort((a, b) => a.idAsociacion - b.idAsociacion)
                 );
                 notify('Asociación creada exitosamente');
             }
@@ -433,20 +458,7 @@ const SystemConfig = () => {
                 else if (error.mensaje) errorMessage = error.mensaje;
                 else if (error.error) errorMessage = error.error;
             }
-            const errorLower = errorMessage.toLowerCase();
-            if (
-                errorMessage.includes('400') ||
-                errorLower.includes('ya existe') ||
-                errorLower.includes('duplicate') ||
-                errorLower.includes('unique') ||
-                errorLower.includes('nombre ya registrado') ||
-                errorLower.includes('already exists') ||
-                errorLower.includes('conflicto')
-            ) {
-                notify('Ya existe una asociación con este nombre', 'error');
-            } else {
-                notify(errorMessage, 'error');
-            }
+            notify(errorMessage, 'error');
         } finally {
             setSavingAsociacion(false);
         }
@@ -455,30 +467,31 @@ const SystemConfig = () => {
     const handleToggleAsociacionStatus = async (id) => {
         const asociacion = asociaciones.find(a => a.idAsociacion === id);
         if (!asociacion) return;
-        const nuevoEstado = !asociacion.activa;
-        const accion = nuevoEstado ? 'activar' : 'desactivar';
-        if (!window.confirm(`¿Está seguro de ${accion} la asociación "${asociacion.nombre}"?`)) return;
+
+        if (!window.confirm(`¿Está seguro de ${asociacion.activa ? 'desactivar' : 'activar'} la asociación "${asociacion.nombre}"?`)) return;
+
         setTogglingAsociacion(id);
         try {
-            // Usar el método unificado cambiarEstadoActivo
-            const result = await asociacionService.cambiarEstadoActivo(id, nuevoEstado);
-            const updatedData = result?.asociacion || result;
+            if (asociacion.activa) {
+                await asociacionService.desactivar(id);
+            } else {
+                await asociacionService.activar(id);
+            }
+
             setAsociaciones(prev =>
                 prev.map(a =>
                     a.idAsociacion === id
-                        ? { ...a, activa: nuevoEstado, ...updatedData }
+                        ? { ...a, activa: !asociacion.activa }
                         : a
                 )
             );
-            notify(`Asociación ${nuevoEstado ? 'activada' : 'desactivada'} correctamente`);
+            notify(`Asociación ${asociacion.activa ? 'desactivada' : 'activada'} correctamente`);
         } catch (error) {
             console.error('Error al cambiar estado de asociación:', error);
             let errorMessage = 'Error al cambiar el estado de la asociación';
             if (error) {
                 if (typeof error === 'string') errorMessage = error;
                 else if (error.message) errorMessage = error.message;
-                else if (error.mensaje) errorMessage = error.mensaje;
-                else if (error.error) errorMessage = error.error;
             }
             notify(errorMessage, 'error');
         } finally {
@@ -486,31 +499,122 @@ const SystemConfig = () => {
         }
     };
 
-    const filteredAsociaciones = asociaciones
-        .filter(asoc => {
-            const matchSearch =
-                asoc.nombre?.toLowerCase().includes(searchAsociaciones.toLowerCase()) ||
-                (asoc.region && asoc.region.toLowerCase().includes(searchAsociaciones.toLowerCase()));
-            const matchFilter =
-                asociacionFilter === 'todos' ? true :
-                    asociacionFilter === 'activos' ? asoc.activa === true :
-                        asoc.activa === false;
-            return matchSearch && matchFilter;
-        })
-        .sort((a, b) => a.idAsociacion - b.idAsociacion);
+    // ══════════════════════════════════════════════════════════════════════
+    // GESTIÓN DE USUARIOS DE ASOCIACIÓN - MODIFICADO
+    // ══════════════════════════════════════════════════════════════════════
+    const handleOpenUsuariosAsociacionDialog = async (asociacion) => {
+        setSelectedAsociacionForUsuarios(asociacion);
+        setUsuariosAsociacionDialogOpen(true);
+        setLoadingUsuariosAsociacion(true);
+        setErrorUsuariosAsociacion(null);
+
+        try {
+            const usuarios = await asociacionService.listarUsuariosAsociacionPorInstancia(1);
+
+            try {
+                const asociacionCompleta = await asociacionService.findById(asociacion.idAsociacion);
+                const usuariosRelacionadosIds = asociacionCompleta.usuarios?.map(u => u.id) || [];
+
+                const usuariosConRelacion = usuarios.map(usuario => ({
+                    ...usuario,
+                    relacionado: usuariosRelacionadosIds.includes(usuario.id)
+                }));
+
+                setUsuariosAsociacion(usuariosConRelacion);
+            } catch (error) {
+                console.error('Error al obtener usuarios relacionados:', error);
+                const usuariosConRelacion = usuarios.map(usuario => ({
+                    ...usuario,
+                    relacionado: false
+                }));
+                setUsuariosAsociacion(usuariosConRelacion);
+            }
+        } catch (error) {
+            console.error('Error al cargar usuarios de asociación:', error);
+            setErrorUsuariosAsociacion(error?.message || 'Error al cargar los usuarios');
+            notify('Error al cargar los usuarios de la asociación', 'error');
+        } finally {
+            setLoadingUsuariosAsociacion(false);
+        }
+    };
+
+    const handleCloseUsuariosAsociacionDialog = () => {
+        setUsuariosAsociacionDialogOpen(false);
+        setSelectedAsociacionForUsuarios(null);
+        setUsuariosAsociacion([]);
+        setErrorUsuariosAsociacion(null);
+        setDesvinculandoUsuario(null);
+    };
+
+    const handleRelacionarUsuario = async (usuario) => {
+        if (!selectedAsociacionForUsuarios) return;
+
+        setActionLoading(true);
+        try {
+            await asociacionService.relacionarUsuario(
+                selectedAsociacionForUsuarios.idAsociacion,
+                usuario.id
+            );
+
+            setUsuariosAsociacion(prev =>
+                prev.map(u =>
+                    u.id === usuario.id
+                        ? { ...u, relacionado: true }
+                        : u
+                )
+            );
+
+            notify(`Usuario "${usuario.nombre}" relacionado exitosamente con la asociación`, 'success');
+        } catch (error) {
+            console.error('Error al relacionar usuario:', error);
+            notify(error?.message || 'Error al relacionar el usuario con la asociación', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDesvincularUsuario = async (usuario) => {
+        if (!selectedAsociacionForUsuarios) return;
+
+        if (!window.confirm(`¿Está seguro de desvincular al usuario "${usuario.nombre}" de la asociación?`)) {
+            return;
+        }
+
+        setDesvinculandoUsuario(usuario.id);
+        try {
+            await asociacionService.desvincularUsuario(
+                selectedAsociacionForUsuarios.idAsociacion,
+                usuario.id
+            );
+
+            setUsuariosAsociacion(prev =>
+                prev.map(u =>
+                    u.id === usuario.id
+                        ? { ...u, relacionado: false }
+                        : u
+                )
+            );
+
+            notify(`Usuario "${usuario.nombre}" desvinculado exitosamente`, 'success');
+        } catch (error) {
+            console.error('Error al desvincular usuario:', error);
+            notify(error?.message || 'Error al desvincular el usuario', 'error');
+        } finally {
+            setDesvinculandoUsuario(null);
+        }
+    };
 
     // ══════════════════════════════════════════════════════════════════════
-    // REGIONES - VERSIÓN CORREGIDA (SIN ELIMINAR)
+    // REGIONES
     // ══════════════════════════════════════════════════════════════════════
-    const fetchRegiones = async () => {
+    const fetchRegionesList = async () => {
         setLoadingRegiones(true);
         setErrorRegiones(null);
         try {
-            // Usar el método findAll del servicio de regiones
             const data = await regionesService.findAll();
             const regionesArray = Array.isArray(data) ? data : [];
-            const sorted = regionesArray.sort((a, b) => a.id - b.id);
-            setRegiones(sorted);
+            const sorted = regionesArray.sort((a, b) => a.idRegion - b.idRegion);
+            setRegionesList(sorted);
         } catch (error) {
             console.error('Error al cargar regiones:', error);
             const errorMessage = error?.error || error?.message || 'No se pudieron cargar las regiones';
@@ -521,47 +625,9 @@ const SystemConfig = () => {
         }
     };
 
-    // Debounce: verificar nombre duplicado de región
-    useEffect(() => {
-        const check = async () => {
-            if (!regionForm.nombre || regionForm.nombre.length < 3) {
-                setRegionNombreExists(false);
-                return;
-            }
-            setCheckingRegionNombre(true);
-            try {
-                // Para edición, necesitamos verificar si el nombre ya existe excluyendo el ID actual
-                // Como no tenemos un método específico, podemos buscar por nombre y comparar IDs
-                if (editingRegion) {
-                    try {
-                        const existingRegion = await regionesService.findByNombreIgnoreCase(regionForm.nombre);
-                        setRegionNombreExists(existingRegion !== null && existingRegion.id !== editingRegion.id);
-                    } catch {
-                        setRegionNombreExists(false);
-                    }
-                } else {
-                    // Para creación nueva, verificamos si existe
-                    try {
-                        const existingRegion = await regionesService.findByNombreIgnoreCase(regionForm.nombre);
-                        setRegionNombreExists(existingRegion !== null);
-                    } catch {
-                        setRegionNombreExists(false);
-                    }
-                }
-            } catch (error) {
-                console.error('Error verificando nombre de región:', error);
-                setRegionNombreExists(false);
-            } finally {
-                setCheckingRegionNombre(false);
-            }
-        };
-        const t = setTimeout(check, 500);
-        return () => clearTimeout(t);
-    }, [regionForm.nombre, editingRegion]);
-
-    const filteredRegiones = regiones
+    const filteredRegiones = regionesList
         .filter(region => {
-            const matchSearch = 
+            const matchSearch =
                 region.nombre?.toLowerCase().includes(searchRegiones.toLowerCase()) ||
                 (region.pais?.toLowerCase() || '').includes(searchRegiones.toLowerCase()) ||
                 (region.estado?.toLowerCase() || '').includes(searchRegiones.toLowerCase());
@@ -571,18 +637,10 @@ const SystemConfig = () => {
                         region.activa === false;
             return matchSearch && matchFilter;
         })
-        .sort((a, b) => a.id - b.id);
+        .sort((a, b) => a.idRegion - b.idRegion);
 
     const handleOpenRegionDialog = (region = null) => {
         setEditingRegion(region);
-        setRegionForm({
-            nombre: region?.nombre || '',
-            pais: region?.pais || 'Chile',
-            estado: region?.estado || '',
-            activa: region?.activa !== undefined ? region.activa : true,
-            idInstancia: region?.idInstancia || 1
-        });
-        setRegionNombreExists(false);
         setRegionDialogOpen(true);
     };
 
@@ -590,66 +648,25 @@ const SystemConfig = () => {
         if (savingRegion) return;
         setRegionDialogOpen(false);
         setEditingRegion(null);
-        setRegionForm({ 
-            nombre: '', 
-            pais: 'Chile', 
-            estado: '', 
-            activa: true,
-            idInstancia: 1 
-        });
-        setRegionNombreExists(false);
         setSavingRegion(false);
     };
 
-    const handleRegionFormChange = (field) => (event) => {
-        setRegionForm(prev => ({ ...prev, [field]: event.target.value }));
-    };
-
-    const handleSaveRegion = async () => {
-        if (!regionForm.nombre.trim()) {
-            notify('El nombre de la región es obligatorio', 'error');
-            return;
-        }
-        if (!regionForm.pais.trim()) {
-            notify('El país es obligatorio', 'error');
-            return;
-        }
-        if (regionNombreExists) {
-            notify('Ya existe una región con este nombre', 'error');
-            return;
-        }
-
+    const handleSaveRegion = async (regionData) => {
         setSavingRegion(true);
         try {
             if (editingRegion) {
-                // Actualizar región existente
-                const payload = {
-                    nombre: regionForm.nombre.trim(),
-                    pais: regionForm.pais.trim(),
-                    estado: regionForm.estado.trim() || null,
-                    activa: regionForm.activa,
-                    idInstancia: regionForm.idInstancia
-                };
-                const updatedRegion = await regionesService.update(editingRegion.id, payload);
-                setRegiones(prev =>
-                    prev.map(r => r.id === editingRegion.id
+                const updatedRegion = await regionesService.update(editingRegion.idRegion, regionData);
+                setRegionesList(prev =>
+                    prev.map(r => r.idRegion === editingRegion.idRegion
                         ? { ...r, ...updatedRegion }
                         : r
-                    ).sort((a, b) => a.id - b.id)
+                    ).sort((a, b) => a.idRegion - b.idRegion)
                 );
                 notify('Región actualizada exitosamente');
             } else {
-                // Crear nueva región
-                const payload = {
-                    nombre: regionForm.nombre.trim(),
-                    pais: regionForm.pais.trim(),
-                    estado: regionForm.estado.trim() || null,
-                    activa: regionForm.activa,
-                    idInstancia: regionForm.idInstancia
-                };
-                const newRegion = await regionesService.create(payload);
-                setRegiones(prev =>
-                    [...prev, newRegion].sort((a, b) => a.id - b.id)
+                const newRegion = await regionesService.create(regionData);
+                setRegionesList(prev =>
+                    [...prev, newRegion].sort((a, b) => a.idRegion - b.idRegion)
                 );
                 notify('Región creada exitosamente');
             }
@@ -663,51 +680,36 @@ const SystemConfig = () => {
                 else if (error.mensaje) errorMessage = error.mensaje;
                 else if (error.error) errorMessage = error.error;
             }
-            const errorLower = errorMessage.toLowerCase();
-            if (
-                errorMessage.includes('400') ||
-                errorLower.includes('ya existe') ||
-                errorLower.includes('duplicate') ||
-                errorLower.includes('unique') ||
-                errorLower.includes('nombre ya registrado') ||
-                errorLower.includes('already exists') ||
-                errorLower.includes('conflicto')
-            ) {
-                notify('Ya existe una región con este nombre', 'error');
-            } else {
-                notify(errorMessage, 'error');
-            }
+            notify(errorMessage, 'error');
         } finally {
             setSavingRegion(false);
         }
     };
 
     const handleToggleRegionStatus = async (id) => {
-        const region = regiones.find(r => r.id === id);
+        const region = regionesList.find(r => r.idRegion === id);
         if (!region) return;
-        const nuevoEstado = !region.activa;
-        const accion = nuevoEstado ? 'activar' : 'desactivar';
-        if (!window.confirm(`¿Está seguro de ${accion} la región "${region.nombre}"?`)) return;
-        
+
+        if (!window.confirm(`¿Está seguro de ${region.activa ? 'desactivar' : 'activar'} la región "${region.nombre}"?`)) return;
+
         setTogglingRegion(id);
         try {
-            // Usar el método unificado cambiarEstadoActivo
-            const result = await regionesService.cambiarEstadoActivo(id, nuevoEstado);
-            // La respuesta contiene { mensaje, region }
-            const regionActualizada = result.region;
-            
-            setRegiones(prev =>
-                prev.map(r => r.id === id ? { ...r, ...regionActualizada, activa: nuevoEstado } : r)
+            if (region.activa) {
+                await regionesService.desactivarRegion(id);
+            } else {
+                await regionesService.activarRegion(id);
+            }
+
+            setRegionesList(prev =>
+                prev.map(r => r.idRegion === id ? { ...r, activa: !region.activa } : r)
             );
-            notify(result.mensaje || `Región ${nuevoEstado ? 'activada' : 'desactivada'} correctamente`);
+            notify(`Región ${region.activa ? 'desactivada' : 'activada'} correctamente`);
         } catch (error) {
             console.error('Error al cambiar estado de región:', error);
             let errorMessage = 'Error al cambiar el estado de la región';
             if (error) {
                 if (typeof error === 'string') errorMessage = error;
                 else if (error.message) errorMessage = error.message;
-                else if (error.mensaje) errorMessage = error.mensaje;
-                else if (error.error) errorMessage = error.error;
             }
             notify(errorMessage, 'error');
         } finally {
@@ -731,13 +733,6 @@ const SystemConfig = () => {
         setChanges(prev => [...prev, { field, oldValue, newValue, timestamp: new Date().toLocaleTimeString() }]);
     };
 
-    const handleSave = () => {
-        setTimeout(() => {
-            notify('Configuración guardada exitosamente');
-            setChanges([]);
-        }, 1000);
-    };
-
     const handleConfirmAssignment = () => {
         setAssignDialogOpen(false);
         setSelectedAgent(null);
@@ -747,6 +742,21 @@ const SystemConfig = () => {
 
     const toggleChangesPanel = () => setShowChangesPanel(prev => !prev);
     const systemHealth = config.maintenanceMode ? 90 : 100;
+
+    const filteredAsociaciones = asociaciones
+        .filter(asoc => {
+            const matchSearch =
+                asoc.nombre?.toLowerCase().includes(searchAsociaciones.toLowerCase()) ||
+                (asoc.codigo && asoc.codigo.toLowerCase().includes(searchAsociaciones.toLowerCase())) ||
+                (asoc.representanteLegal && asoc.representanteLegal.toLowerCase().includes(searchAsociaciones.toLowerCase())) ||
+                (asoc.nombreRegion && asoc.nombreRegion.toLowerCase().includes(searchAsociaciones.toLowerCase()));
+            const matchFilter =
+                asociacionFilter === 'todos' ? true :
+                    asociacionFilter === 'activos' ? asoc.activa === true :
+                        asoc.activa === false;
+            return matchSearch && matchFilter;
+        })
+        .sort((a, b) => a.idAsociacion - b.idAsociacion);
 
     const tabs = [
         { label: 'Catálogo Certificaciones', icon: <SchoolIcon /> },
@@ -974,7 +984,7 @@ const SystemConfig = () => {
                             </Box>
                         )}
 
-                        {/* TAB 2: Roles - CORREGIDO */}
+                        {/* TAB 2: Roles */}
                         {activeTab === 2 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1173,7 +1183,7 @@ const SystemConfig = () => {
                             </Box>
                         )}
 
-                        {/* TAB 3: Regiones - COMPLETADO Y CORREGIDO (SIN ELIMINAR) */}
+                        {/* TAB 3: Regiones */}
                         {activeTab === 3 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1206,7 +1216,7 @@ const SystemConfig = () => {
                                             Total: {filteredRegiones.length}
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                                            Activas: {regiones.filter(r => r.activa).length}
+                                            Activas: {regionesList.filter(r => r.activa).length}
                                         </Typography>
                                         <Button
                                             variant="contained"
@@ -1288,7 +1298,7 @@ const SystemConfig = () => {
                                             ) : (
                                                 filteredRegiones.map(region => (
                                                     <TableRow
-                                                        key={region.id}
+                                                        key={region.idRegion}
                                                         hover
                                                         sx={{
                                                             '&:hover': { bgcolor: '#f8f9fa' },
@@ -1298,7 +1308,7 @@ const SystemConfig = () => {
                                                     >
                                                         <TableCell>
                                                             <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {region.id}
+                                                                {region.idRegion}
                                                             </Typography>
                                                         </TableCell>
                                                         <TableCell>
@@ -1335,7 +1345,7 @@ const SystemConfig = () => {
                                                                         size="small"
                                                                         sx={{ color: colors.accents.blue }}
                                                                         onClick={() => handleOpenRegionDialog(region)}
-                                                                        disabled={togglingRegion === region.id}
+                                                                        disabled={togglingRegion === region.idRegion}
                                                                     >
                                                                         <EditIcon fontSize="small" />
                                                                     </IconButton>
@@ -1344,10 +1354,10 @@ const SystemConfig = () => {
                                                                     <IconButton
                                                                         size="small"
                                                                         sx={{ color: region.activa ? colors.semaforo.rojo : colors.secondary.main }}
-                                                                        onClick={() => handleToggleRegionStatus(region.id)}
-                                                                        disabled={togglingRegion === region.id}
+                                                                        onClick={() => handleToggleRegionStatus(region.idRegion)}
+                                                                        disabled={togglingRegion === region.idRegion}
                                                                     >
-                                                                        {togglingRegion === region.id
+                                                                        {togglingRegion === region.idRegion
                                                                             ? <CircularProgress size={16} sx={{ color: colors.primary.main }} />
                                                                             : region.activa
                                                                                 ? <BlockIcon fontSize="small" />
@@ -1378,7 +1388,7 @@ const SystemConfig = () => {
                             </Box>
                         )}
 
-                        {/* TAB 5: Asociaciones */}
+                        {/* TAB 5: Asociaciones - CON BOTÓN DE GESTIÓN QUE CAMBIA SEGÚN ESTADO */}
                         {activeTab === 5 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1426,7 +1436,7 @@ const SystemConfig = () => {
                                 </Box>
 
                                 <TextField
-                                    placeholder="Buscar asociación por nombre o región..."
+                                    placeholder="Buscar por nombre, código, representante o región..."
                                     value={searchAsociaciones}
                                     onChange={e => setSearchAsociaciones(e.target.value)}
                                     InputProps={{
@@ -1457,17 +1467,18 @@ const SystemConfig = () => {
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '25%' }}>Nombre</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '25%' }}>Región</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Instancia</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '12%' }} align="center">Estatus</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '13%' }} align="center">Acciones</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Asociación</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '8%' }}>Código</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '12%' }}>Región</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '15%' }}>Representante Legal</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '8%' }} align="center">Estatus</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '32%' }} align="center">Acciones</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {loadingAsociaciones ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                                         <CircularProgress size={30} sx={{ color: colors.primary.main }} />
                                                         <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>
                                                             Cargando asociaciones...
@@ -1476,7 +1487,7 @@ const SystemConfig = () => {
                                                 </TableRow>
                                             ) : errorAsociaciones ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                                         <Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>
                                                             {errorAsociaciones}
                                                         </Typography>
@@ -1484,7 +1495,7 @@ const SystemConfig = () => {
                                                 </TableRow>
                                             ) : filteredAsociaciones.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                                         <Typography variant="body2" sx={{ color: colors.text.secondary }}>
                                                             No se encontraron asociaciones
                                                         </Typography>
@@ -1507,19 +1518,38 @@ const SystemConfig = () => {
                                                             </Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
-                                                                {asoc.nombre}
-                                                            </Typography>
+                                                            <Box>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
+                                                                    {asoc.nombre}
+                                                                </Typography>
+                                                            </Box>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {asoc.region || 'No especificada'}
-                                                            </Typography>
+                                                            {asoc.codigo ? (
+                                                                <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                                                    {asoc.codigo}
+                                                                </Typography>
+                                                            ) : (
+                                                                <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+                                                                    -
+                                                                </Typography>
+                                                            )}
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                Instancia 1 (SICAG)
-                                                            </Typography>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                <LocationOnIcon sx={{ fontSize: 14, color: colors.accents.blue }} />
+                                                                <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                                                    {asoc.nombreRegion || 'No especificada'}
+                                                                </Typography>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                <PersonIcon sx={{ fontSize: 14, color: colors.accents.blue }} />
+                                                                <Typography variant="body2" sx={{ color: colors.primary.dark }}>
+                                                                    {asoc.representanteLegal || 'No especificado'}
+                                                                </Typography>
+                                                            </Box>
                                                         </TableCell>
                                                         <TableCell align="center">
                                                             <Chip
@@ -1534,14 +1564,24 @@ const SystemConfig = () => {
                                                             />
                                                         </TableCell>
                                                         <TableCell align="center">
-                                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                            <Stack direction="row" spacing={0.5} justifyContent="center" flexWrap="wrap">
                                                                 <Tooltip title="Editar asociación">
                                                                     <IconButton
                                                                         size="small"
                                                                         sx={{ color: colors.accents.blue }}
                                                                         onClick={() => handleOpenAsociacionDialog(asoc)}
+                                                                        disabled={togglingAsociacion === asoc.idAsociacion}
                                                                     >
                                                                         <EditIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                                <Tooltip title="Gestionar usuarios de la asociación">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        sx={{ color: colors.accents.purple }}
+                                                                        onClick={() => handleOpenUsuariosAsociacionDialog(asoc)}
+                                                                    >
+                                                                        <GroupIcon fontSize="small" />
                                                                     </IconButton>
                                                                 </Tooltip>
                                                                 <Tooltip title={asoc.activa ? 'Desactivar' : 'Activar'}>
@@ -1690,176 +1730,13 @@ const SystemConfig = () => {
                                         </Typography>
                                     </Box>
                                 </Paper>
-
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Box sx={{ display: 'flex', gap: 1 }}>
-                                        {['todos', 'activos', 'inactivos'].map(f => (
-                                            <Chip
-                                                key={f}
-                                                label={f.charAt(0).toUpperCase() + f.slice(1)}
-                                                variant="outlined"
-                                                clickable
-                                                size="small"
-                                                sx={{
-                                                    borderColor: f === 'activos' ? colors.secondary.main :
-                                                        f === 'inactivos' ? colors.primary.dark : colors.primary.main,
-                                                    color: f === 'activos' ? colors.secondary.main :
-                                                        f === 'inactivos' ? colors.primary.dark : colors.primary.main,
-                                                    cursor: 'pointer'
-                                                }}
-                                            />
-                                        ))}
-                                    </Box>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                                            Total: 0 niveles
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                                            Activos: 0
-                                        </Typography>
-                                        <Button
-                                            variant="contained"
-                                            startIcon={<AddIcon />}
-                                            size="small"
-                                            sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
-                                        >
-                                            Nuevo Nivel
-                                        </Button>
-                                    </Box>
-                                </Box>
-
-                                <TextField
-                                    placeholder="Buscar nivel de reconocimiento por nombre..."
-                                    size="small"
-                                    sx={{
-                                        maxWidth: 400,
-                                        '& .MuiOutlinedInput-root': {
-                                            '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                        }
-                                    }}
-                                />
-
-                                <TableContainer sx={{ border: `1px solid ${colors.primary.light}`, borderRadius: 1 }}>
-                                    <Table stickyHeader size="small">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark }}>ID</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark }}>Nombre del Nivel</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark }}>Descripción</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark }} align="center">Estatus</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark }} align="center">Acciones</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            <TableRow>
-                                                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                                                    <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                                                        No hay niveles de reconocimiento disponibles
-                                                    </Typography>
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
                             </Box>
                         )}
                     </Box>
                 </Paper>
-
-                {/* Panel de cambios (lateral) */}
-                {showChangesPanel && (
-                    <Paper elevation={3} sx={{
-                        width: 320,
-                        flexShrink: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden',
-                        borderRadius: 2,
-                        border: `1px solid ${colors.primary.light}`
-                    }}>
-                        <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 2, borderBottom: `1px solid ${colors.primary.light}` }}>
-                                <Typography variant="h6" sx={{ color: colors.primary.dark, fontWeight: 'bold' }}>
-                                    Cambios Recientes
-                                </Typography>
-                                <IconButton size="small" onClick={toggleChangesPanel} sx={{ color: colors.primary.main }}>
-                                    <ChevronRightIcon />
-                                </IconButton>
-                            </Box>
-                            <Box sx={{ flex: 1, overflowY: 'auto' }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <TimerIcon sx={{ color: colors.accents.purple }} />
-                                        <Typography variant="subtitle1" sx={{ color: colors.primary.dark, fontWeight: 'bold' }}>
-                                            Historial
-                                        </Typography>
-                                    </Box>
-                                    <Chip
-                                        label={`${changes.length} cambios`}
-                                        size="small"
-                                        sx={{ bgcolor: colors.primary.main, color: 'white' }}
-                                    />
-                                </Box>
-                                {changes.length > 0 ? (
-                                    changes.slice(-10).reverse().map((c, i) => (
-                                        <Paper
-                                            key={i}
-                                            sx={{
-                                                p: 1.5,
-                                                mb: 1.5,
-                                                bgcolor: 'white',
-                                                borderLeft: `3px solid ${colors.accents.blue}`,
-                                                border: `1px solid ${colors.primary.light}`
-                                            }}
-                                        >
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: colors.primary.dark, textTransform: 'capitalize' }}>
-                                                    {c.field.replace(/([A-Z])/g, ' $1').toLowerCase()}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: colors.text.secondary }}>{c.timestamp}</Typography>
-                                            </Box>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                                                <Typography variant="caption" sx={{ color: colors.text.secondary }}>De:</Typography>
-                                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: colors.semaforo.rojo, maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {c.oldValue.toString()}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: colors.text.secondary, mx: 0.5 }}>→</Typography>
-                                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: colors.secondary.main, maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {c.newValue.toString()}
-                                                </Typography>
-                                            </Box>
-                                        </Paper>
-                                    ))
-                                ) : (
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 6 }}>
-                                        <CheckCircleIcon sx={{ color: colors.secondary.main, fontSize: 48, mb: 2, opacity: 0.7 }} />
-                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                                            No hay cambios pendientes
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: colors.primary.light, mt: 1 }}>
-                                            Realice cambios en la configuración
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Box>
-                            <Box sx={{ pt: 2, mt: 2, borderTop: `1px solid ${colors.primary.light}` }}>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<ChevronRightIcon />}
-                                    onClick={toggleChangesPanel}
-                                    fullWidth
-                                    sx={{ color: colors.primary.main, borderColor: colors.primary.main }}
-                                >
-                                    Cerrar Panel
-                                </Button>
-                            </Box>
-                        </Box>
-                    </Paper>
-                )}
             </Box>
 
-            {/* ── Diálogo de Roles (CORREGIDO) ── */}
+            {/* ── Diálogo de Roles ── */}
             <Dialog
                 open={rolDialogOpen}
                 onClose={handleCloseRolDialog}
@@ -1936,214 +1813,46 @@ const SystemConfig = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* ── Diálogo de Regiones (CORREGIDO, SIN OPCIÓN DE ELIMINAR) ── */}
-            <Dialog
-                open={regionDialogOpen}
-                onClose={handleCloseRegionDialog}
-                maxWidth="sm"
-                fullWidth
-                PaperProps={{ sx: { borderRadius: 2 } }}
-            >
-                <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.light}` }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PublicIcon sx={{ color: colors.primary.main }} />
-                        <Typography variant="h6" sx={{ color: colors.primary.dark }}>
-                            {editingRegion ? 'Editar Región' : 'Nueva Región'}
-                        </Typography>
-                    </Box>
-                </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField
-                            fullWidth
-                            label="Nombre de la Región"
-                            value={regionForm.nombre}
-                            onChange={handleRegionFormChange('nombre')}
-                            required
-                            error={regionNombreExists}
-                            helperText={regionNombreExists ? 'Este nombre ya existe' : checkingRegionNombre ? 'Verificando...' : ''}
-                            disabled={savingRegion}
-                            size="small"
-                            sx={{
-                                '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
-                            }}
-                        />
-                        <TextField
-                            fullWidth
-                            label="País"
-                            value={regionForm.pais}
-                            onChange={handleRegionFormChange('pais')}
-                            required
-                            placeholder="Ej: Chile, Argentina, Perú..."
-                            disabled={savingRegion}
-                            size="small"
-                            sx={{
-                                '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
-                            }}
-                        />
-                        <TextField
-                            fullWidth
-                            label="Estado / Provincia"
-                            value={regionForm.estado}
-                            onChange={handleRegionFormChange('estado')}
-                            placeholder="Ej: Región Metropolitana, Provincia de Buenos Aires..."
-                            disabled={savingRegion}
-                            size="small"
-                            sx={{
-                                '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
-                            }}
-                        />
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={regionForm.activa}
-                                    onChange={handleRegionFormChange('activa')}
-                                    disabled={savingRegion}
-                                    size="small"
-                                    sx={{
-                                        '& .MuiSwitch-switchBase.Mui-checked': {
-                                            color: colors.secondary.main,
-                                            '&:hover': { backgroundColor: '#e8f5e9' },
-                                        },
-                                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                            backgroundColor: colors.secondary.main,
-                                        },
-                                    }}
-                                />
-                            }
-                            label={
-                                <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                    Región Activa
-                                </Typography>
-                            }
-                        />
-                        <Box sx={{ mt: 1, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: `1px solid ${colors.primary.light}` }}>
-                            <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <InfoIcon sx={{ fontSize: 16, color: colors.accents.blue }} />
-                                Las regiones no se eliminan, solo se activan o desactivan
-                            </Typography>
-                            {editingRegion && (
-                                <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
-                                    El estado activo/inactivo también puede cambiarse desde la tabla
-                                </Typography>
-                            )}
-                        </Box>
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ p: 2, borderTop: `1px solid ${colors.primary.light}` }}>
-                    <Button
-                        onClick={handleCloseRegionDialog}
-                        disabled={savingRegion}
-                        sx={{ color: colors.text.secondary }}
-                        size="small"
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleSaveRegion}
-                        variant="contained"
-                        disabled={!regionForm.nombre.trim() || !regionForm.pais.trim() || regionNombreExists || checkingRegionNombre || savingRegion}
-                        startIcon={savingRegion ? <CircularProgress size={18} sx={{ color: 'white' }} /> : null}
-                        size="small"
-                        sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
-                    >
-                        {savingRegion ? 'Guardando...' : (editingRegion ? 'Actualizar' : 'Crear')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* ── Diálogo de Asociaciones ── */}
-            <Dialog
+            {/* ── Diálogo de Asociaciones - USANDO EL COMPONENTE SEPARADO ── */}
+            <CreateAsociacion
                 open={asociacionDialogOpen}
                 onClose={handleCloseAsociacionDialog}
-                maxWidth="sm"
-                fullWidth
-                PaperProps={{ sx: { borderRadius: 2 } }}
-            >
-                <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.light}` }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <BusinessIcon sx={{ color: colors.primary.main }} />
-                        <Typography variant="h6" sx={{ color: colors.primary.dark }}>
-                            {editingAsociacion ? 'Editar Asociación' : 'Nueva Asociación'}
-                        </Typography>
-                    </Box>
-                </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField
-                            fullWidth
-                            label="Nombre de la Asociación"
-                            value={asociacionForm.nombre}
-                            onChange={handleAsociacionFormChange('nombre')}
-                            required
-                            disabled={savingAsociacion}
-                            size="small"
-                            sx={{
-                                '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
-                            }}
-                        />
-                        <TextField
-                            fullWidth
-                            label="Región"
-                            value={asociacionForm.region}
-                            onChange={handleAsociacionFormChange('region')}
-                            placeholder="Ej: Región Metropolitana, Región de Valparaíso..."
-                            disabled={savingAsociacion}
-                            size="small"
-                            sx={{
-                                '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
-                            }}
-                        />
-                        <Box sx={{ mt: 1, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: `1px solid ${colors.primary.light}` }}>
-                            <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <InfoIcon sx={{ fontSize: 16, color: colors.accents.blue }} />
-                                La asociación se creará en la Instancia 1 (SICAG)
-                            </Typography>
-                            {editingAsociacion && (
-                                <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
-                                    El estado activa/inactiva se cambia desde la tabla con el botón de bloqueo
-                                </Typography>
-                            )}
-                        </Box>
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ p: 2, borderTop: `1px solid ${colors.primary.light}` }}>
-                    <Button
-                        onClick={handleCloseAsociacionDialog}
-                        disabled={savingAsociacion}
-                        sx={{ color: colors.text.secondary }}
-                        size="small"
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleSaveAsociacion}
-                        variant="contained"
-                        disabled={!asociacionForm.nombre.trim() || savingAsociacion}
-                        startIcon={savingAsociacion ? <CircularProgress size={18} sx={{ color: 'white' }} /> : null}
-                        size="small"
-                        sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
-                    >
-                        {savingAsociacion ? 'Guardando...' : (editingAsociacion ? 'Actualizar' : 'Crear')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                onSave={handleSaveAsociacion}
+                editingAsociacion={editingAsociacion}
+                saving={savingAsociacion}
+                regiones={regiones}
+            />
 
+            {/* ── NUEVO: Diálogo para gestionar usuarios de asociación - AHORA ES EL COMPONENTE SEPARADO ── */}
+            <AsigAsociacion
+                open={usuariosAsociacionDialogOpen}
+                onClose={handleCloseUsuariosAsociacionDialog}
+                asociacion={selectedAsociacionForUsuarios}
+                usuarios={usuariosAsociacion}
+                loading={loadingUsuariosAsociacion}
+                error={errorUsuariosAsociacion}
+                onRelacionar={handleRelacionarUsuario}
+                actionLoading={actionLoading}
+            />
+
+            {/* ── Diálogo para CREAR Región ── */}
+            <CreateRegion
+                open={regionDialogOpen && !editingRegion}
+                onClose={handleCloseRegionDialog}
+                onSave={handleSaveRegion}
+                saving={savingRegion}
+            />
+
+            {/* ── Diálogo para EDITAR Región ── */}
+            <EditRegion
+                open={regionDialogOpen && !!editingRegion}
+                onClose={handleCloseRegionDialog}
+                onSave={handleSaveRegion}
+                editingRegion={editingRegion}
+                saving={savingRegion}
+            />
+
+            {/* ── Diálogo de Asignación ── */}
             <Dialog
                 open={assignDialogOpen}
                 onClose={() => setAssignDialogOpen(false)}
