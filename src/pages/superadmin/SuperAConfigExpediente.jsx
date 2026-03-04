@@ -25,6 +25,8 @@ import {
   Badge,
   Zoom,
   Fade,
+  Tab,
+  Tabs,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -47,6 +49,8 @@ import {
   CloudUpload as CloudUploadIcon,
   AttachFile as AttachFileIcon,
   Info as InfoIcon,
+  Code as CodeIcon,
+  Computer as ComputerIcon,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
@@ -64,6 +68,11 @@ import EditCategoryDialog from "../../components/expediente/EditCategoryDialog";
 import CreateDocumentDialog from "../../components/expediente/CreateDocumentDialog";
 import EditDocumentDialog from "../../components/expediente/EditDocumentDialog";
 
+import CreateProgramaDialog from "../../components/programas/CreateProgramaDialog";
+import EditProgramaDialog from "../../components/programas/EditProgramaDialog";
+
+import { getProgramasPorApartado, eliminarPrograma } from "../../services/programas";
+
 // Importar iconos y colores desde el archivo de iconos
 import {
   institutionalColors,
@@ -80,15 +89,26 @@ const ConfigExpediente = () => {
     message: "",
     severity: "success",
   });
+  
+  // Estado para controlar si hay una actualización pendiente
+  const [pendingUpdate, setPendingUpdate] = useState(false);
+  
+  // Estado para controlar la pestaña activa (documentos o programas)
+  const [activeTab, setActiveTab] = useState(0);
 
-  // Estados para los diálogos
+  // Estados para los diálogos de categorías y documentos
   const [openCreateCategory, setOpenCreateCategory] = useState(false);
   const [openEditCategory, setOpenEditCategory] = useState(false);
   const [openCreateDocument, setOpenCreateDocument] = useState(false);
   const [openEditDocument, setOpenEditDocument] = useState(false);
 
+  // Estados para los diálogos de programas
+  const [openCreatePrograma, setOpenCreatePrograma] = useState(false);
+  const [openEditPrograma, setOpenEditPrograma] = useState(false);
+
   const [currentApartado, setCurrentApartado] = useState(null);
   const [currentDocumento, setCurrentDocumento] = useState(null);
+  const [currentPrograma, setCurrentPrograma] = useState(null);
   const [selectedApartadoId, setSelectedApartadoId] = useState(null);
 
   const [expandedCategory, setExpandedCategory] = useState(null);
@@ -97,6 +117,18 @@ const ConfigExpediente = () => {
   useEffect(() => {
     cargarApartados();
   }, []);
+
+  // Efecto para actualizar la página después de 2 segundos cuando hay una actualización pendiente
+  useEffect(() => {
+    if (pendingUpdate) {
+      const timer = setTimeout(() => {
+        cargarApartados();
+        setPendingUpdate(false);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [pendingUpdate]);
 
   const cargarApartados = async () => {
     try {
@@ -109,10 +141,16 @@ const ConfigExpediente = () => {
       const apartadosData = await getTodosApartados();
       console.log("📂 Apartados obtenidos del backend:", apartadosData);
 
-      const apartadosConDocumentos = await Promise.all(
+      const apartadosConDocumentosYProgramas = await Promise.all(
         apartadosData.map(async (apartado) => {
           try {
+            // Cargar documentos
             const documentos = await getDocumentosPorApartado(
+              apartado.idApartado,
+            );
+            
+            // Cargar programas
+            const programas = await getProgramasPorApartado(
               apartado.idApartado,
             );
 
@@ -121,35 +159,37 @@ const ConfigExpediente = () => {
               documentos,
             );
             console.log(
-              "📄 Documentos completos:",
-              JSON.stringify(documentos, null, 2),
+              `💻 Programas del apartado ${apartado.nombre} (ID: ${apartado.idApartado}):`,
+              programas,
             );
 
             return {
               ...apartado,
               documentos: documentos || [],
+              programas: programas || [],
             };
           } catch (error) {
             console.error(
-              `❌ Error cargando documentos para apartado ${apartado.idApartado}:`,
+              `❌ Error cargando datos para apartado ${apartado.idApartado}:`,
               error,
             );
 
             return {
               ...apartado,
               documentos: [],
+              programas: [],
             };
           }
         }),
       );
 
       console.log(
-        "🟣 Apartados con documentos incluidos:",
-        apartadosConDocumentos,
+        "🟣 Apartados con documentos y programas incluidos:",
+        apartadosConDocumentosYProgramas,
       );
 
       // 2️⃣ Filtrar activos y ordenar
-      const apartadosActivos = apartadosConDocumentos
+      const apartadosActivos = apartadosConDocumentosYProgramas
         .filter((ap) => ap.activo !== false)
         .sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
@@ -180,11 +220,20 @@ const ConfigExpediente = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Calcular estadísticas (quitando requiredDocuments)
+  // Función para manejar la actualización después de 2 segundos
+  const handleUpdateWithDelay = () => {
+    setPendingUpdate(true);
+  };
+
+  // Calcular estadísticas
   const stats = {
     totalCategories: apartados.length,
     totalDocuments: apartados.reduce(
       (total, ap) => total + (ap.documentos?.length || 0),
+      0,
+    ),
+    totalProgramas: apartados.reduce(
+      (total, ap) => total + (ap.programas?.length || 0),
       0,
     ),
     requiredCategories: apartados.filter((ap) => ap.obligatorio).length,
@@ -205,6 +254,7 @@ const ConfigExpediente = () => {
     setOpenCreateCategory(false);
     showSnackbar("Categoría creada exitosamente");
     setExpandedCategory(nuevoApartado.idApartado);
+    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
   };
 
   const handleUpdateCategorySuccess = (apartadoActualizado) => {
@@ -218,18 +268,20 @@ const ConfigExpediente = () => {
     setOpenEditCategory(false);
     setCurrentApartado(null);
     showSnackbar("Categoría actualizada exitosamente");
+    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
   };
 
   const handleDeleteCategory = async (apartadoId) => {
     if (
       window.confirm(
-        "¿Está seguro de eliminar esta categoría y todos sus documentos?",
+        "¿Está seguro de eliminar esta categoría y todos sus documentos y programas?",
       )
     ) {
       try {
         await desactivarApartado(apartadoId);
         setApartados(apartados.filter((ap) => ap.idApartado !== apartadoId));
         showSnackbar("Categoría eliminada exitosamente");
+        handleUpdateWithDelay(); // Programar actualización después de 2 segundos
       } catch (error) {
         console.error("Error eliminando categoría:", error);
         showSnackbar("Error al eliminar la categoría", "error");
@@ -266,6 +318,7 @@ const ConfigExpediente = () => {
     setOpenCreateDocument(false);
     setCurrentApartado(null);
     showSnackbar("Documento creado exitosamente");
+    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
   };
 
   const handleUpdateDocumentSuccess = (apartadoId, documentoActualizado) => {
@@ -288,6 +341,7 @@ const ConfigExpediente = () => {
     setCurrentApartado(null);
     setCurrentDocumento(null);
     showSnackbar("Documento actualizado exitosamente");
+    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
   };
 
   const handleDeleteDocument = async (apartadoId, documentoId) => {
@@ -326,11 +380,115 @@ const ConfigExpediente = () => {
         );
 
         showSnackbar("Documento eliminado exitosamente");
+        handleUpdateWithDelay(); // Programar actualización después de 2 segundos
       } catch (error) {
         console.error("Error eliminando documento:", error);
         showSnackbar("Error al eliminar el documento", "error");
       }
     }
+  };
+
+  // Handlers para programas
+  const handleAddPrograma = (apartadoId) => {
+    const apartado = apartados.find((ap) => ap.idApartado === apartadoId);
+    setCurrentApartado(apartado);
+    setSelectedApartadoId(apartadoId);
+    setOpenCreatePrograma(true);
+  };
+
+  const handleEditPrograma = (apartado, programa) => {
+    setCurrentApartado(apartado);
+    setCurrentPrograma(programa);
+    setOpenEditPrograma(true);
+  };
+
+  const handleCreateProgramaSuccess = (apartadoId, nuevoPrograma) => {
+    setApartados(
+      apartados.map((apartado) => {
+        if (apartado.idApartado === apartadoId) {
+          return {
+            ...apartado,
+            programas: [...(apartado.programas || []), nuevoPrograma],
+          };
+        }
+        return apartado;
+      }),
+    );
+    setOpenCreatePrograma(false);
+    setCurrentApartado(null);
+    showSnackbar("Programa creado exitosamente");
+    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+  };
+
+  const handleUpdateProgramaSuccess = (apartadoId, programaActualizado) => {
+    setApartados(
+      apartados.map((apartado) => {
+        if (apartado.idApartado === apartadoId) {
+          return {
+            ...apartado,
+            programas: (apartado.programas || []).map((prog) =>
+              prog.id === programaActualizado.id
+                ? programaActualizado
+                : prog,
+            ),
+          };
+        }
+        return apartado;
+      }),
+    );
+    setOpenEditPrograma(false);
+    setCurrentApartado(null);
+    setCurrentPrograma(null);
+    showSnackbar("Programa actualizado exitosamente");
+    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+  };
+
+  const handleDeletePrograma = async (apartadoId, programaId) => {
+    // Buscar el programa completo en el estado local
+    const programa = (
+      apartados.find((a) => a.idApartado === apartadoId)?.programas || []
+    ).find((prog) => prog.id === programaId);
+
+    console.log("Intentando eliminar programa:");
+    console.log("apartadoId:", apartadoId);
+    console.log("programaId:", programaId);
+    console.log("Programa completo:", programa);
+
+    if (!programaId || !programa) {
+      console.error("Error: programa no encontrado o ID indefinido");
+      showSnackbar("No se puede eliminar: programa no encontrado", "error");
+      return;
+    }
+
+    if (window.confirm("¿Está seguro de eliminar este programa?")) {
+      try {
+        await eliminarPrograma(programaId);
+
+        setApartados(
+          apartados.map((apartado) => {
+            if (apartado.idApartado === apartadoId) {
+              return {
+                ...apartado,
+                programas: (apartado.programas || []).filter(
+                  (prog) => prog.id !== programaId,
+                ),
+              };
+            }
+            return apartado;
+          }),
+        );
+
+        showSnackbar("Programa eliminado exitosamente");
+        handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+      } catch (error) {
+        console.error("Error eliminando programa:", error);
+        showSnackbar("Error al eliminar el programa", "error");
+      }
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
   };
 
   const handleCategoryExpand = (apartadoId) => {
@@ -361,6 +519,32 @@ const ConfigExpediente = () => {
     if (days <= 30) return <ScheduleIcon fontSize="small" />;
     if (days <= 90) return <TimerIcon fontSize="small" />;
     return <ScheduleIcon fontSize="small" />;
+  };
+
+  const getTipoProgramaColor = (tipo) => {
+    switch (tipo?.toLowerCase()) {
+      case 'backend':
+        return institutionalColors.success;
+      case 'frontend':
+        return institutionalColors.info;
+      case 'fullstack':
+        return institutionalColors.warning;
+      default:
+        return institutionalColors.primary;
+    }
+  };
+
+  const getTipoProgramaIcon = (tipo) => {
+    switch (tipo?.toLowerCase()) {
+      case 'backend':
+        return <CodeIcon fontSize="small" />;
+      case 'frontend':
+        return <ComputerIcon fontSize="small" />;
+      case 'fullstack':
+        return <CodeIcon fontSize="small" />;
+      default:
+        return <CodeIcon fontSize="small" />;
+    }
   };
 
   if (loading) {
@@ -402,7 +586,8 @@ const ConfigExpediente = () => {
         flexDirection: "column",
         backgroundColor: institutionalColors.background,
       }}
-    >{/* Header */}
+    >
+      {/* Header */}
       <Box sx={{ mb: 3, p: 2.5 }}>
         <Box
           sx={{
@@ -427,8 +612,7 @@ const ConfigExpediente = () => {
               variant="body2"
               sx={{ color: institutionalColors.textSecondary }}
             >
-              Panel de Super Administrador - Gestión global de categorías y
-              documentos
+              Panel de Super Administrador - Gestión global de categorías, documentos y programas
             </Typography>
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
@@ -451,6 +635,23 @@ const ConfigExpediente = () => {
                   <RefreshIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+              {pendingUpdate && (
+                <Chip
+                  size="small"
+                  icon={<RefreshIcon />}
+                  label="Actualizando en 2 segundos..."
+                  sx={{
+                    bgcolor: alpha(institutionalColors.warning, 0.1),
+                    color: institutionalColors.warning,
+                    animation: "pulse 1.5s infinite",
+                    "@keyframes pulse": {
+                      "0%": { opacity: 1 },
+                      "50%": { opacity: 0.6 },
+                      "100%": { opacity: 1 },
+                    },
+                  }}
+                />
+              )}
             </Box>
           </Box>
 
@@ -475,15 +676,15 @@ const ConfigExpediente = () => {
           </Alert>
         )}
 
-        {/* 3 CARDS CON ESTADÍSTICAS (quitamos la de Rev. Comité) */}
+        {/* 4 CARDS CON ESTADÍSTICAS (incluyendo programas) */}
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(4, 1fr)",
             gap: 2,
             mb: 3,
             width: "100%",
-            "@media (max-width: 900px)": {
+            "@media (max-width: 1100px)": {
               gridTemplateColumns: "repeat(2, 1fr)",
             },
             "@media (max-width: 600px)": {
@@ -638,6 +839,66 @@ const ConfigExpediente = () => {
 
           <Card
             sx={{
+              borderLeft: `4px solid ${institutionalColors.warning}`,
+              height: 120,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 1.5,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                height: "100%",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  mb: 1,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ color: institutionalColors.warning }}>
+                    <CodeIcon />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: institutionalColors.textSecondary,
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Programas Totales
+                  </Typography>
+                </Box>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: institutionalColors.textPrimary,
+                    fontWeight: "bold",
+                    fontSize: "1.5rem",
+                    lineHeight: 1,
+                    textAlign: "right",
+                  }}
+                >
+                  {stats.totalProgramas}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Card
+            sx={{
               borderLeft: `4px solid ${institutionalColors.info}`,
               height: 120,
               display: "flex",
@@ -770,6 +1031,39 @@ const ConfigExpediente = () => {
             </Typography>
           </Box>
 
+          {/* Tabs para alternar entre Documentos y Programas */}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', px: 2.5 }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={handleTabChange}
+              sx={{
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem',
+                  minHeight: 48,
+                },
+                '& .Mui-selected': {
+                  color: institutionalColors.primary,
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: institutionalColors.primary,
+                },
+              }}
+            >
+              <Tab 
+                icon={<DescriptionIcon sx={{ fontSize: 20 }} />} 
+                iconPosition="start" 
+                label={`Documentos (${stats.totalDocuments})`} 
+              />
+              <Tab 
+                icon={<CodeIcon sx={{ fontSize: 20 }} />} 
+                iconPosition="start" 
+                label={`Programas (${stats.totalProgramas})`} 
+              />
+            </Tabs>
+          </Box>
+
           {/* Lista de apartados */}
           <Box
             sx={{
@@ -813,7 +1107,7 @@ const ConfigExpediente = () => {
                     sx={{ color: institutionalColors.textSecondary, mb: 3, textAlign: "center" }}
                   >
                     Comience creando una nueva categoría global para organizar los
-                    documentos del expediente
+                    documentos y programas del expediente
                   </Typography>
                   <Button
                     variant="contained"
@@ -876,7 +1170,10 @@ const ConfigExpediente = () => {
                           }}
                         >
                           <Badge
-                            badgeContent={apartado.documentos?.length || 0}
+                            badgeContent={activeTab === 0 
+                              ? (apartado.documentos?.length || 0)
+                              : (apartado.programas?.length || 0)
+                            }
                             color="primary"
                             sx={{ mr: 2 }}
                           >
@@ -924,6 +1221,24 @@ const ConfigExpediente = () => {
                                   }}
                                 />
                               )}
+                              <Chip
+                                size="small"
+                                icon={activeTab === 0 ? <DescriptionIcon /> : <CodeIcon />}
+                                label={activeTab === 0 
+                                  ? `${apartado.documentos?.length || 0} documentos`
+                                  : `${apartado.programas?.length || 0} programas`
+                                }
+                                sx={{
+                                  height: 22,
+                                  fontSize: "0.7rem",
+                                  bgcolor: alpha(activeTab === 0 
+                                    ? institutionalColors.success 
+                                    : institutionalColors.warning, 0.1),
+                                  color: activeTab === 0 
+                                    ? institutionalColors.success 
+                                    : institutionalColors.warning,
+                                }}
+                              />
                             </Box>
                             <Typography
                               variant="body2"
@@ -934,7 +1249,6 @@ const ConfigExpediente = () => {
                           </Box>
 
                           <Stack direction="row" spacing={1}>
-                            
                             <Tooltip title="Editar categoría" arrow>
                               <IconButton
                                 size="small"
@@ -951,9 +1265,6 @@ const ConfigExpediente = () => {
                               >
                                 <EditIcon fontSize="small" />
                               </IconButton>
-
-
-
                             </Tooltip>
                             <Tooltip title="Eliminar categoría" arrow>
                               <IconButton
@@ -978,241 +1289,479 @@ const ConfigExpediente = () => {
 
                       <AccordionDetails sx={{ bgcolor: "#fff", p: 3 }}>
                         <Box sx={{ pl: 7 }}>
-                          <List sx={{ p: 0 }}>
-                            {(apartado.documentos || [])
-                              .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-                              .map((documento, docIndex) => (
-                                <Fade
-                                  key={documento.idDocumento}
-                                  in={true}
-                                  style={{ transitionDelay: `${docIndex * 30}ms` }}
-                                >
-                                  <ListItem
-                                    sx={{
-                                      p: 2,
-                                      mb: 2,
-                                      borderRadius: 2,
-                                      bgcolor: institutionalColors.background,
-                                      border: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
-                                      borderLeft: `4px solid ${institutionalColors.primary}`,
-                                      alignItems: "flex-start",
-                                      transition: "all 0.2s",
-                                      "&:hover": {
-                                        transform: "translateX(4px)",
-                                        boxShadow: 2,
-                                      },
-                                    }}
-                                  >
-                                    <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
-                                      <Avatar
+                          {activeTab === 0 ? (
+                            // SECCIÓN DE DOCUMENTOS
+                            <>
+                              <List sx={{ p: 0 }}>
+                                {(apartado.documentos || [])
+                                  .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+                                  .map((documento, docIndex) => (
+                                    <Fade
+                                      key={documento.idDocumento}
+                                      in={true}
+                                      style={{ transitionDelay: `${docIndex * 30}ms` }}
+                                    >
+                                      <ListItem
                                         sx={{
-                                          width: 32,
-                                          height: 32,
-                                          bgcolor: alpha(institutionalColors.primary, 0.1),
-                                          color: institutionalColors.primary,
+                                          p: 2,
+                                          mb: 2,
+                                          borderRadius: 2,
+                                          bgcolor: institutionalColors.background,
+                                          border: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
+                                          borderLeft: `4px solid ${institutionalColors.primary}`,
+                                          alignItems: "flex-start",
+                                          transition: "all 0.2s",
+                                          "&:hover": {
+                                            transform: "translateX(4px)",
+                                            boxShadow: 2,
+                                          },
                                         }}
                                       >
-                                        <DescriptionIcon fontSize="small" />
-                                      </Avatar>
-                                    </ListItemIcon>
-
-                                    <Box sx={{ flex: 1 }}>
-                                      {/* Título con badges */}
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          flexWrap: "wrap",
-                                          gap: 1,
-                                          mb: 1,
-                                        }}
-                                      >
-                                        <Typography
-                                          variant="subtitle1"
-                                          sx={{
-                                            fontWeight: "bold",
-                                            color: institutionalColors.textPrimary,
-                                          }}
-                                        >
-                                          {documento.nombreArchivo}
-                                        </Typography>
-
-                                        {documento.periodoRevision > 0 && (
-                                          <Tooltip
-                                            title={getReviewDescription(documento)}
-                                            arrow
+                                        <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
+                                          <Avatar
+                                            sx={{
+                                              width: 32,
+                                              height: 32,
+                                              bgcolor: alpha(institutionalColors.primary, 0.1),
+                                              color: institutionalColors.primary,
+                                            }}
                                           >
+                                            <DescriptionIcon fontSize="small" />
+                                          </Avatar>
+                                        </ListItemIcon>
+
+                                        <Box sx={{ flex: 1 }}>
+                                          {/* Título con badges */}
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              flexWrap: "wrap",
+                                              gap: 1,
+                                              mb: 1,
+                                            }}
+                                          >
+                                            <Typography
+                                              variant="subtitle1"
+                                              sx={{
+                                                fontWeight: "bold",
+                                                color: institutionalColors.textPrimary,
+                                              }}
+                                            >
+                                              {documento.nombreArchivo}
+                                            </Typography>
+
+                                            {documento.periodoRevision > 0 && (
+                                              <Tooltip
+                                                title={getReviewDescription(documento)}
+                                                arrow
+                                              >
+                                                <Chip
+                                                  size="small"
+                                                  icon={getReviewIcon(documento.periodoRevision)}
+                                                  label={getReviewDescription(documento)}
+                                                  sx={{
+                                                    height: 24,
+                                                    bgcolor: alpha(institutionalColors.info, 0.1),
+                                                    color: institutionalColors.info,
+                                                    "& .MuiChip-icon": {
+                                                      color: institutionalColors.info,
+                                                    },
+                                                  }}
+                                                />
+                                              </Tooltip>
+                                            )}
+                                          </Box>
+
+                                          {/* Descripción */}
+                                          <Typography
+                                            variant="body2"
+                                            sx={{
+                                              color: institutionalColors.textSecondary,
+                                              mb: 1.5,
+                                            }}
+                                          >
+                                            {documento.descripcion || "Sin descripción"}
+                                          </Typography>
+
+                                          {/* Chips informativos mejorados */}
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              gap: 1,
+                                              flexWrap: "wrap",
+                                              mb: 2,
+                                            }}
+                                          >
+                                            {documento.formatoEsperado && (
+                                              <Chip
+                                                size="small"
+                                                icon={<AttachFileIcon />}
+                                                label={`Formato: ${documento.formatoEsperado}`}
+                                                sx={{
+                                                  height: 24,
+                                                  bgcolor: alpha(institutionalColors.success, 0.1),
+                                                  color: institutionalColors.success,
+                                                }}
+                                              />
+                                            )}
+
+                                            {documento.etiquetas && (
+                                              <Chip
+                                                size="small"
+                                                icon={<InfoIcon />}
+                                                label={documento.etiquetas}
+                                                sx={{
+                                                  height: 24,
+                                                  bgcolor: alpha(institutionalColors.warning, 0.1),
+                                                  color: institutionalColors.warning,
+                                                }}
+                                              />
+                                            )}
+                                          </Box>
+
+                                          {/* Información técnica mejorada */}
+                                          <Box
+                                            sx={{
+                                              display: "grid",
+                                              gridTemplateColumns: "repeat(3, 1fr)",
+                                              gap: 1,
+                                              mt: 1,
+                                              p: 1.5,
+                                              borderRadius: 2,
+                                              bgcolor: alpha(institutionalColors.primary, 0.03),
+                                              fontSize: "0.75rem",
+                                            }}
+                                          >
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                Fecha Carga
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium">
+                                                {documento.fechaCarga || "N/A"}
+                                              </Typography>
+                                            </Box>
+
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                Última Modificación
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium">
+                                                {documento.fechaModificacion || "N/A"}
+                                              </Typography>
+                                            </Box>
+
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                ID Documento
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium" sx={{ fontFamily: "monospace" }}>
+                                                #{documento.idDocumento}
+                                              </Typography>
+                                            </Box>
+                                          </Box>
+                                        </Box>
+
+                                        <ListItemSecondaryAction>
+                                          <Stack direction="row" spacing={1}>
+                                            <Tooltip title="Editar documento" arrow>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() =>
+                                                  handleEditDocument(
+                                                    apartado,
+                                                    documento,
+                                                  )
+                                                }
+                                                sx={{
+                                                  color: institutionalColors.primary,
+                                                  "&:hover": {
+                                                    bgcolor: alpha(institutionalColors.primary, 0.1),
+                                                  },
+                                                }}
+                                              >
+                                                <EditIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+
+                                            <Tooltip title="Eliminar documento" arrow>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() =>
+                                                  handleDeleteDocument(
+                                                    apartado.idApartado,
+                                                    documento.idDocumento,
+                                                  )
+                                                }
+                                                sx={{
+                                                  color: institutionalColors.error,
+                                                  "&:hover": {
+                                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                                  },
+                                                }}
+                                              >
+                                                <DeleteIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </Stack>
+                                        </ListItemSecondaryAction>
+                                      </ListItem>
+                                    </Fade>
+                                  ))}
+                              </List>
+
+                              <Button
+                                variant="outlined"
+                                startIcon={<AddIcon />}
+                                size="medium"
+                                onClick={() => handleAddDocument(apartado.idApartado)}
+                                sx={{
+                                  mt: 2,
+                                  color: institutionalColors.primary,
+                                  borderColor: institutionalColors.primary,
+                                  "&:hover": {
+                                    borderColor: institutionalColors.secondary,
+                                    bgcolor: alpha(institutionalColors.primary, 0.04),
+                                  },
+                                }}
+                              >
+                                Agregar Documento a esta Categoría
+                              </Button>
+                            </>
+                          ) : (
+                            // SECCIÓN DE PROGRAMAS
+                            <>
+                              <List sx={{ p: 0 }}>
+                                {(apartado.programas || [])
+                                  .sort((a, b) => (a.id || 0) - (b.id || 0))
+                                  .map((programa, progIndex) => (
+                                    <Fade
+                                      key={programa.id}
+                                      in={true}
+                                      style={{ transitionDelay: `${progIndex * 30}ms` }}
+                                    >
+                                      <ListItem
+                                        sx={{
+                                          p: 2,
+                                          mb: 2,
+                                          borderRadius: 2,
+                                          bgcolor: institutionalColors.background,
+                                          border: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
+                                          borderLeft: `4px solid ${getTipoProgramaColor(programa.tipo)}`,
+                                          alignItems: "flex-start",
+                                          transition: "all 0.2s",
+                                          "&:hover": {
+                                            transform: "translateX(4px)",
+                                            boxShadow: 2,
+                                          },
+                                        }}
+                                      >
+                                        <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
+                                          <Avatar
+                                            sx={{
+                                              width: 32,
+                                              height: 32,
+                                              bgcolor: alpha(getTipoProgramaColor(programa.tipo), 0.1),
+                                              color: getTipoProgramaColor(programa.tipo),
+                                            }}
+                                          >
+                                            {getTipoProgramaIcon(programa.tipo)}
+                                          </Avatar>
+                                        </ListItemIcon>
+
+                                        <Box sx={{ flex: 1 }}>
+                                          {/* Título con badges */}
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              flexWrap: "wrap",
+                                              gap: 1,
+                                              mb: 1,
+                                            }}
+                                          >
+                                            <Typography
+                                              variant="subtitle1"
+                                              sx={{
+                                                fontWeight: "bold",
+                                                color: institutionalColors.textPrimary,
+                                              }}
+                                            >
+                                              {programa.nombre}
+                                            </Typography>
+
                                             <Chip
                                               size="small"
-                                              icon={getReviewIcon(documento.periodoRevision)}
-                                              label={getReviewDescription(documento)}
+                                              icon={getTipoProgramaIcon(programa.tipo)}
+                                              label={programa.tipo || 'Sin tipo'}
                                               sx={{
                                                 height: 24,
-                                                bgcolor: alpha(institutionalColors.info, 0.1),
-                                                color: institutionalColors.info,
+                                                bgcolor: alpha(getTipoProgramaColor(programa.tipo), 0.1),
+                                                color: getTipoProgramaColor(programa.tipo),
                                                 "& .MuiChip-icon": {
-                                                  color: institutionalColors.info,
+                                                  color: getTipoProgramaColor(programa.tipo),
                                                 },
                                               }}
                                             />
-                                          </Tooltip>
-                                        )}
-                                      </Box>
 
-                                      {/* Descripción */}
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          color: institutionalColors.textSecondary,
-                                          mb: 1.5,
-                                        }}
-                                      >
-                                        {documento.descripcion || "Sin descripción"}
-                                      </Typography>
+                                            {programa.activo === false && (
+                                              <Chip
+                                                size="small"
+                                                label="Inactivo"
+                                                color="default"
+                                                sx={{ height: 24 }}
+                                              />
+                                            )}
+                                          </Box>
 
-                                      {/* Chips informativos mejorados */}
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          gap: 1,
-                                          flexWrap: "wrap",
-                                          mb: 2,
-                                        }}
-                                      >
-                                        {documento.formatoEsperado && (
-                                          <Chip
-                                            size="small"
-                                            icon={<AttachFileIcon />}
-                                            label={`Formato: ${documento.formatoEsperado}`}
+                                          {/* Descripción */}
+                                          <Typography
+                                            variant="body2"
                                             sx={{
-                                              height: 24,
-                                              bgcolor: alpha(institutionalColors.success, 0.1),
-                                              color: institutionalColors.success,
-                                            }}
-                                          />
-                                        )}
-
-                                        {documento.etiquetas && (
-                                          <Chip
-                                            size="small"
-                                            icon={<InfoIcon />}
-                                            label={documento.etiquetas}
-                                            sx={{
-                                              height: 24,
-                                              bgcolor: alpha(institutionalColors.warning, 0.1),
-                                              color: institutionalColors.warning,
-                                            }}
-                                          />
-                                        )}
-                                      </Box>
-
-                                      {/* Información técnica mejorada */}
-                                      <Box
-                                        sx={{
-                                          display: "grid",
-                                          gridTemplateColumns: "repeat(3, 1fr)",
-                                          gap: 1,
-                                          mt: 1,
-                                          p: 1.5,
-                                          borderRadius: 2,
-                                          bgcolor: alpha(institutionalColors.primary, 0.03),
-                                          fontSize: "0.75rem",
-                                        }}
-                                      >
-                                        <Box>
-                                          <Typography variant="caption" color="textSecondary" display="block">
-                                            Fecha Carga
-                                          </Typography>
-                                          <Typography variant="body2" fontWeight="medium">
-                                            {documento.fechaCarga || "N/A"}
-                                          </Typography>
-                                        </Box>
-
-                                        <Box>
-                                          <Typography variant="caption" color="textSecondary" display="block">
-                                            Última Modificación
-                                          </Typography>
-                                          <Typography variant="body2" fontWeight="medium">
-                                            {documento.fechaModificacion || "N/A"}
-                                          </Typography>
-                                        </Box>
-
-                                        <Box>
-                                          <Typography variant="caption" color="textSecondary" display="block">
-                                            ID Documento
-                                          </Typography>
-                                          <Typography variant="body2" fontWeight="medium" sx={{ fontFamily: "monospace" }}>
-                                            #{documento.idDocumento}
-                                          </Typography>
-                                        </Box>
-                                      </Box>
-                                    </Box>
-
-                                    <ListItemSecondaryAction>
-                                      <Stack direction="row" spacing={1}>
-                                        <Tooltip title="Editar documento" arrow>
-                                          <IconButton
-                                            size="small"
-                                            onClick={() =>
-                                              handleEditDocument(
-                                                apartado,
-                                                documento,
-                                              )
-                                            }
-                                            sx={{
-                                              color: institutionalColors.primary,
-                                              "&:hover": {
-                                                bgcolor: alpha(institutionalColors.primary, 0.1),
-                                              },
+                                              color: institutionalColors.textSecondary,
+                                              mb: 1.5,
                                             }}
                                           >
-                                            <EditIcon fontSize="small" />
-                                          </IconButton>
-                                        </Tooltip>
+                                            {programa.descripcion || "Sin descripción"}
+                                          </Typography>
 
-                                        <Tooltip title="Eliminar documento" arrow>
-                                          <IconButton
-                                            size="small"
-                                            onClick={() =>
-                                              handleDeleteDocument(
-                                                apartado.idApartado,
-                                                documento.idDocumento,
-                                              )
-                                            }
+                                          {/* Información del programa */}
+                                          <Box
                                             sx={{
-                                              color: institutionalColors.error,
-                                              "&:hover": {
-                                                bgcolor: alpha(institutionalColors.error, 0.1),
-                                              },
+                                              display: "grid",
+                                              gridTemplateColumns: "repeat(3, 1fr)",
+                                              gap: 1,
+                                              mt: 1,
+                                              p: 1.5,
+                                              borderRadius: 2,
+                                              bgcolor: alpha(institutionalColors.primary, 0.03),
+                                              fontSize: "0.75rem",
                                             }}
                                           >
-                                            <DeleteIcon fontSize="small" />
-                                          </IconButton>
-                                        </Tooltip>
-                                      </Stack>
-                                    </ListItemSecondaryAction>
-                                  </ListItem>
-                                </Fade>
-                              ))}
-                          </List>
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                Horas Requeridas
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium">
+                                                {programa.horasRequeridas || 0} horas
+                                              </Typography>
+                                            </Box>
 
-                          <Button
-                            variant="outlined"
-                            startIcon={<AddIcon />}
-                            size="medium"
-                            onClick={() => handleAddDocument(apartado.idApartado)}
-                            sx={{
-                              mt: 2,
-                              color: institutionalColors.primary,
-                              borderColor: institutionalColors.primary,
-                              "&:hover": {
-                                borderColor: institutionalColors.secondary,
-                                bgcolor: alpha(institutionalColors.primary, 0.04),
-                              },
-                            }}
-                          >
-                            Agregar Documento a esta Categoría
-                          </Button>
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                ID Programa
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium" sx={{ fontFamily: "monospace" }}>
+                                                #{programa.id}
+                                              </Typography>
+                                            </Box>
+
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                Configuración
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium">
+                                                {programa.configuracionJson ? '✓ Configurado' : 'Sin configurar'}
+                                              </Typography>
+                                            </Box>
+                                          </Box>
+
+                                          {/* Mostrar configuración JSON si existe */}
+                                          {programa.configuracionJson && (
+                                            <Box
+                                              sx={{
+                                                mt: 1,
+                                                p: 1,
+                                                borderRadius: 1,
+                                                bgcolor: alpha(institutionalColors.info, 0.05),
+                                                border: `1px solid ${alpha(institutionalColors.info, 0.2)}`,
+                                              }}
+                                            >
+                                              <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 0.5 }}>
+                                                Configuración:
+                                              </Typography>
+                                              <Typography
+                                                variant="caption"
+                                                sx={{
+                                                  fontFamily: 'monospace',
+                                                  fontSize: '0.7rem',
+                                                  whiteSpace: 'pre-wrap',
+                                                  wordBreak: 'break-all',
+                                                }}
+                                              >
+                                                {programa.configuracionJson}
+                                              </Typography>
+                                            </Box>
+                                          )}
+                                        </Box>
+
+                                        <ListItemSecondaryAction>
+                                          <Stack direction="row" spacing={1}>
+                                            <Tooltip title="Editar programa" arrow>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() =>
+                                                  handleEditPrograma(
+                                                    apartado,
+                                                    programa,
+                                                  )
+                                                }
+                                                sx={{
+                                                  color: institutionalColors.primary,
+                                                  "&:hover": {
+                                                    bgcolor: alpha(institutionalColors.primary, 0.1),
+                                                  },
+                                                }}
+                                              >
+                                                <EditIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+
+                                            <Tooltip title="Eliminar programa" arrow>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() =>
+                                                  handleDeletePrograma(
+                                                    apartado.idApartado,
+                                                    programa.id,
+                                                  )
+                                                }
+                                                sx={{
+                                                  color: institutionalColors.error,
+                                                  "&:hover": {
+                                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                                  },
+                                                }}
+                                              >
+                                                <DeleteIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </Stack>
+                                        </ListItemSecondaryAction>
+                                      </ListItem>
+                                    </Fade>
+                                  ))}
+                              </List>
+
+                              <Button
+                                variant="outlined"
+                                startIcon={<AddIcon />}
+                                size="medium"
+                                onClick={() => handleAddPrograma(apartado.idApartado)}
+                                sx={{
+                                  mt: 2,
+                                  color: institutionalColors.warning,
+                                  borderColor: institutionalColors.warning,
+                                  "&:hover": {
+                                    borderColor: institutionalColors.secondary,
+                                    bgcolor: alpha(institutionalColors.warning, 0.04),
+                                  },
+                                }}
+                              >
+                                Agregar Programa a esta Categoría
+                              </Button>
+                            </>
+                          )}
                         </Box>
                       </AccordionDetails>
                     </Accordion>
@@ -1223,7 +1772,7 @@ const ConfigExpediente = () => {
         </Paper>
       </Box>
 
-      {/* Modales */}
+      {/* Modales de Categorías */}
       <CreateCategoryDialog
         open={openCreateCategory}
         onClose={() => setOpenCreateCategory(false)}
@@ -1242,6 +1791,7 @@ const ConfigExpediente = () => {
         isSuperAdmin={true}
       />
 
+      {/* Modales de Documentos */}
       <CreateDocumentDialog
         open={openCreateDocument}
         onClose={() => {
@@ -1263,6 +1813,31 @@ const ConfigExpediente = () => {
         onSuccess={handleUpdateDocumentSuccess}
         apartadoId={currentApartado?.idApartado}
         documento={currentDocumento}
+        apartado={currentApartado}
+      />
+
+      {/* Modales de Programas */}
+      <CreateProgramaDialog
+        open={openCreatePrograma}
+        onClose={() => {
+          setOpenCreatePrograma(false);
+          setCurrentApartado(null);
+        }}
+        onSuccess={handleCreateProgramaSuccess}
+        apartadoId={selectedApartadoId}
+        apartado={currentApartado}
+      />
+
+      <EditProgramaDialog
+        open={openEditPrograma}
+        onClose={() => {
+          setOpenEditPrograma(false);
+          setCurrentApartado(null);
+          setCurrentPrograma(null);
+        }}
+        onSuccess={handleUpdateProgramaSuccess}
+        apartadoId={currentApartado?.idApartado}
+        programa={currentPrograma}
         apartado={currentApartado}
       />
 
