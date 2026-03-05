@@ -44,7 +44,7 @@ import UserManagement from './pages/admin/UserManagement';
 import UserReview from './pages/admin/UserReview';
 
 // Páginas de Comité
-import CommitteeDashboard from "./pages/committee/Dashboard";
+import CommitteeDashboard from "./pages/committee/CommitteeDashboard";
 import PendingReviews from "./pages/committee/PendingReviews";
 
 // Páginas de Usuario agente

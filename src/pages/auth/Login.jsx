@@ -1,5 +1,5 @@
 // src/pages/auth/Login.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Container,
@@ -16,15 +16,8 @@ import {
   FormControl,
   InputLabel,
   IconButton,
-  Input,
-  FilledInput,
-  OutlinedInput,
-  FormHelperText,
   CircularProgress,
   Divider,
-  Avatar,
-  useTheme,
-  useMediaQuery,
   Snackbar,
 } from "@mui/material";
 import {
@@ -34,10 +27,12 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   Login as LoginIcon,
-  Security as SecurityIcon,
   ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
+
+// Importar el logo
+import vugaaLogo from "../../assets/Vugaa_logo.jpeg";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -52,8 +47,6 @@ const Login = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Opciones de instancias
   const tenantOptions = [
@@ -124,7 +117,7 @@ const Login = () => {
             case "asociacion":
               navigate("/association/dashboard");
               break;
-            default: // agente, profesionista, empresario
+            default:
               navigate("/dashboard");
           }
         }, 1500);
@@ -144,9 +137,7 @@ const Login = () => {
       admin: { email: "admin@caaarem.com", tenant: "caaarem", label: "Admin" },
       comite: { email: "comite@caaarem.com", tenant: "caaarem", label: "Comité" },
       asociacion: { email: "asociacion@caaarem.com", tenant: "caaarem", label: "Asociación" },
-      agente: { email: "agente@caaarem.com", tenant: "caaarem", label: "Agente" },
-      profesionista: { email: "profesionista@caaarem.com", tenant: "caaarem", label: "Profesionista" },
-      empresario: { email: "empresario@caaarem.com", tenant: "caaarem", label: "Empresario" }
+      agente: { email: "agente@caaarem.com", tenant: "caaarem", label: "Agente" }
     };
     
     if (demos[role]) {
@@ -158,48 +149,108 @@ const Login = () => {
 
   return (
     <Box sx={{ 
-      minHeight: '100vh', 
+      minHeight: '100vh',
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      py: 4
+      background: "linear-gradient(135deg, #ffffff 0%, #133B6B 50%, #1E4A7A 100%)",
+      py: { xs: 2, sm: 4 }
     }}>
-      <Container maxWidth="sm">
+      <Container maxWidth="sm" sx={{ my: { xs: 2, sm: 4 } }}>
         <Paper 
           elevation={6} 
           sx={{ 
             borderRadius: 4,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            backdropFilter: "blur(10px)",
+            bgcolor: "rgba(255, 255, 255, 0.95)",
+            position: 'relative'
           }}
         >
-          {/* Header con gradiente */}
+          {/* Header con gradiente institucional, logo y título */}
           <Box sx={{ 
             bgcolor: '#133B6B', 
-            p: 3, 
+            p: { xs: 3, sm: 4 }, 
             textAlign: 'center',
-            background: 'linear-gradient(135deg, #133B6B 0%, #1E4A7A 100%)'
+            background: 'linear-gradient(135deg, #0D2A4D 0%, #133B6B 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: { xs: 280, sm: 320 },
+            position: 'relative'
           }}>
-            <Avatar sx={{ 
-              width: 80, 
-              height: 80, 
-              mx: 'auto', 
-              mb: 2,
-              bgcolor: '#00C2D1'
-            }}>
-              <SecurityIcon sx={{ fontSize: 40 }} />
-            </Avatar>
-            <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>
-              VUGAA
-            </Typography>
-            <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-              Ventanilla Única de Gestión de Agentes Aduanales
+            {/* Botón de regresar */}
+            <Box
+              sx={{
+                position: "absolute",
+                top: 16,
+                left: 16,
+                zIndex: 20
+              }}
+            >
+              <Button
+                component={Link}
+                to="/inicio"
+                startIcon={<ArrowBackIcon />}
+                size="small"
+                sx={{
+                  color: "white",
+                  backgroundColor: "rgba(0, 0, 0, 0.4)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255, 255, 255, 0.3)",
+                  "&:hover": {
+                    backgroundColor: "rgba(0, 0, 0, 0.6)",
+                    border: "1px solid rgba(255, 255, 255, 0.5)",
+                  },
+                  textTransform: "none",
+                  fontWeight: 600,
+                  borderRadius: 3,
+                  px: { xs: 2, sm: 3 },
+                  py: 0.75,
+                  fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                }}
+              >
+                Regresar
+              </Button>
+            </Box>
+
+            <Box
+              component="img"
+              src={vugaaLogo}
+              alt="VUGAA Logo"
+              sx={{
+                width: { xs: '70%', sm: '65%' },
+                maxWidth: 320,
+                height: 'auto',
+                mx: 'auto',
+                mb: 2,
+                borderRadius: 4,
+                boxShadow: "0 15px 35px rgba(0,0,0,0.4)",
+              }}
+            />
+            
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                color: 'white', 
+                fontWeight: 700,
+                letterSpacing: 2,
+                textTransform: 'uppercase',
+                borderTop: '2px solid rgba(255,255,255,0.3)',
+                paddingTop: 2,
+                width: '80%',
+                fontSize: { xs: '1.5rem', sm: '2rem' }
+              }}
+            >
+              INICIAR SESIÓN
             </Typography>
           </Box>
 
-          <Box sx={{ p: 4 }}>
+          <Box sx={{ p: { xs: 3, sm: 4 } }}>
             {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
+              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                 {error}
               </Alert>
             )}
@@ -216,9 +267,17 @@ const Login = () => {
                     onChange={(e) => setTenant(e.target.value)}
                     startAdornment={
                       <InputAdornment position="start">
-                        <BusinessIcon sx={{ color: "#7f8c8d" }} />
+                        <BusinessIcon sx={{ color: "#64748b" }} />
                       </InputAdornment>
                     }
+                    sx={{
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#00C2D1",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#00C2D1",
+                      },
+                    }}
                   >
                     {tenantOptions.map((option) => (
                       <MenuItem 
@@ -247,7 +306,7 @@ const Login = () => {
                 {/* Email */}
                 <TextField
                   fullWidth
-                  label="Email"
+                  label="Correo electrónico"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -255,7 +314,24 @@ const Login = () => {
                   helperText={emailError}
                   required
                   InputProps={{
-                    startAdornment: <EmailIcon sx={{ mr: 1, color: "#7f8c8d" }} />,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <EmailIcon sx={{ color: "#64748b" }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      "&:hover fieldset": {
+                        borderColor: "#00C2D1",
+                      },
+                      "&.Mui-focused fieldset": {
+                        borderColor: "#00C2D1",
+                      },
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": {
+                      color: "#00C2D1",
+                    },
                   }}
                 />
 
@@ -270,7 +346,11 @@ const Login = () => {
                   helperText={passwordError}
                   required
                   InputProps={{
-                    startAdornment: <LockIcon sx={{ mr: 1, color: "#7f8c8d" }} />,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LockIcon sx={{ color: "#64748b" }} />
+                      </InputAdornment>
+                    ),
                     endAdornment: (
                       <InputAdornment position="end">
                         <IconButton
@@ -281,6 +361,19 @@ const Login = () => {
                         </IconButton>
                       </InputAdornment>
                     )
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      "&:hover fieldset": {
+                        borderColor: "#00C2D1",
+                      },
+                      "&.Mui-focused fieldset": {
+                        borderColor: "#00C2D1",
+                      },
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": {
+                      color: "#00C2D1",
+                    },
                   }}
                 />
 
@@ -295,9 +388,12 @@ const Login = () => {
                     py: 1.5,
                     bgcolor: "#133B6B",
                     "&:hover": { bgcolor: "#0D2A4D" },
+                    textTransform: "none",
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 500,
                   }}
                 >
-                  {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+                  {loading ? "Iniciando sesión..." : "Ingresar al sistema"}
                 </Button>
               </Stack>
             </Box>
@@ -305,20 +401,24 @@ const Login = () => {
             <Box sx={{ mt: 2, textAlign: "center" }}>
               <Link
                 to="/recuperar-password"
-                style={{ textDecoration: "none", color: "#00C2D1" }}
+                style={{ textDecoration: "none", color: "#00C2D1", fontWeight: 500 }}
               >
                 ¿Olvidaste tu contraseña?
               </Link>
             </Box>
 
-            <Divider sx={{ my: 3 }}>Acceso rápido</Divider>
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="caption" sx={{ color: "#94a3b8", px: 2 }}>
+                Acceso rápido
+              </Typography>
+            </Divider>
 
             {/* Demo Login Buttons */}
             <Box>
               <Typography
                 variant="subtitle2"
                 align="center"
-                sx={{ color: "#7f8c8d", mb: 2 }}
+                sx={{ color: "#64748b", mb: 2 }}
               >
                 Cuentas de demostración:
               </Typography>
@@ -330,23 +430,30 @@ const Login = () => {
                 useFlexGap
                 sx={{ gap: 1 }}
               >
-                {['supera', 'admin', 'comite', 'asociacion', 'agente'].map((role) => (
+                {[
+                  { role: 'supera', label: 'Super' },
+                  { role: 'admin', label: 'Admin' },
+                  { role: 'comite', label: 'Comité' },
+                  { role: 'asociacion', label: 'Asociación' },
+                  { role: 'agente', label: 'Agente' }
+                ].map((item) => (
                   <Button
-                    key={role}
+                    key={item.role}
                     variant="outlined"
                     size="small"
-                    onClick={() => handleDemoLogin(role)}
+                    onClick={() => handleDemoLogin(item.role)}
                     sx={{ 
                       textTransform: 'capitalize',
                       borderColor: '#133B6B',
                       color: '#133B6B',
+                      fontSize: { xs: '0.7rem', sm: '0.8125rem' },
                       '&:hover': {
                         borderColor: '#00C2D1',
                         bgcolor: 'rgba(0,194,209,0.04)'
                       }
                     }}
                   >
-                    {role}
+                    {item.label}
                   </Button>
                 ))}
               </Stack>

@@ -9,18 +9,17 @@ import {
   TextField,
   Button,
   Alert,
-  Stack,
   InputAdornment,
   CircularProgress,
-  Avatar,
 } from '@mui/material';
 import {
   Email as EmailIcon,
-  ArrowBack as ArrowBackIcon,
-  Send as SendIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+
+// Importar el logo
+import vugaaLogo from "../../assets/Vugaa_logo.jpeg";
 
 const RecuperarPassword = () => {
   const [email, setEmail] = useState('');
@@ -71,103 +70,174 @@ const RecuperarPassword = () => {
 
   return (
     <Box sx={{ 
-      minHeight: '100vh', 
+      minHeight: '100vh',
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      py: 4
+      background: "linear-gradient(135deg, #ffffff 0%, #133B6B 50%, #1E4A7A 100%)",
+      py: { xs: 2, sm: 4 }
     }}>
-      <Container maxWidth="sm">
-        <Paper elevation={6} sx={{ borderRadius: 4, overflow: 'hidden' }}>
+      <Container maxWidth="sm" sx={{ my: { xs: 2, sm: 4 } }}>
+        <Paper 
+          elevation={6} 
+          sx={{ 
+            borderRadius: 4,
+            overflow: 'hidden',
+            backdropFilter: "blur(10px)",
+            bgcolor: "rgba(255, 255, 255, 0.95)",
+          }}
+        >
+          {/* Header con logo grande */}
           <Box sx={{ 
             bgcolor: '#133B6B', 
-            p: 3, 
+            p: { xs: 4, sm: 5 }, 
             textAlign: 'center',
-            background: 'linear-gradient(135deg, #133B6B 0%, #1E4A7A 100%)'
+            background: 'linear-gradient(135deg, #0D2A4D 0%, #133B6B 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: { xs: 280, sm: 320 }
           }}>
-            <Avatar sx={{ 
-              width: 60, 
-              height: 60, 
-              mx: 'auto', 
-              mb: 2,
-              bgcolor: '#00C2D1'
-            }}>
-              <EmailIcon sx={{ fontSize: 30 }} />
-            </Avatar>
-            <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold' }}>
-              Recuperar Contraseña
+            <Box
+              component="img"
+              src={vugaaLogo}
+              alt="VUGAA Logo"
+              sx={{
+                width: { xs: '70%', sm: '65%' },
+                maxWidth: 320,
+                height: 'auto',
+                mx: 'auto',
+                mb: 2,
+                borderRadius: 4,
+                boxShadow: "0 15px 35px rgba(0,0,0,0.4)",
+              }}
+            />
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                color: 'white', 
+                fontWeight: 600,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                borderTop: '2px solid rgba(255,255,255,0.3)',
+                paddingTop: 2,
+                width: '80%'
+              }}
+            >
+              RECUPERACIÓN DE CONTRASEÑA
             </Typography>
           </Box>
 
-          <Box sx={{ p: 4 }}>
+          <Box sx={{ p: { xs: 4, sm: 5 } }}>
             {success ? (
-              <Box sx={{ textAlign: 'center' }}>
-                <CheckCircleIcon sx={{ fontSize: 60, color: '#4caf50', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
+              <Box sx={{ textAlign: 'center', py: 2 }}>
+                <CheckCircleIcon sx={{ fontSize: 80, color: '#4caf50', mb: 2 }} />
+                <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: '#133B6B', mb: 2 }}>
                   ¡Solicitud enviada!
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 4, px: 2 }}>
                   Si el email existe en nuestro sistema, recibirás instrucciones para recuperar tu contraseña.
                 </Typography>
                 <Button
                   variant="contained"
                   onClick={() => navigate('/login')}
-                  startIcon={<ArrowBackIcon />}
+                  sx={{
+                    py: 1.2,
+                    px: 4,
+                    bgcolor: "#133B6B",
+                    "&:hover": { bgcolor: "#0D2A4D" },
+                    textTransform: "none",
+                    fontSize: "1rem",
+                    fontWeight: 500,
+                    borderRadius: 2,
+                  }}
                 >
-                  Volver al login
+                  Volver al inicio de sesión
                 </Button>
               </Box>
             ) : (
-              <Box component="form" onSubmit={handleSubmit}>
+              <Box>
                 {error && (
-                  <Alert severity="error" sx={{ mb: 3 }}>
+                  <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                     {error}
                   </Alert>
                 )}
 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Ingresa tu email y te enviaremos instrucciones para restablecer tu contraseña.
+                <Typography variant="body1" sx={{ mb: 4, color: '#4a5568', textAlign: 'center', fontSize: '1.1rem' }}>
+                  Ingresa tu correo electrónico y recibirás instrucciones para restablecer tu contraseña.
                 </Typography>
 
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  error={!!emailError}
-                  helperText={emailError}
-                  required
-                  sx={{ mb: 3 }}
-                  InputProps={{
-                    startAdornment: <EmailIcon sx={{ mr: 1, color: "#7f8c8d" }} />,
-                  }}
-                />
-
-                <Stack direction="row" spacing={2}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => navigate('/login')}
-                    startIcon={<ArrowBackIcon />}
+                <Box component="form" onSubmit={handleSubmit}>
+                  <TextField
                     fullWidth
-                  >
-                    Cancelar
-                  </Button>
+                    label="Correo electrónico *"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    error={!!emailError}
+                    helperText={emailError}
+                    variant="outlined"
+                    sx={{
+                      mb: 4,
+                      "& .MuiOutlinedInput-root": {
+                        "&:hover fieldset": {
+                          borderColor: "#00C2D1",
+                        },
+                        "&.Mui-focused fieldset": {
+                          borderColor: "#00C2D1",
+                        },
+                      },
+                      "& .MuiInputLabel-root.Mui-focused": {
+                        color: "#00C2D1",
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <EmailIcon sx={{ color: "#64748b" }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+
                   <Button
                     type="submit"
                     variant="contained"
                     disabled={loading}
-                    startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
                     fullWidth
                     sx={{
+                      py: 1.8,
                       bgcolor: "#133B6B",
                       "&:hover": { bgcolor: "#0D2A4D" },
+                      textTransform: "none",
+                      fontSize: "1.1rem",
+                      fontWeight: 500,
+                      borderRadius: 2,
+                      mb: 2
                     }}
                   >
-                    {loading ? 'Enviando...' : 'Enviar'}
+                    {loading ? <CircularProgress size={26} color="inherit" /> : 'Enviar instrucciones'}
                   </Button>
-                </Stack>
+
+                  <Button
+                    variant="text"
+                    onClick={() => navigate('/login')}
+                    fullWidth
+                    sx={{
+                      textTransform: "none",
+                      color: "#00C2D1",
+                      fontSize: "1rem",
+                      fontWeight: 500,
+                      py: 1,
+                      "&:hover": {
+                        backgroundColor: "rgba(0,194,209,0.04)",
+                      },
+                    }}
+                  >
+                    Volver al inicio de sesión
+                  </Button>
+                </Box>
               </Box>
             )}
           </Box>
