@@ -27,7 +27,6 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    // Verificar cada 5 minutos
     const interval = setInterval(checkToken, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -38,7 +37,6 @@ export const AuthProvider = ({ children }) => {
     const expiration = localStorage.getItem('tokenExpiration');
     
     if (token && userStr && expiration) {
-      // Verificar si el token ha expirado
       if (Date.now() > parseInt(expiration)) {
         logout();
       } else {
@@ -73,9 +71,7 @@ export const AuthProvider = ({ children }) => {
       );
       
       if (response.data.token) {
-        console.log('Rol del backend:', response.data.rol);
-        
-        // Mapeo de roles del backend a frontend
+
         const roleMap = {
           'SUPERADMIN': 'supera',
           'ADMIN': 'admin',
@@ -92,12 +88,12 @@ export const AuthProvider = ({ children }) => {
           nombre: response.data.nombre,
           rol: roleMap[response.data.rol] || response.data.rol.toLowerCase(),
           instanciaId: response.data.instanciaId,
-          instanciaNombre: response.data.instanciaNombre
+          instanciaNombre: response.data.instanciaNombre,
+
+          // NUEVO CAMPO
+          perfilCompleto: response.data.perfilCompleto ?? false
         };
-        
-        console.log('Rol mapeado:', userData.rol);
-        
-        // Calcular expiración (24 horas por defecto)
+
         const expiration = Date.now() + (response.data.expiresIn || 86400000);
         
         localStorage.setItem('token', response.data.token);
@@ -128,7 +124,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    // Llamar al endpoint de logout (opcional)
     API.post('/auth/logout').catch(console.error);
     
     localStorage.removeItem('token');
@@ -140,56 +135,50 @@ export const AuthProvider = ({ children }) => {
   };
 
   const recuperarPassword = async (email) => {
-  setLoading(true);
-  try {
-    const response = await API.post('/auth/recuperar-password', { email });
-    // El backend siempre devuelve success true por seguridad
-    return { 
-      success: true, 
-      mensaje: response.data.mensaje || 'Si el email existe, recibirás instrucciones' 
-    };
-  } catch (error) {
-    console.error('Error en recuperar password:', error);
-    // Por seguridad, siempre devolvemos success true aunque haya error
-    return { 
-      success: true, 
-      mensaje: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña' 
-    };
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const response = await API.post('/auth/recuperar-password', { email });
+      return { 
+        success: true, 
+        mensaje: response.data.mensaje || 'Si el email existe, recibirás instrucciones' 
+      };
+    } catch (error) {
+      return { 
+        success: true, 
+        mensaje: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
 
-// Mejora la función restablecerPassword
-const restablecerPassword = async (token, nuevaPassword, confirmarPassword) => {
-  setLoading(true);
-  try {
-    const response = await API.post('/auth/restablecer-password', {
-      token,
-      nuevaPassword,
-      confirmarPassword
-    });
-    return { 
-      success: true, 
-      mensaje: response.data.mensaje || 'Contraseña actualizada exitosamente' 
-    };
-  } catch (error) {
-    console.error('Error en restablecer password:', error);
-    return { 
-      success: false, 
-      mensaje: error.response?.data?.mensaje || 'Error al restablecer la contraseña' 
-    };
-  } finally {
-    setLoading(false);
-  }
-};
+  const restablecerPassword = async (token, nuevaPassword, confirmarPassword) => {
+    setLoading(true);
+    try {
+      const response = await API.post('/auth/restablecer-password', {
+        token,
+        nuevaPassword,
+        confirmarPassword
+      });
+      return { 
+        success: true, 
+        mensaje: response.data.mensaje || 'Contraseña actualizada exitosamente' 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        mensaje: error.response?.data?.mensaje || 'Error al restablecer la contraseña' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const refreshToken = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) return false;
 
     try {
-      // Endpoint para refrescar token (implementar si es necesario)
       const response = await API.post('/auth/refresh-token', { refreshToken });
       
       if (response.data.token) {
@@ -215,7 +204,10 @@ const restablecerPassword = async (token, nuevaPassword, confirmarPassword) => {
       refreshToken,
       loading,
       isAuthenticated: !!user,
-      tokenExpiration
+      tokenExpiration,
+
+      // 🔵 LOGICA DE PERFIL
+      perfilIncompleto: user ? !user.perfilCompleto : false
     }}>
       {children}
     </AuthContext.Provider>

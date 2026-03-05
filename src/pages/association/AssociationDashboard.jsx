@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'; 
+import React, { useState, useRef, useEffect } from 'react'; 
 import {
   Box,
   Grid,
@@ -40,6 +40,9 @@ import {
   Verified as VerifiedIcon,
   Folder as FolderIcon
 } from '@mui/icons-material';
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import PerfilIncompletoModal from "../../components/common/PerfilIncompletoModal";
 
 // Colores institucionales
 const institutionalColors = {
@@ -58,10 +61,20 @@ const institutionalColors = {
 };
 
 const AssociationDashboard = () => {
+  const { perfilIncompleto, user } = useAuth();
+  const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState('month');
   const [page, setPage] = useState(1);
+  const [openPerfilModal, setOpenPerfilModal] = useState(false);
   const rowsPerPage = 5;
   const tableRef = useRef(null);
+
+  // Efecto para mostrar el modal si el perfil está incompleto
+  useEffect(() => {
+    if (perfilIncompleto) {
+      setOpenPerfilModal(true);
+    }
+  }, [perfilIncompleto]);
 
   // Datos de la asociación
   const associationData = {
@@ -429,6 +442,12 @@ const AssociationDashboard = () => {
           )}
         </Paper>
       </Container>
+
+      {/* Modal de Perfil Incompleto */}
+      <PerfilIncompletoModal 
+        open={openPerfilModal}
+        onClose={() => setOpenPerfilModal(false)}
+      />
     </Box>
   );
 };
