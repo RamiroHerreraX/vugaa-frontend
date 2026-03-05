@@ -211,6 +211,39 @@ class UsuarioService {
     }
   }
 
-}
+  /** ------------------ NUEVOS MÉTODOS PARA ASOCIACIONES ------------------ **/
 
+  // Usuarios SIN asociación (para invitar)
+  async findUsuariosSinAsociacion(instanciaId) {
+    try {
+      const response = await API.get(`/usuarios/asociacion/sin-asociacion/${instanciaId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error en findUsuariosSinAsociacion:", error);
+      throw error.response?.data || { error: "Error al obtener usuarios sin asociación" };
+    }
+  }
+
+  // Usuarios que pertenecen a MI asociación
+  async findUsuariosDeMiAsociacion(idAsociacion) {
+    try {
+      const response = await API.get(`/usuarios/asociacion/mia/${idAsociacion}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error en findUsuariosDeMiAsociacion:", error);
+      throw error.response?.data || { error: "Error al obtener usuarios de mi asociación" };
+    }
+  }
+
+  // Usuarios de mi asociación que me dieron permiso para subir documentos
+  async findUsuariosConPermisoDocumentos(idAsociacion) {
+    try {
+      const response = await API.get(`/usuarios/asociacion/con-permiso/${idAsociacion}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error en findUsuariosConPermisoDocumentos:", error);
+      throw error.response?.data || { error: "Error al obtener usuarios con permiso" };
+    }
+  }
+}
 export default new UsuarioService();

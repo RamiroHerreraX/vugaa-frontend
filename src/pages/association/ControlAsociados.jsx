@@ -14,90 +14,69 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  MenuItem,
   Stack,
   InputAdornment,
   Avatar,
   Tooltip,
-  FormControl,
-  InputLabel,
   Alert,
   Snackbar,
   CircularProgress,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Pagination,
-  Select,
   Tabs,
   Tab,
-  LinearProgress,
   Badge,
-  Rating,
 } from "@mui/material";
 import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Search as SearchIcon,
   Visibility as VisibilityIcon,
-  Mail as MailIcon,
-  Phone as PhoneIcon,
   Download as DownloadIcon,
   Group as GroupIcon,
   PersonAdd as PersonAddIcon,
   VerifiedUser as VerifiedIcon,
-  Save as SaveIcon,
   Close as CloseIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   LocationOn as LocationIcon,
-  Upload as UploadIcon,
-  AttachFile as AttachFileIcon,
-  Description as DescriptionIcon,
-  PictureAsPdf as PdfIcon,
-  Image as ImageIcon,
-  InsertDriveFile as FileIcon,
-  Star as StarIcon,
-  StarBorder as StarBorderIcon,
-  EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
+
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import ImageIcon from "@mui/icons-material/Image";
+import DescriptionIcon from "@mui/icons-material/Description";
+import InsertDriveFileIcon  from "@mui/icons-material/InsertDriveFile";
 import { useNavigate } from "react-router-dom";
+
 import {
-  format,
   parseISO,
-  isAfter,
-  addMonths,
   differenceInYears,
 } from "date-fns";
-import { es } from "date-fns/locale";
+
+// Importar componentes separados
+import AssociateUserDialog from "../../components/asociados/AssociateUserDialog";
+import AddCertificationDialog from "../../components/asociados/AddCertificationDialog";
+import UserDetailsDialog from "../../components/asociados/UserDetailsDialog";
+import DocumentsDialog from "../../components/asociados/DocumentsDialog";
+import UploadDocumentsDialog from "../../components/asociados/UploadDocumentsDialog";
 
 // Colores institucionales
 const institutionalColors = {
-  primary: "#133B6B", // Azul oscuro principal
-  secondary: "#1a4c7a", // Azul medio
-  accent: "#e9e9e9", // Color para acentos (gris claro)
-  background: "#f4f6f8", // Fondo claro
-  lightBlue: "rgba(19, 59, 107, 0.08)", // Azul transparente para hover
-  darkBlue: "#0D2A4D", // Azul más oscuro
-  textPrimary: "#111827", // Texto principal
-  textSecondary: "#6b7280", // Texto secundario
-  success: "#059669", // Verde para éxito
-  warning: "#d97706", // Naranja para advertencias
-  error: "#dc2626", // Rojo para errores
-  info: "#1976d2", // Azul para información
-  // Niveles - ahora con colores más neutros
-  level1: "#6b7280", // Gris para Nivel I
-  level2: "#4b5563", // Gris más oscuro para Nivel II
-  level3: "#1f2937", // Gris muy oscuro para Nivel III
+  primary: "#133B6B",
+  secondary: "#1a4c7a",
+  accent: "#e9e9e9",
+  background: "#f4f6f8",
+  lightBlue: "rgba(19, 59, 107, 0.08)",
+  darkBlue: "#0D2A4D",
+  textPrimary: "#111827",
+  textSecondary: "#6b7280",
+  success: "#059669",
+  warning: "#d97706",
+  error: "#dc2626",
+  info: "#1976d2",
+  level1: "#6b7280",
+  level2: "#4b5563",
+  level3: "#1f2937",
 };
 
-// Niveles de reconocimiento - SIN nombres de metales
+// Niveles de reconocimiento
 const recognitionLevels = [
   {
     value: 1,
@@ -125,7 +104,7 @@ const recognitionLevels = [
   },
 ];
 
-// Datos iniciales actualizados con fecha de ingreso y nivel de reconocimiento
+// Datos iniciales
 const initialUsers = [
   {
     id: 1,
@@ -138,15 +117,14 @@ const initialUsers = [
     color: "#526F78",
     avatar: "LR",
     department: "Operaciones",
-    joinDate: "2023-01-15", // Fecha de ingreso a la asociación
-    // El permiso lo da el usuario desde su dispositivo
-    uploadPermission: "permitido", // Estado inicial: no se puede subir documentos
+    joinDate: "2023-01-15",
+    uploadPermission: "permitido",
     associationCertifications: [
       {
         id: 1,
         name: "Curso de ética profesional y código de conducta",
-        type: "Formación ética y cumplimiento ",
-        hoursValue: 20, // Horas que vale la certificación
+        type: "etica_cumplimiento",
+        hoursValue: 20,
         status: "active",
         documents: [
           {
@@ -154,7 +132,7 @@ const initialUsers = [
             name: "certificado_aduanal_basico.pdf",
             url: "/assets/Curso de ética profesional y código de conducta.pdf",
             type: "application/pdf",
-            size: 245760, // 240KB
+            size: 245760,
             uploadDate: "2024-01-20T10:30:00",
             uploadedBy: "admin@asociacion.com",
           },
@@ -163,8 +141,8 @@ const initialUsers = [
       {
         id: 2,
         name: "Diplomado en Comercio Exterior y Legislación Aduanera",
-        type: "Actualización técnica aduaner",
-        hoursValue: 40, // Horas que vale la certificación
+        type: "actualizacion_aduanera",
+        hoursValue: 40,
         status: "active",
         documents: [
           {
@@ -172,7 +150,7 @@ const initialUsers = [
             name: "Diplomado en Comercio Exterior y Legislación Aduanera.pdf",
             url: "/assets/Diplomado en Comercio Exterior y Legislación Aduanera.pdf",
             type: "application/pdf",
-            size: 245760, // 240KB
+            size: 245760,
             uploadDate: "2024-01-20T10:30:00",
             uploadedBy: "admin@asociacion.com",
           },
@@ -180,7 +158,6 @@ const initialUsers = [
       },
     ],
   },
-
   {
     id: 2,
     name: "María González López",
@@ -193,13 +170,13 @@ const initialUsers = [
     avatar: "MG",
     department: "Dirección",
     joinDate: "2022-06-10",
-    uploadPermission: "no-permitido", // Sin permiso de subida inicialmente
+    uploadPermission: "no-permitido",
     associationCertifications: [
       {
         id: 1,
         name: "Certificación de Comité",
         type: "administrativa",
-        hoursValue: 15, // Horas que vale la certificación
+        hoursValue: 15,
         status: "active",
         documents: [],
       },
@@ -217,7 +194,7 @@ const initialUsers = [
     avatar: "CL",
     department: "Consultoría",
     joinDate: "2024-01-20",
-    uploadPermission: "permitido", // Usuario dio permiso desde su dispositivo
+    uploadPermission: "permitido",
     associationCertifications: [],
   },
   {
@@ -238,7 +215,7 @@ const initialUsers = [
         id: 1,
         name: "Certificación de Auditor",
         type: "legal",
-        hoursValue: 30, // Horas que vale la certificación
+        hoursValue: 30,
         status: "active",
         documents: [
           {
@@ -246,7 +223,7 @@ const initialUsers = [
             name: "certificado_auditor.pdf",
             url: "/documentos/auditor.pdf",
             type: "application/pdf",
-            size: 182400, // 178KB
+            size: 182400,
             uploadDate: "2024-05-15T14:20:00",
             uploadedBy: "admin@asociacion.com",
           },
@@ -255,7 +232,7 @@ const initialUsers = [
             name: "constancia_vigencia.jpg",
             url: "/documentos/constancia.jpg",
             type: "image/jpeg",
-            size: 512000, // 500KB
+            size: 512000,
             uploadDate: "2024-05-20T09:15:00",
             uploadedBy: "admin@asociacion.com",
           },
@@ -298,7 +275,6 @@ const availableUsers = [
 ];
 
 const UserManagement = () => {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState("todos");
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
@@ -308,7 +284,6 @@ const UserManagement = () => {
   const [openUploadDialog, setOpenUploadDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedCertification, setSelectedCertification] = useState(null);
-  const [selectedDocument, setSelectedDocument] = useState(null);
   const [page, setPage] = useState(1);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -320,39 +295,34 @@ const UserManagement = () => {
   const [uploading, setUploading] = useState(false);
 
   const rowsPerPage = 10;
-
   const [users, setUsers] = useState(initialUsers);
 
-  // Estados para el formulario de nueva certificación - MODIFICADO: quitamos fechas y descripción, agregamos hoursValue
+  // Estados para el formulario de nueva certificación
   const [newCertification, setNewCertification] = useState({
     name: "",
     type: "operativa",
-    hoursValue: "", // Horas que vale la certificación
+    hoursValue: "",
   });
 
   // Estados para subida de documentos en certificación
   const [certificationFiles, setCertificationFiles] = useState([]);
   const [certificationUploading, setCertificationUploading] = useState(false);
-  const [certificationUploadProgress, setCertificationUploadProgress] =
-    useState(0);
-  const certificationFileInputRef = React.useRef(null);
+  const [certificationUploadProgress, setCertificationUploadProgress] = useState(0);
 
   // Estados para subida de documentos adicionales
   const [uploadFiles, setUploadFiles] = useState([]);
-  const fileInputRef = React.useRef(null);
 
   // Tipos de certificaciones
   const certificationTypes = [
-    // NUEVAS certificaciones de formación
     {
       value: "etica_cumplimiento",
       label: "Formación ética y cumplimiento",
-      color: "#455a64", // azul gris institucional
+      color: "#455a64",
     },
     {
       value: "actualizacion_aduanera",
       label: "Actualización técnica aduanera",
-      color: "#1565c0", // azul técnico
+      color: "#1565c0",
     },
     {
       value: "operativa",
@@ -380,6 +350,7 @@ const UserManagement = () => {
       color: institutionalColors.error,
     },
   ];
+
   // Calcular estadísticas para las tabs
   const stats = useMemo(() => {
     const total = users.length;
@@ -399,20 +370,16 @@ const UserManagement = () => {
 
   // Función para obtener el nivel de reconocimiento del usuario
   const getRecognitionLevel = (user) => {
-    if (!user || !user.associationCertifications) return 1; // Nivel I por defecto
-
+    if (!user || !user.associationCertifications) return 1;
     const certificationsCount = user.associationCertifications.length;
-
-    if (certificationsCount >= 8) return 3; // Nivel III
-    if (certificationsCount >= 4) return 2; // Nivel II
-    return 1; // Nivel I
+    if (certificationsCount >= 8) return 3;
+    if (certificationsCount >= 4) return 2;
+    return 1;
   };
 
   // Función para obtener información del nivel de reconocimiento
   const getRecognitionLevelInfo = (level) => {
-    return (
-      recognitionLevels.find((l) => l.value === level) || recognitionLevels[0]
-    );
+    return recognitionLevels.find((l) => l.value === level) || recognitionLevels[0];
   };
 
   // Función para calcular la antigüedad en la asociación
@@ -431,14 +398,13 @@ const UserManagement = () => {
 
   // Función para obtener el ícono según el tipo de archivo
   const getFileIcon = (fileType) => {
-    if (fileType.includes("pdf")) return <PdfIcon sx={{ color: "#f44336" }} />;
-    if (fileType.includes("image"))
-      return <ImageIcon sx={{ color: "#4caf50" }} />;
+    if (fileType.includes("pdf")) return <PictureAsPdfIcon sx={{ color: "#f44336" }} />;
+    if (fileType.includes("image")) return <ImageIcon sx={{ color: "#4caf50" }} />;
     if (fileType.includes("word") || fileType.includes("document"))
       return <DescriptionIcon sx={{ color: "#2196f3" }} />;
     if (fileType.includes("excel") || fileType.includes("sheet"))
       return <DescriptionIcon sx={{ color: "#4caf50" }} />;
-    return <FileIcon sx={{ color: "#757575" }} />;
+    return <InsertDriveFileIcon sx={{ color: "#757575" }} />;
   };
 
   // Función para formatear tamaño de archivo
@@ -450,11 +416,10 @@ const UserManagement = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Función de filtrado mejorada con tabs
+  // Función de filtrado
   const filteredUsers = useMemo(() => {
     let filtered = users;
 
-    // Filtro por búsqueda
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -467,23 +432,13 @@ const UserManagement = () => {
       );
     }
 
-    // Filtro por pestaña seleccionada
     if (selectedTab === "con-permisos") {
-      filtered = filtered.filter(
-        (user) => user.uploadPermission === "permitido",
-      );
+      filtered = filtered.filter((user) => user.uploadPermission === "permitido");
     } else if (selectedTab === "sin-permisos") {
-      filtered = filtered.filter(
-        (user) => user.uploadPermission === "no-permitido",
-      );
+      filtered = filtered.filter((user) => user.uploadPermission === "no-permitido");
     }
-    // Para 'todos' no aplicamos filtro adicional
 
-    // Ordenamiento por nombre
-    filtered.sort((a, b) => {
-      return a.name.localeCompare(b.name);
-    });
-
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
     return filtered;
   }, [users, searchTerm, selectedTab]);
 
@@ -493,7 +448,7 @@ const UserManagement = () => {
     return filteredUsers.slice(start, start + rowsPerPage);
   }, [filteredUsers, page]);
 
-  // Funciones de manejo
+  // Handlers
   const handleAddExistingUser = () => {
     setOpenAddUserDialog(true);
   };
@@ -501,13 +456,12 @@ const UserManagement = () => {
   const handleAddUserToAssociation = (user) => {
     setLoading(true);
     try {
-      // Simular llamada API
       setTimeout(() => {
         const newAssociationUser = {
           ...user,
-          region: "Norte", // Región por defecto
-          joinDate: new Date().toISOString().split("T")[0], // Fecha actual como fecha de ingreso
-          uploadPermission: "no-permitido", // SIN permiso por defecto (el usuario debe dar permiso desde su dispositivo)
+          region: "Norte",
+          joinDate: new Date().toISOString().split("T")[0],
+          uploadPermission: "no-permitido",
           associationCertifications: [],
           avatar: user.name
             .split(" ")
@@ -523,7 +477,7 @@ const UserManagement = () => {
 
         setSnackbar({
           open: true,
-          message: `Usuario ${user.name} agregado a la asociación correctamente. El usuario debe dar permiso de subida desde su dispositivo.`,
+          message: `Usuario ${user.name} agregado a la asociación correctamente.`,
           severity: "success",
         });
         setLoading(false);
@@ -538,42 +492,13 @@ const UserManagement = () => {
     }
   };
 
-  const handleCheckPermissionStatus = useCallback(
-    async (userId) => {
-      setLoading(true);
-      try {
-        // Simular verificación del permiso desde el dispositivo del usuario
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const user = users.find((u) => u.id === userId);
-
-        setSnackbar({
-          open: true,
-          message: `El permiso de subida lo debe dar el usuario ${user.name} desde su dispositivo. No puedes modificar este permiso.`,
-          severity: "info",
-        });
-      } catch (error) {
-        setSnackbar({
-          open: true,
-          message: "Error al verificar el permiso",
-          severity: "error",
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [users],
-  );
-
   const handleAddCertification = (userId) => {
     const user = users.find((u) => u.id === userId);
 
-    // SOLO puedo ver certificaciones si el usuario me dio permiso
     if (user.uploadPermission !== "permitido") {
       setSnackbar({
         open: true,
-        message:
-          "No puedes subir certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
+        message: "No puedes subir certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
         severity: "warning",
       });
       return;
@@ -583,19 +508,17 @@ const UserManagement = () => {
     setNewCertification({
       name: "",
       type: "operativa",
-      hoursValue: "", // Horas que vale la certificación
+      hoursValue: "",
     });
     setCertificationFiles([]);
     setOpenCertificationDialog(true);
   };
 
-  // Manejar selección de archivos para certificación
   const handleCertificationFileSelect = (event) => {
     const files = Array.from(event.target.files);
     setCertificationFiles((prev) => [...prev, ...files]);
   };
 
-  // Eliminar archivo de la lista de certificación
   const handleRemoveCertificationFile = (index) => {
     setCertificationFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -610,12 +533,10 @@ const UserManagement = () => {
       return;
     }
 
-    // Verificar que el usuario tenga permiso
     if (!selectedUser || selectedUser.uploadPermission !== "permitido") {
       setSnackbar({
         open: true,
-        message:
-          "No tienes permiso para subir certificaciones para este usuario",
+        message: "No tienes permiso para subir certificaciones para este usuario",
         severity: "error",
       });
       return;
@@ -624,20 +545,17 @@ const UserManagement = () => {
     setLoading(true);
 
     try {
-      // Si hay archivos para subir, procesarlos
       let documents = [];
 
       if (certificationFiles.length > 0) {
         setCertificationUploading(true);
         setCertificationUploadProgress(0);
 
-        // Simular subida de archivos con progreso
         for (let i = 0; i <= 100; i += 10) {
           await new Promise((resolve) => setTimeout(resolve, 100));
           setCertificationUploadProgress(i);
         }
 
-        // Crear objetos de documentos
         documents = certificationFiles.map((file, index) => ({
           id: Date.now() + index,
           name: file.name,
@@ -654,10 +572,7 @@ const UserManagement = () => {
       const certification = {
         id: Date.now(),
         ...newCertification,
-        // Convertir hoursValue a número, si está vacío poner 0
-        hoursValue: newCertification.hoursValue
-          ? parseInt(newCertification.hoursValue)
-          : 0,
+        hoursValue: newCertification.hoursValue ? parseInt(newCertification.hoursValue) : 0,
         status: "active",
         documents: documents,
       };
@@ -679,14 +594,11 @@ const UserManagement = () => {
       setOpenCertificationDialog(false);
       setCertificationFiles([]);
 
-      const message =
-        documents.length > 0
-          ? `Certificación agregada correctamente con ${documents.length} documento(s)`
-          : "Certificación agregada correctamente";
-
       setSnackbar({
         open: true,
-        message: message,
+        message: documents.length > 0
+          ? `Certificación agregada correctamente con ${documents.length} documento(s)`
+          : "Certificación agregada correctamente",
         severity: "success",
       });
     } catch (error) {
@@ -702,12 +614,10 @@ const UserManagement = () => {
   };
 
   const handleEditCertification = (user, certification) => {
-    // SOLO puedo editar si el usuario me dio permiso
     if (user.uploadPermission !== "permitido") {
       setSnackbar({
         open: true,
-        message:
-          "No puedes editar certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
+        message: "No puedes editar certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
         severity: "warning",
       });
       return;
@@ -720,19 +630,17 @@ const UserManagement = () => {
       type: certification.type,
       hoursValue: certification.hoursValue || "",
     });
-    setCertificationFiles([]); // No cargamos los documentos existentes para edición
+    setCertificationFiles([]);
     setOpenCertificationDialog(true);
   };
 
   const handleDeleteCertification = async (userId, certificationId) => {
     const user = users.find((u) => u.id === userId);
 
-    // SOLO puedo eliminar si el usuario me dio permiso
     if (user.uploadPermission !== "permitido") {
       setSnackbar({
         open: true,
-        message:
-          "No puedes eliminar certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
+        message: "No puedes eliminar certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
         severity: "warning",
       });
       return;
@@ -747,10 +655,9 @@ const UserManagement = () => {
           user.id === userId
             ? {
                 ...user,
-                associationCertifications:
-                  user.associationCertifications.filter(
-                    (c) => c.id !== certificationId,
-                  ),
+                associationCertifications: user.associationCertifications.filter(
+                  (c) => c.id !== certificationId,
+                ),
               }
             : user,
         ),
@@ -772,9 +679,7 @@ const UserManagement = () => {
     }
   };
 
-  // Función para subir documentos a una certificación existente
   const handleUploadDocuments = (user, certification) => {
-    // Verificar permiso
     if (user.uploadPermission !== "permitido") {
       setSnackbar({
         open: true,
@@ -791,18 +696,15 @@ const UserManagement = () => {
     setOpenUploadDialog(true);
   };
 
-  // Manejar selección de archivos para subida adicional
   const handleFileSelect = (event) => {
     const files = Array.from(event.target.files);
     setUploadFiles((prev) => [...prev, ...files]);
   };
 
-  // Eliminar archivo de la lista de subida adicional
   const handleRemoveFile = (index) => {
     setUploadFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Subir archivos adicionales
   const handleUploadFiles = async () => {
     if (uploadFiles.length === 0) {
       setSnackbar({
@@ -817,24 +719,21 @@ const UserManagement = () => {
     setUploadProgress(0);
 
     try {
-      // Simular subida con progreso
       for (let i = 0; i <= 100; i += 10) {
         await new Promise((resolve) => setTimeout(resolve, 200));
         setUploadProgress(i);
       }
 
-      // Crear objetos de documentos
       const newDocuments = uploadFiles.map((file, index) => ({
         id: Date.now() + index,
         name: file.name,
-        url: URL.createObjectURL(file), // En producción, esto sería la URL del servidor
+        url: URL.createObjectURL(file),
         type: file.type,
         size: file.size,
         uploadDate: new Date().toISOString(),
-        uploadedBy: "admin@asociacion.com", // Usuario actual
+        uploadedBy: "admin@asociacion.com",
       }));
 
-      // Actualizar el estado
       setUsers((prev) =>
         prev.map((user) => {
           if (user.id === selectedUser.id) {
@@ -875,14 +774,12 @@ const UserManagement = () => {
     }
   };
 
-  // Ver documentos de una certificación
   const handleViewDocuments = (user, certification) => {
     setSelectedUser(user);
     setSelectedCertification(certification);
     setOpenDocumentDialog(true);
   };
 
-  // Eliminar documento - CORREGIDO: eliminada la coma después de return user
   const handleDeleteDocument = async (documentId) => {
     if (!selectedUser || !selectedCertification) return;
 
@@ -900,9 +797,7 @@ const UserManagement = () => {
                   if (cert.id === selectedCertification.id) {
                     return {
                       ...cert,
-                      documents: cert.documents.filter(
-                        (doc) => doc.id !== documentId,
-                      ),
+                      documents: cert.documents.filter((doc) => doc.id !== documentId),
                     };
                   }
                   return cert;
@@ -910,11 +805,10 @@ const UserManagement = () => {
               ),
             };
           }
-          return user; // ← AQUÍ ESTABA EL ERROR (había una coma después de return user)
+          return user;
         }),
       );
 
-      // Actualizar el estado local del diálogo
       setSelectedCertification((prev) => ({
         ...prev,
         documents: prev.documents.filter((doc) => doc.id !== documentId),
@@ -952,7 +846,6 @@ const UserManagement = () => {
     return certType ? certType.color : institutionalColors.textSecondary;
   };
 
-  // Definir las tabs (sin la de desactivados)
   const tabs = [
     { value: "todos", label: `TODOS (${stats.total})`, icon: <GroupIcon /> },
     {
@@ -978,7 +871,7 @@ const UserManagement = () => {
         p: 2,
       }}
     >
-      {/* Snackbar para notificaciones */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
@@ -1036,12 +929,8 @@ const UserManagement = () => {
                     Rol: user.roleName,
                     Región: user.region,
                     Departamento: user.department,
-                    "Permiso Subida":
-                      user.uploadPermission === "permitido"
-                        ? "Permitido"
-                        : "No Permitido",
-                    Certificaciones:
-                      user.associationCertifications?.length || 0,
+                    "Permiso Subida": user.uploadPermission === "permitido" ? "Permitido" : "No Permitido",
+                    Certificaciones: user.associationCertifications?.length || 0,
                   }));
 
                   const csv = [
@@ -1107,17 +996,13 @@ const UserManagement = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon
-                      sx={{ color: institutionalColors.textSecondary }}
-                    />
+                    <SearchIcon sx={{ color: institutionalColors.textSecondary }} />
                   </InputAdornment>
                 ),
                 endAdornment: searchTerm && (
                   <InputAdornment position="end">
                     <IconButton size="small" onClick={() => setSearchTerm("")}>
-                      <CloseIcon
-                        sx={{ color: institutionalColors.textSecondary }}
-                      />
+                      <CloseIcon sx={{ color: institutionalColors.textSecondary }} />
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -1127,7 +1012,7 @@ const UserManagement = () => {
         </Grid>
       </Paper>
 
-      {/* Tabs de navegación */}
+      {/* Tabs y tabla (se mantiene igual) */}
       <Paper
         elevation={1}
         sx={{
@@ -1151,20 +1036,18 @@ const UserManagement = () => {
             borderColor: "divider",
             bgcolor: "background.paper",
             "& .MuiTab-root.Mui-selected": {
-              color:
-                selectedTab === "con-permisos"
-                  ? institutionalColors.success
-                  : selectedTab === "sin-permisos"
-                    ? institutionalColors.error
-                    : institutionalColors.primary,
+              color: selectedTab === "con-permisos"
+                ? institutionalColors.success
+                : selectedTab === "sin-permisos"
+                  ? institutionalColors.error
+                  : institutionalColors.primary,
             },
             "& .MuiTabs-indicator": {
-              backgroundColor:
-                selectedTab === "con-permisos"
-                  ? institutionalColors.success
-                  : selectedTab === "sin-permisos"
-                    ? institutionalColors.error
-                    : institutionalColors.primary,
+              backgroundColor: selectedTab === "con-permisos"
+                ? institutionalColors.success
+                : selectedTab === "sin-permisos"
+                  ? institutionalColors.error
+                  : institutionalColors.primary,
             },
           }}
         >
@@ -1175,79 +1058,27 @@ const UserManagement = () => {
               icon={tab.icon}
               iconPosition="start"
               label={tab.label}
-              sx={{
-                minHeight: 48,
-              }}
+              sx={{ minHeight: 48 }}
             />
           ))}
         </Tabs>
 
-        {/* Contenido principal */}
+        {/* Contenido principal - Tabla (se mantiene igual) */}
         <TableContainer sx={{ flex: 1 }}>
           {loading ? (
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: 200,
-              }}
-            >
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: 200 }}>
               <CircularProgress sx={{ color: institutionalColors.primary }} />
             </Box>
           ) : (
             <Table stickyHeader size="medium">
               <TableHead>
                 <TableRow>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Usuario
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Rol / Departamento
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Región
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Certificaciones
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Permiso de Subida
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      color: institutionalColors.primary,
-                    }}
-                    align="center"
-                  >
-                    Acciones
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Usuario</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Rol / Departamento</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Región</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Certificaciones</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Permiso de Subida</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }} align="center">Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1256,23 +1087,12 @@ const UserManagement = () => {
                   const levelInfo = getRecognitionLevelInfo(level);
 
                   return (
-                    <TableRow
-                      key={user.id}
-                      hover
-                      sx={{
-                        "&:hover": {
-                          backgroundColor: "rgba(0, 0, 0, 0.04)",
-                        },
-                      }}
-                    >
+                    <TableRow key={user.id} hover>
                       <TableCell>
                         <Stack direction="row" spacing={2} alignItems="center">
                           <Badge
                             overlap="circular"
-                            anchorOrigin={{
-                              vertical: "bottom",
-                              horizontal: "right",
-                            }}
+                            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                             badgeContent={
                               <Tooltip title={levelInfo.label}>
                                 <Avatar
@@ -1302,17 +1122,10 @@ const UserManagement = () => {
                             </Avatar>
                           </Badge>
                           <Box>
-                            <Typography
-                              variant="subtitle2"
-                              fontWeight="bold"
-                              sx={{ color: institutionalColors.textPrimary }}
-                            >
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
                               {user.name}
                             </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{ color: institutionalColors.textSecondary }}
-                            >
+                            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
                               {user.email}
                             </Typography>
                           </Box>
@@ -1331,11 +1144,7 @@ const UserManagement = () => {
                               mb: 0.5,
                             }}
                           />
-                          <Typography
-                            variant="caption"
-                            display="block"
-                            sx={{ color: institutionalColors.textSecondary }}
-                          >
+                          <Typography variant="caption" display="block" sx={{ color: institutionalColors.textSecondary }}>
                             {user.department}
                           </Typography>
                         </Box>
@@ -1343,14 +1152,8 @@ const UserManagement = () => {
 
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <LocationIcon
-                            fontSize="small"
-                            sx={{ color: institutionalColors.textSecondary }}
-                          />
-                          <Typography
-                            variant="body2"
-                            sx={{ color: institutionalColors.textPrimary }}
-                          >
+                          <LocationIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
+                          <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
                             {user.region}
                           </Typography>
                         </Stack>
@@ -1358,27 +1161,21 @@ const UserManagement = () => {
 
                       <TableCell>
                         <Stack spacing={0.5}>
-                          <Typography
-                            variant="body1"
-                            fontWeight="bold"
-                            sx={{ color: institutionalColors.textPrimary }}
-                          >
+                          <Typography variant="body1" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
                             {user.associationCertifications?.length || 0}
                           </Typography>
-                          {user.associationCertifications
-                            ?.slice(0, 2)
-                            .map((cert, index) => (
-                              <Chip
-                                key={index}
-                                label={cert.name}
-                                size="small"
-                                sx={{
-                                  bgcolor: `${getCertificationColor(cert.type)}15`,
-                                  color: getCertificationColor(cert.type),
-                                  maxWidth: 120,
-                                }}
-                              />
-                            ))}
+                          {user.associationCertifications?.slice(0, 2).map((cert, index) => (
+                            <Chip
+                              key={index}
+                              label={cert.name}
+                              size="small"
+                              sx={{
+                                bgcolor: `${getCertificationColor(cert.type)}15`,
+                                color: getCertificationColor(cert.type),
+                                maxWidth: 120,
+                              }}
+                            />
+                          ))}
                           {user.associationCertifications?.length > 2 && (
                             <Chip
                               label={`+${user.associationCertifications.length - 2} más`}
@@ -1394,50 +1191,24 @@ const UserManagement = () => {
                       </TableCell>
 
                       <TableCell>
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           {user.uploadPermission === "permitido" ? (
                             <>
-                              <CheckCircleIcon
-                                sx={{ color: institutionalColors.success }}
-                                fontSize="small"
-                              />
-                              <Typography
-                                variant="body2"
-                                sx={{ color: institutionalColors.success }}
-                              >
+                              <CheckCircleIcon sx={{ color: institutionalColors.success }} fontSize="small" />
+                              <Typography variant="body2" sx={{ color: institutionalColors.success }}>
                                 Permitido
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color: institutionalColors.textSecondary,
-                                }}
-                                display="block"
-                              >
+                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }} display="block">
                                 (Usuario dio permiso)
                               </Typography>
                             </>
                           ) : (
                             <>
-                              <CancelIcon
-                                sx={{ color: institutionalColors.error }}
-                                fontSize="small"
-                              />
-                              <Typography
-                                variant="body2"
-                                sx={{ color: institutionalColors.error }}
-                              >
+                              <CancelIcon sx={{ color: institutionalColors.error }} fontSize="small" />
+                              <Typography variant="body2" sx={{ color: institutionalColors.error }}>
                                 No Permitido
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color: institutionalColors.textSecondary,
-                                }}
-                                display="block"
-                              >
+                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }} display="block">
                                 (Usuario debe dar permiso)
                               </Typography>
                             </>
@@ -1446,11 +1217,7 @@ const UserManagement = () => {
                       </TableCell>
 
                       <TableCell align="center">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="center"
-                        >
+                        <Stack direction="row" spacing={1} justifyContent="center">
                           <Tooltip title="Ver detalles">
                             <IconButton
                               size="small"
@@ -1480,17 +1247,15 @@ const UserManagement = () => {
                                   } else {
                                     setSnackbar({
                                       open: true,
-                                      message:
-                                        "No puedes subir certificaciones. El usuario no ha dado permiso desde su dispositivo.",
+                                      message: "No puedes subir certificaciones. El usuario no ha dado permiso desde su dispositivo.",
                                       severity: "warning",
                                     });
                                   }
                                 }}
                                 sx={{
-                                  color:
-                                    user.uploadPermission === "permitido"
-                                      ? institutionalColors.success
-                                      : institutionalColors.textSecondary,
+                                  color: user.uploadPermission === "permitido"
+                                    ? institutionalColors.success
+                                    : institutionalColors.textSecondary,
                                 }}
                               >
                                 <VerifiedIcon />
@@ -1520,13 +1285,8 @@ const UserManagement = () => {
               bgcolor: "background.paper",
             }}
           >
-            <Typography
-              variant="body2"
-              sx={{ color: institutionalColors.textSecondary }}
-            >
-              Mostrando {(page - 1) * rowsPerPage + 1} -{" "}
-              {Math.min(page * rowsPerPage, filteredUsers.length)} de{" "}
-              {filteredUsers.length} usuarios
+            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
+              Mostrando {(page - 1) * rowsPerPage + 1} - {Math.min(page * rowsPerPage, filteredUsers.length)} de {filteredUsers.length} usuarios
             </Typography>
             <Pagination
               count={Math.ceil(filteredUsers.length / rowsPerPage)}
@@ -1538,9 +1298,7 @@ const UserManagement = () => {
                 "& .MuiPaginationItem-root.Mui-selected": {
                   bgcolor: institutionalColors.primary,
                   color: "white",
-                  "&:hover": {
-                    bgcolor: institutionalColors.secondary,
-                  },
+                  "&:hover": { bgcolor: institutionalColors.secondary },
                 },
               }}
             />
@@ -1548,34 +1306,12 @@ const UserManagement = () => {
         )}
 
         {filteredUsers.length === 0 && !loading && (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              p: 8,
-              flex: 1,
-            }}
-          >
-            <GroupIcon
-              sx={{
-                fontSize: 64,
-                color: institutionalColors.textSecondary,
-                mb: 2,
-              }}
-            />
-            <Typography
-              variant="h6"
-              sx={{ color: institutionalColors.textSecondary }}
-              gutterBottom
-            >
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", p: 8, flex: 1 }}>
+            <GroupIcon sx={{ fontSize: 64, color: institutionalColors.textSecondary, mb: 2 }} />
+            <Typography variant="h6" sx={{ color: institutionalColors.textSecondary }} gutterBottom>
               No se encontraron usuarios en esta categoría
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ color: institutionalColors.textSecondary, mb: 3 }}
-            >
+            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, mb: 3 }}>
               {selectedTab === "todos"
                 ? "No hay usuarios en la asociación"
                 : selectedTab === "con-permisos"
@@ -1585,12 +1321,7 @@ const UserManagement = () => {
             <Button
               variant="contained"
               onClick={handleAddExistingUser}
-              sx={{
-                bgcolor: institutionalColors.primary,
-                "&:hover": {
-                  bgcolor: institutionalColors.secondary,
-                },
-              }}
+              sx={{ bgcolor: institutionalColors.primary, "&:hover": { bgcolor: institutionalColors.secondary } }}
             >
               Agregar Usuarios
             </Button>
@@ -1598,1382 +1329,83 @@ const UserManagement = () => {
         )}
       </Paper>
 
-      {/* Diálogo para agregar usuarios existentes */}
-      <Dialog
+      {/* Diálogos importados */}
+      <AssociateUserDialog
         open={openAddUserDialog}
         onClose={() => setOpenAddUserDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <PersonAddIcon sx={{ color: institutionalColors.primary }} />
-            <Typography
-              variant="h6"
-              sx={{ color: institutionalColors.textPrimary }}
-            >
-              Agregar Usuario Existente a la Asociación
-            </Typography>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            variant="body2"
-            sx={{ color: institutionalColors.textSecondary }}
-            paragraph
-          >
-            Selecciona un usuario existente en el sistema para agregarlo a tu
-            asociación.
-            <strong> IMPORTANTE:</strong> El permiso para subir documentos lo
-            debe dar el usuario desde su dispositivo.
-          </Typography>
+        availableUsers={availableUsers}
+        onAddUser={handleAddUserToAssociation}
+        loading={loading}
+        getRoleColor={getRoleColor}
+      />
 
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ color: institutionalColors.primary }}>
-                    Usuario
-                  </TableCell>
-                  <TableCell sx={{ color: institutionalColors.primary }}>
-                    Email
-                  </TableCell>
-                  <TableCell sx={{ color: institutionalColors.primary }}>
-                    Rol
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{ color: institutionalColors.primary }}
-                  >
-                    Acción
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {availableUsers.map((user) => (
-                  <TableRow key={user.id} hover>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: getRoleColor(user.role),
-                            fontWeight: "bold",
-                            color: "white",
-                          }}
-                        >
-                          {user.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </Avatar>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: institutionalColors.textPrimary }}
-                        >
-                          {user.name}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: institutionalColors.textSecondary }}
-                      >
-                        {user.email}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={user.roleName}
-                        size="small"
-                        sx={{
-                          bgcolor: `${getRoleColor(user.role)}15`,
-                          color: getRoleColor(user.role),
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => handleAddUserToAssociation(user)}
-                        disabled={loading}
-                        sx={{
-                          bgcolor: institutionalColors.primary,
-                          "&:hover": {
-                            bgcolor: institutionalColors.secondary,
-                          },
-                        }}
-                      >
-                        Agregar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setOpenAddUserDialog(false)}
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Diálogo para agregar/editar certificación CON CARGA DE ARCHIVOS - MODIFICADO */}
-      <Dialog
+      <AddCertificationDialog
         open={openCertificationDialog}
-        onClose={() =>
-          !certificationUploading && setOpenCertificationDialog(false)
-        }
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Typography
-            variant="h6"
-            sx={{ color: institutionalColors.textPrimary }}
-          >
-            {selectedCertification
-              ? "Editar Certificación"
-              : "Nueva Certificación"}
-          </Typography>
-          <Typography
-            variant="caption"
-            display="block"
-            sx={{ color: institutionalColors.textSecondary }}
-          >
-            {selectedUser?.uploadPermission === "permitido"
-              ? "Permiso de subida concedido por el usuario"
-              : "No tienes permiso para subir documentos para este usuario"}
-          </Typography>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <Typography
-              variant="body2"
-              sx={{ color: institutionalColors.textSecondary }}
-            >
-              Usuario: <strong>{selectedUser?.name}</strong>
-            </Typography>
+        onClose={() => {
+          setOpenCertificationDialog(false);
+          setSelectedCertification(null);
+          setCertificationFiles([]);
+        }}
+        selectedUser={selectedUser}
+        selectedCertification={selectedCertification}
+        newCertification={newCertification}
+        onCertificationChange={setNewCertification}
+        certificationFiles={certificationFiles}
+        onFileSelect={handleCertificationFileSelect}
+        onRemoveFile={handleRemoveCertificationFile}
+        onSave={handleSaveCertification}
+        loading={loading}
+        certificationUploading={certificationUploading}
+        certificationUploadProgress={certificationUploadProgress}
+        certificationTypes={certificationTypes}
+        getFileIcon={getFileIcon}
+        formatFileSize={formatFileSize}
+      />
 
-            {selectedUser?.uploadPermission !== "permitido" ? (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                No puedes subir certificaciones. Este usuario no ha dado permiso
-                de subida desde su dispositivo.
-              </Alert>
-            ) : (
-              <>
-                {/* Datos de la certificación - MODIFICADO: quitamos fechas y descripción, agregamos hoursValue */}
-                <TextField
-                  label="Nombre de la certificación"
-                  value={newCertification.name}
-                  onChange={(e) =>
-                    setNewCertification({
-                      ...newCertification,
-                      name: e.target.value,
-                    })
-                  }
-                  fullWidth
-                  required
-                  disabled={certificationUploading}
-                />
-
-                <FormControl fullWidth>
-                  <InputLabel
-                    sx={{
-                      "&.Mui-focused": { color: institutionalColors.primary },
-                    }}
-                  >
-                    Tipo de certificación
-                  </InputLabel>
-                  <Select
-                    value={newCertification.type}
-                    onChange={(e) =>
-                      setNewCertification({
-                        ...newCertification,
-                        type: e.target.value,
-                      })
-                    }
-                    label="Tipo de certificación"
-                    disabled={certificationUploading}
-                    sx={{
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: institutionalColors.primary,
-                      },
-                    }}
-                  >
-                    {certificationTypes.map((type) => (
-                      <MenuItem key={type.value} value={type.value}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Box
-                            sx={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: "50%",
-                              bgcolor: type.color,
-                            }}
-                          />
-                          <span>{type.label}</span>
-                        </Stack>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  label="Horas que vale"
-                  type="number"
-                  value={newCertification.hoursValue}
-                  onChange={(e) =>
-                    setNewCertification({
-                      ...newCertification,
-                      hoursValue: e.target.value,
-                    })
-                  }
-                  fullWidth
-                  disabled={certificationUploading}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">horas</InputAdornment>
-                    ),
-                  }}
-                />
-
-                <Divider sx={{ my: 1 }}>
-                  <Chip label="DOCUMENTOS" size="small" />
-                </Divider>
-
-                {/* Área de carga de documentos */}
-                <Box
-                  sx={{
-                    border: "2px dashed",
-                    borderColor: institutionalColors.primary,
-                    borderRadius: 2,
-                    p: 3,
-                    textAlign: "center",
-                    bgcolor: institutionalColors.lightBlue,
-                    cursor: certificationUploading ? "not-allowed" : "pointer",
-                    opacity: certificationUploading ? 0.7 : 1,
-                    "&:hover": {
-                      bgcolor: certificationUploading
-                        ? "rgba(19, 59, 107, 0.08)"
-                        : "rgba(19, 59, 107, 0.12)",
-                    },
-                  }}
-                  onClick={() =>
-                    !certificationUploading &&
-                    certificationFileInputRef.current?.click()
-                  }
-                >
-                  <input
-                    type="file"
-                    ref={certificationFileInputRef}
-                    onChange={handleCertificationFileSelect}
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-                    disabled={certificationUploading}
-                    style={{ display: "none" }}
-                  />
-                  <UploadIcon
-                    sx={{
-                      fontSize: 48,
-                      color: institutionalColors.primary,
-                      mb: 1,
-                    }}
-                  />
-                  <Typography
-                    variant="body1"
-                    sx={{ color: institutionalColors.textPrimary }}
-                    gutterBottom
-                  >
-                    Haz clic para adjuntar documentos
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: institutionalColors.textSecondary }}
-                  >
-                    Sube los archivos relacionados con esta certificación
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: institutionalColors.textSecondary,
-                      display: "block",
-                      mt: 1,
-                    }}
-                  >
-                    Formatos permitidos: PDF, DOC, DOCX, JPG, PNG (Máx. 10MB por
-                    archivo)
-                  </Typography>
-                </Box>
-
-                {/* Lista de archivos seleccionados */}
-                {certificationFiles.length > 0 && (
-                  <Box>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ color: institutionalColors.textPrimary, mb: 1 }}
-                    >
-                      Documentos a adjuntar ({certificationFiles.length})
-                    </Typography>
-                    <List dense>
-                      {certificationFiles.map((file, index) => (
-                        <ListItem
-                          key={index}
-                          secondaryAction={
-                            <IconButton
-                              edge="end"
-                              size="small"
-                              onClick={() =>
-                                handleRemoveCertificationFile(index)
-                              }
-                              disabled={certificationUploading}
-                            >
-                              <DeleteIcon
-                                fontSize="small"
-                                sx={{ color: institutionalColors.error }}
-                              />
-                            </IconButton>
-                          }
-                        >
-                          <ListItemIcon>{getFileIcon(file.type)}</ListItemIcon>
-                          <ListItemText
-                            primary={file.name}
-                            secondary={formatFileSize(file.size)}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
-                )}
-
-                {/* Barra de progreso de subida */}
-                {certificationUploading && (
-                  <Box sx={{ width: "100%" }}>
-                    <LinearProgress
-                      variant="determinate"
-                      value={certificationUploadProgress}
-                      sx={{
-                        height: 8,
-                        borderRadius: 4,
-                        bgcolor: institutionalColors.accent,
-                        "& .MuiLinearProgress-bar": {
-                          bgcolor: institutionalColors.primary,
-                        },
-                      }}
-                    />
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: institutionalColors.textSecondary,
-                        mt: 1,
-                        display: "block",
-                        textAlign: "center",
-                      }}
-                    >
-                      Subiendo documentos... {certificationUploadProgress}%
-                    </Typography>
-                  </Box>
-                )}
-              </>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setOpenCertificationDialog(false);
-              setSelectedCertification(null);
-              setCertificationFiles([]);
-            }}
-            disabled={loading || certificationUploading}
-          >
-            Cancelar
-          </Button>
-          {selectedUser?.uploadPermission === "permitido" && (
-            <Button
-              onClick={handleSaveCertification}
-              variant="contained"
-              disabled={loading || certificationUploading}
-              startIcon={
-                loading || certificationUploading ? (
-                  <CircularProgress size={20} sx={{ color: "white" }} />
-                ) : (
-                  <SaveIcon />
-                )
-              }
-              sx={{
-                bgcolor: institutionalColors.primary,
-                "&:hover": {
-                  bgcolor: institutionalColors.secondary,
-                },
-              }}
-            >
-              {loading || certificationUploading
-                ? "Guardando..."
-                : selectedCertification
-                  ? "Actualizar"
-                  : certificationFiles.length > 0
-                    ? `Agregar con ${certificationFiles.length} documento(s)`
-                    : "Agregar"}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Diálogo de detalles del usuario con nivel de reconocimiento */}
-      <Dialog
+      <UserDetailsDialog
         open={openDetailsDialog}
         onClose={() => setOpenDetailsDialog(false)}
+        selectedUser={selectedUser}
+        getRecognitionLevel={getRecognitionLevel}
+        getRecognitionLevelInfo={getRecognitionLevelInfo}
+        getRoleColor={getRoleColor}
+        getCertificationColor={getCertificationColor}
+        getMembershipDuration={getMembershipDuration}
+        certificationTypes={certificationTypes}
+        onEditCertification={handleEditCertification}
+        onDeleteCertification={handleDeleteCertification}
+        onViewDocuments={handleViewDocuments}
+        onUploadDocuments={handleUploadDocuments}
+      />
 
-        fullWidth
-        PaperProps={{
-          sx: {
-            width: "100%",
-           maxWidth: "1200px", 
-            minHeight: "80vh",
-            maxHeight: "90vh",
-          },
-        }}
-      >
-        {selectedUser && (
-          <>
-            <DialogTitle sx={{ pb: 1 }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Badge
-                  overlap="circular"
-                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                  badgeContent={
-                    <Tooltip
-                      title={
-                        getRecognitionLevelInfo(
-                          getRecognitionLevel(selectedUser),
-                        ).label
-                      }
-                    >
-                      <Avatar
-                        sx={{
-                          width: 32,
-                          height: 32,
-                          bgcolor: getRecognitionLevelInfo(
-                            getRecognitionLevel(selectedUser),
-                          ).color,
-                          fontSize: "0.9rem",
-                          fontWeight: "bold",
-                          border: "2px solid white",
-                        }}
-                      >
-                        {
-                          getRecognitionLevelInfo(
-                            getRecognitionLevel(selectedUser),
-                          ).icon
-                        }
-                      </Avatar>
-                    </Tooltip>
-                  }
-                >
-                  <Avatar
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      bgcolor: getRoleColor(selectedUser.role),
-                      fontWeight: "bold",
-                      color: "white",
-                      fontSize: "1.5rem",
-                    }}
-                  >
-                    {selectedUser.avatar}
-                  </Avatar>
-                </Badge>
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      color: institutionalColors.textPrimary,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {selectedUser.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: institutionalColors.textSecondary }}
-                  >
-                    {selectedUser.roleName} • {selectedUser.department}
-                  </Typography>
-                </Box>
-              </Stack>
-            </DialogTitle>
-
-            <DialogContent dividers sx={{ p: 3 }}>
-              <Grid container spacing={3}>
-                {/* ================= INFO PERSONAL ================= */}
-               <Grid item xs={12}>
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      color: institutionalColors.textSecondary,
-                      mb: 1,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Información Personal
-                  </Typography>
-
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      p: 2,
-                      bgcolor: "#f9fafb",
-                      width: "100%",
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    <List dense disablePadding>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                          <MailIcon
-                            sx={{
-                              color: institutionalColors.textSecondary,
-                              fontSize: 20,
-                            }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Email"
-                          secondary={selectedUser.email}
-                          primaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textSecondary,
-                              fontSize: "0.75rem",
-                            },
-                          }}
-                          secondaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textPrimary,
-                              fontSize: "0.875rem",
-                              fontWeight: 500,
-                            },
-                          }}
-                        />
-                      </ListItem>
-
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                          <PhoneIcon
-                            sx={{
-                              color: institutionalColors.textSecondary,
-                              fontSize: 20,
-                            }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Teléfono"
-                          secondary={selectedUser.phone}
-                          primaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textSecondary,
-                              fontSize: "0.75rem",
-                            },
-                          }}
-                          secondaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textPrimary,
-                              fontSize: "0.875rem",
-                              fontWeight: 500,
-                            },
-                          }}
-                        />
-                      </ListItem>
-
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                          <LocationIcon
-                            sx={{
-                              color: institutionalColors.textSecondary,
-                              fontSize: 20,
-                            }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Región"
-                          secondary={selectedUser.region}
-                          primaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textSecondary,
-                              fontSize: "0.75rem",
-                            },
-                          }}
-                          secondaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textPrimary,
-                              fontSize: "0.875rem",
-                              fontWeight: 500,
-                            },
-                          }}
-                        />
-                      </ListItem>
-
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                          <TrophyIcon
-                            sx={{
-                              color: institutionalColors.textSecondary,
-                              fontSize: 20,
-                            }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Antigüedad en la asociación"
-                          secondary={getMembershipDuration(
-                            selectedUser.joinDate,
-                          )}
-                          primaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textSecondary,
-                              fontSize: "0.75rem",
-                            },
-                          }}
-                          secondaryTypographyProps={{
-                            sx: {
-                              color: institutionalColors.textPrimary,
-                              fontSize: "0.875rem",
-                              fontWeight: 500,
-                            },
-                          }}
-                        />
-                      </ListItem>
-                      <ListItem sx={{ px: 0, alignItems: "flex-start" }}>
-                        {/* Icono izquierdo */}
-                        <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
-                          <VerifiedIcon
-                            sx={{
-                              color: institutionalColors.textSecondary,
-                              fontSize: 20,
-                            }}
-                          />
-                        </ListItemIcon>
-
-                        {/* Contenido */}
-                        <Box sx={{ width: "100%" }}>
-                          {/* Título */}
-                          <Typography
-                            sx={{
-                              color: institutionalColors.textSecondary,
-                              fontSize: "0.75rem",
-                              mb: 0.5,
-                            }}
-                          >
-                            Nivel de asociado
-                          </Typography>
-
-                          {/* Nivel */}
-                          <Stack
-                            direction="row"
-                            spacing={1.5}
-                            alignItems="center"
-                          >
-                            <Avatar
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                bgcolor: getRecognitionLevelInfo(
-                                  getRecognitionLevel(selectedUser),
-                                ).color,
-                                fontSize: "1.2rem",
-                                fontWeight: "bold",
-                              }}
-                            >
-                              {
-                                getRecognitionLevelInfo(
-                                  getRecognitionLevel(selectedUser),
-                                ).icon
-                              }
-                            </Avatar>
-
-                            <Box>
-                              <Typography
-                                sx={{
-                                  color: getRecognitionLevelInfo(
-                                    getRecognitionLevel(selectedUser),
-                                  ).color,
-                                  fontWeight: 600,
-                                  fontSize: "0.95rem",
-                                  lineHeight: 1.2,
-                                }}
-                              >
-                                {
-                                  getRecognitionLevelInfo(
-                                    getRecognitionLevel(selectedUser),
-                                  ).label
-                                }
-                              </Typography>
-
-                              <Typography
-                                sx={{
-                                  color: institutionalColors.textSecondary,
-                                  fontSize: "0.75rem",
-                                }}
-                              >
-                                {selectedUser.associationCertifications
-                                  ?.length || 0}{" "}
-                                certificaciones
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        </Box>
-                      </ListItem>
-                    </List>
-                  </Paper>
-                </Grid>
-
-                {/* ================= CERTIFICACIONES ================= */}
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 1 }} />
-
-                  {/* HEADER + PERMISO */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      gap: 1,
-                      mb: 2,
-                      mt: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle2"
-                      sx={{
-                        color: institutionalColors.textSecondary,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Certificaciones de la Asociación
-                    </Typography>
-
-                    <Chip
-                      size="small"
-                      icon={
-                        selectedUser.uploadPermission === "permitido" ? (
-                          <CheckCircleIcon sx={{ fontSize: 16 }} />
-                        ) : (
-                          <CancelIcon sx={{ fontSize: 16 }} />
-                        )
-                      }
-                      label={
-                        selectedUser.uploadPermission === "permitido"
-                          ? "Permiso de carga concedido"
-                          : "Permiso de carga no concedido"
-                      }
-                      sx={{
-                        bgcolor:
-                          selectedUser.uploadPermission === "permitido"
-                            ? `${institutionalColors.success}10`
-                            : `${institutionalColors.error}10`,
-                        color:
-                          selectedUser.uploadPermission === "permitido"
-                            ? institutionalColors.success
-                            : institutionalColors.error,
-                        borderColor:
-                          selectedUser.uploadPermission === "permitido"
-                            ? institutionalColors.success
-                            : institutionalColors.error,
-                        fontWeight: 500,
-                        "& .MuiChip-icon": {
-                          color: "inherit",
-                        },
-                      }}
-                      variant="outlined"
-                    />
-                  </Box>
-
-                  {selectedUser.associationCertifications?.length > 0 ? (
-                    <TableContainer
-                      component={Paper}
-                      variant="outlined"
-                      sx={{ borderRadius: 2 }}
-                    >
-                      <Table size="small">
-                        <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                          <TableRow>
-                            <TableCell
-                              sx={{
-                                color: institutionalColors.primary,
-                                fontWeight: 600,
-                              }}
-                            >
-                              Certificación
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                color: institutionalColors.primary,
-                                fontWeight: 600,
-                              }}
-                            >
-                              Tipo
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                color: institutionalColors.primary,
-                                fontWeight: 600,
-                              }}
-                            >
-                              Horas
-                            </TableCell>
-                            <TableCell
-                              align="center"
-                              sx={{
-                                color: institutionalColors.primary,
-                                fontWeight: 600,
-                              }}
-                            >
-                              Documentos
-                            </TableCell>
-
-                            
-                            <TableCell
-                              align="right"
-                              sx={{
-                                color: institutionalColors.primary,
-                                fontWeight: 600,
-                              }}
-                            >
-                              Acciones
-                            </TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {selectedUser.associationCertifications.map(
-                            (cert) => (
-                              <TableRow
-                                key={cert.id}
-                                hover
-                                sx={{
-                                  "&:last-child td, &:last-child th": {
-                                    border: 0,
-                                  },
-                                }}
-                              >
-                                <TableCell>
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight="500"
-                                    sx={{
-                                      color: institutionalColors.textPrimary,
-                                    }}
-                                  >
-                                    {cert.name}
-                                  </Typography>
-                                </TableCell>
-
-                                <TableCell>
-                                  <Chip
-                                    label={
-                                      certificationTypes.find(
-                                        (t) => t.value === cert.type,
-                                      )?.label || cert.type
-                                    }
-                                    size="small"
-                                    sx={{
-                                      bgcolor: `${getCertificationColor(cert.type)}10`,
-                                      color: getCertificationColor(cert.type),
-                                      fontWeight: 500,
-                                      fontSize: "0.75rem",
-                                    }}
-                                  />
-                                </TableCell>
-
-                                <TableCell>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      color: institutionalColors.textPrimary,
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    {cert.hoursValue || 0} horas
-                                  </Typography>
-                                </TableCell>
-
-                                <TableCell align="center">
-                                  <Badge
-                                    badgeContent={cert.documents?.length || 0}
-                                    color="primary"
-                                    sx={{
-                                      "& .MuiBadge-badge": {
-                                        bgcolor: institutionalColors.primary,
-                                        fontSize: "0.65rem",
-                                        height: 18,
-                                        minWidth: 18,
-                                      },
-                                    }}
-                                  >
-                                    <IconButton
-                                      size="small"
-                                      onClick={() =>
-                                        handleViewDocuments(selectedUser, cert)
-                                      }
-                                      disabled={
-                                        selectedUser.uploadPermission !==
-                                        "permitido"
-                                      }
-                                      sx={{
-                                        color: institutionalColors.primary,
-                                        "&.Mui-disabled": {
-                                          color:
-                                            institutionalColors.textSecondary,
-                                          opacity: 0.5,
-                                        },
-                                      }}
-                                    >
-                                      <AttachFileIcon fontSize="small" />
-                                    </IconButton>
-                                  </Badge>
-                                </TableCell>
-
-                                <TableCell align="right">
-                                  <Stack
-                                    direction="row"
-                                    spacing={0.5}
-                                    justifyContent="flex-end"
-                                  >
-                                    <Tooltip title="Editar certificación">
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          onClick={() =>
-                                            handleEditCertification(
-                                              selectedUser,
-                                              cert,
-                                            )
-                                          }
-                                          disabled={
-                                            selectedUser.uploadPermission !==
-                                            "permitido"
-                                          }
-                                          sx={{
-                                            color:
-                                              selectedUser.uploadPermission ===
-                                              "permitido"
-                                                ? institutionalColors.primary
-                                                : institutionalColors.textSecondary,
-                                            opacity:
-                                              selectedUser.uploadPermission ===
-                                              "permitido"
-                                                ? 1
-                                                : 0.5,
-                                          }}
-                                        >
-                                          <EditIcon fontSize="small" />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-
-                                    <Tooltip title="Eliminar certificación">
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          onClick={() =>
-                                            handleDeleteCertification(
-                                              selectedUser.id,
-                                              cert.id,
-                                            )
-                                          }
-                                          disabled={
-                                            selectedUser.uploadPermission !==
-                                            "permitido"
-                                          }
-                                          sx={{
-                                            color: institutionalColors.error,
-                                            opacity:
-                                              selectedUser.uploadPermission ===
-                                              "permitido"
-                                                ? 1
-                                                : 0.5,
-                                          }}
-                                        >
-                                          <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                  </Stack>
-                                </TableCell>
-                              </TableRow>
-                            ),
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : (
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        textAlign: "center",
-                        py: 4,
-                        px: 2,
-                        bgcolor: "#f9fafb",
-                        borderRadius: 2,
-                      }}
-                    >
-                      <VerifiedIcon
-                        sx={{
-                          fontSize: 48,
-                          color: institutionalColors.textSecondary,
-                          mb: 2,
-                          opacity: 0.5,
-                        }}
-                      />
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          color: institutionalColors.textSecondary,
-                          fontWeight: 500,
-                        }}
-                        gutterBottom
-                      >
-                        No hay certificaciones registradas
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: institutionalColors.textSecondary }}
-                      >
-                        {selectedUser.uploadPermission === "permitido"
-                          ? "Agrega certificaciones para este usuario usando el botón + en la lista principal"
-                          : "Este usuario no tiene permiso para agregar certificaciones"}
-                      </Typography>
-                    </Paper>
-                  )}
-                </Grid>
-              </Grid>
-            </DialogContent>
-
-            <DialogActions
-              sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}
-            >
-              <Button
-                onClick={() => setOpenDetailsDialog(false)}
-                variant="contained"
-                sx={{
-                  bgcolor: institutionalColors.primary,
-                  "&:hover": { bgcolor: institutionalColors.secondary },
-                  px: 3,
-                }}
-              >
-                Cerrar
-              </Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
-
-      {/* Diálogo para ver documentos */}
-      <Dialog
+      <DocumentsDialog
         open={openDocumentDialog}
         onClose={() => setOpenDocumentDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        {selectedCertification && (
-          <>
-            <DialogTitle>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <AttachFileIcon sx={{ color: institutionalColors.primary }} />
-                <Box>
-                  <Typography
-                    variant="h6"
-                    sx={{ color: institutionalColors.textPrimary }}
-                  >
-                    Documentos de {selectedCertification.name}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{ color: institutionalColors.textSecondary }}
-                  >
-                    Usuario: {selectedUser?.name}
-                  </Typography>
-                </Box>
-              </Stack>
-            </DialogTitle>
+        selectedUser={selectedUser}
+        selectedCertification={selectedCertification}
+        onDeleteDocument={handleDeleteDocument}
+        onUploadDocuments={() => {
+          setOpenDocumentDialog(false);
+          handleUploadDocuments(selectedUser, selectedCertification);
+        }}
+        getFileIcon={getFileIcon}
+        formatFileSize={formatFileSize}
+      />
 
-            <DialogContent dividers>
-              {selectedCertification.documents?.length > 0 ? (
-                <List>
-                  {selectedCertification.documents.map((doc) => (
-                    <ListItem
-                      key={doc.id}
-                      secondaryAction={
-                        <Stack direction="row" spacing={1}>
-                          {selectedUser?.uploadPermission === "permitido" && (
-                            <Tooltip title="Eliminar">
-                              <IconButton
-                                edge="end"
-                                onClick={() => handleDeleteDocument(doc.id)}
-                                sx={{ color: institutionalColors.error }}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      }
-                    >
-                      <ListItemIcon>{getFileIcon(doc.type)}</ListItemIcon>
-                      <ListItemText
-                        primary={doc.name}
-                        secondary={
-                          <Stack direction="row" spacing={2} component="span">
-                            <Typography variant="caption" component="span">
-                              {formatFileSize(doc.size)}
-                            </Typography>
-                            <Typography variant="caption" component="span">
-                              {format(
-                                parseISO(doc.uploadDate),
-                                "dd/MM/yyyy HH:mm",
-                                { locale: es },
-                              )}
-                            </Typography>
-                          </Stack>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Box sx={{ textAlign: "center", py: 4 }}>
-                  <AttachFileIcon
-                    sx={{
-                      fontSize: 48,
-                      color: institutionalColors.textSecondary,
-                      mb: 2,
-                    }}
-                  />
-                  <Typography
-                    variant="body1"
-                    sx={{ color: institutionalColors.textSecondary }}
-                    gutterBottom
-                  >
-                    No hay documentos para esta certificación
-                  </Typography>
-                  {selectedUser?.uploadPermission === "permitido" && (
-                    <Button
-                      variant="contained"
-                      startIcon={<UploadIcon />}
-                      onClick={() => {
-                        setOpenDocumentDialog(false);
-                        handleUploadDocuments(
-                          selectedUser,
-                          selectedCertification,
-                        );
-                      }}
-                      sx={{
-                        mt: 2,
-                        bgcolor: institutionalColors.primary,
-                        "&:hover": { bgcolor: institutionalColors.secondary },
-                      }}
-                    >
-                      Subir Documentos
-                    </Button>
-                  )}
-                </Box>
-              )}
-            </DialogContent>
-
-            <DialogActions>
-              <Button onClick={() => setOpenDocumentDialog(false)}>
-                Cerrar
-              </Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
-
-      {/* Diálogo para subir documentos adicionales */}
-      <Dialog
+      <UploadDocumentsDialog
         open={openUploadDialog}
         onClose={() => !uploading && setOpenUploadDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <UploadIcon sx={{ color: institutionalColors.primary }} />
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ color: institutionalColors.textPrimary }}
-              >
-                Subir Documentos Adicionales
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: institutionalColors.textSecondary }}
-              >
-                {selectedCertification?.name} - {selectedUser?.name}
-              </Typography>
-            </Box>
-          </Stack>
-        </DialogTitle>
-
-        <DialogContent dividers>
-          <Stack spacing={3}>
-            <Box
-              sx={{
-                border: "2px dashed",
-                borderColor: institutionalColors.primary,
-                borderRadius: 2,
-                p: 3,
-                textAlign: "center",
-                bgcolor: institutionalColors.lightBlue,
-                cursor: uploading ? "not-allowed" : "pointer",
-                opacity: uploading ? 0.7 : 1,
-                "&:hover": {
-                  bgcolor: uploading
-                    ? "rgba(19, 59, 107, 0.08)"
-                    : "rgba(19, 59, 107, 0.12)",
-                },
-              }}
-              onClick={() => !uploading && fileInputRef.current?.click()}
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                multiple
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-                disabled={uploading}
-                style={{ display: "none" }}
-              />
-              <UploadIcon
-                sx={{ fontSize: 48, color: institutionalColors.primary, mb: 1 }}
-              />
-              <Typography
-                variant="body1"
-                sx={{ color: institutionalColors.textPrimary }}
-                gutterBottom
-              >
-                Haz clic para seleccionar archivos
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: institutionalColors.textSecondary }}
-              >
-                o arrastra y suelta los archivos aquí
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  color: institutionalColors.textSecondary,
-                  display: "block",
-                  mt: 1,
-                }}
-              >
-                Formatos permitidos: PDF, JPG, PNG, DOC, DOCX (Máx. 10MB)
-              </Typography>
-            </Box>
-
-            {uploadFiles.length > 0 && (
-              <Box>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ color: institutionalColors.textPrimary, mb: 1 }}
-                >
-                  Archivos seleccionados ({uploadFiles.length})
-                </Typography>
-                <List dense>
-                  {uploadFiles.map((file, index) => (
-                    <ListItem
-                      key={index}
-                      secondaryAction={
-                        <IconButton
-                          edge="end"
-                          size="small"
-                          onClick={() => handleRemoveFile(index)}
-                          disabled={uploading}
-                        >
-                          <DeleteIcon
-                            fontSize="small"
-                            sx={{ color: institutionalColors.error }}
-                          />
-                        </IconButton>
-                      }
-                    >
-                      <ListItemIcon>{getFileIcon(file.type)}</ListItemIcon>
-                      <ListItemText
-                        primary={file.name}
-                        secondary={formatFileSize(file.size)}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            )}
-
-            {uploading && (
-              <Box sx={{ width: "100%" }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={uploadProgress}
-                  sx={{
-                    height: 8,
-                    borderRadius: 4,
-                    bgcolor: institutionalColors.accent,
-                    "& .MuiLinearProgress-bar": {
-                      bgcolor: institutionalColors.primary,
-                    },
-                  }}
-                />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: institutionalColors.textSecondary,
-                    mt: 1,
-                    display: "block",
-                    textAlign: "center",
-                  }}
-                >
-                  Subiendo... {uploadProgress}%
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        </DialogContent>
-
-        <DialogActions>
-          <Button
-            onClick={() => setOpenUploadDialog(false)}
-            disabled={uploading}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleUploadFiles}
-            disabled={uploadFiles.length === 0 || uploading}
-            startIcon={
-              uploading ? (
-                <CircularProgress size={20} sx={{ color: "white" }} />
-              ) : (
-                <UploadIcon />
-              )
-            }
-            sx={{
-              bgcolor: institutionalColors.primary,
-              "&:hover": { bgcolor: institutionalColors.secondary },
-            }}
-          >
-            {uploading ? "Subiendo..." : "Subir Archivos"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        selectedUser={selectedUser}
+        selectedCertification={selectedCertification}
+        uploadFiles={uploadFiles}
+        onFileSelect={handleFileSelect}
+        onRemoveFile={handleRemoveFile}
+        onUpload={handleUploadFiles}
+        uploading={uploading}
+        uploadProgress={uploadProgress}
+        getFileIcon={getFileIcon}
+        formatFileSize={formatFileSize}
+      />
     </Box>
   );
 };
