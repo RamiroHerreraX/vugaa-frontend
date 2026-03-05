@@ -147,6 +147,21 @@ class UsuarioService {
       );
     }
   }
+  async cambiarInstancia(id, instanciaId) {
+    try {
+      const response = await API.patch(`/usuarios/${id}/instancia`, null, {
+        params: { instanciaId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error en cambiarInstancia:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al cambiar la instancia del usuario",
+        }
+      );
+    }
+  }
 }
 
 export default new UsuarioService();
