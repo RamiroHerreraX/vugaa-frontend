@@ -162,6 +162,55 @@ class UsuarioService {
       );
     }
   }
+
+  /**
+   * NUEVO MÉTODO: Obtiene todos los usuarios de una instancia específica
+   * @param {number} instanciaId - ID de la instancia
+   * @returns {Promise<Array>} Lista de usuarios de la instancia en formato UsuarioTablaDTO
+   */
+  async findByInstanciaId(instanciaId) {
+    try {
+      console.log(`Obteniendo usuarios para instancia ID: ${instanciaId}`);
+      const response = await API.get(`/usuarios/instancia/${instanciaId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error en findByInstanciaId:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios por instancia",
+        }
+      );
+    }
+  }
+
+  async findAsociacionByInstanciaId(instanciaId) {
+    try {
+      const response = await API.get(`/usuarios/asociacion/instancia/${instanciaId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error en findAsociacionByInstanciaId:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios de asociación por instancia",
+        }
+      );
+    }
+  }
+
+  async findAgrupadosPorInstancia() {
+    try {
+      const response = await API.get("/usuarios/agrupados");
+      return response.data; // Esto será un objeto { instanciaId: [usuarios...] }
+    } catch (error) {
+      console.error("Error en findAgrupadosPorInstancia:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios agrupados por instancia",
+        }
+      );
+    }
+  }
+
 }
 
 export default new UsuarioService();

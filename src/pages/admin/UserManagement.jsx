@@ -11,7 +11,7 @@ import {
   Visibility as VisibilityIcon, LocationOn as LocationIcon,
   Security as SecurityIcon, PersonAdd as PersonAddIcon,
   SwapHoriz as SwapHorizIcon,
-  Lock as LockIcon, Person as PersonIcon
+  Person as PersonIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -19,7 +19,7 @@ import usuarioService from '../../services/usuarioService';
 import rolService from '../../services/rol';
 import regionesService from '../../services/regiones';
 import CreateUserModal from './../../components/usuariosAdmin/CreateUserModal';
-import { ChangeRoleModal } from './../../components/usuariosAdmin/EditUserModal';
+import { EditUserModal, ChangeRoleModal } from './../../components/usuariosAdmin/EditUserModal';
 
 const colors = {
   primary: { dark: '#0D2A4D', main: '#133B6B', light: '#3A6EA5' },
@@ -87,8 +87,21 @@ const UserManagement = () => {
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
-      const data = await usuarioService.findAllForTable();
-      setUsers(Array.isArray(data) ? data : []);
+      let data = [];
+      
+      // Usar el nuevo método findByInstanciaId si el usuario tiene instanciaId
+      if (user?.instanciaId) {
+        data = await usuarioService.findByInstanciaId(user.instanciaId);
+      } else {
+        data = await usuarioService.findAllForTable();
+      }
+      
+      // Filtrar para excluir al usuario actual
+      const usuariosFiltrados = Array.isArray(data) 
+        ? data.filter(u => u.id !== user?.id)
+        : [];
+      
+      setUsers(usuariosFiltrados);
     } catch (error) {
       mostrarSnackbar('Error al cargar usuarios', 'error');
       setUsers([]);
@@ -148,10 +161,11 @@ const UserManagement = () => {
     }
   }, [users, availableRegions.length, loadingRegions]);
 
-  // Obtener cargos ocupados del comité
+  // Obtener cargos ocupados del comité (excluyendo al usuario actual)
   const getCargosOcupados = (excludeUserId = null) => {
     return users
-      .filter(u => esRolComite(u.rolNombre) && u.rolEspecifico && u.id !== excludeUserId)
+      .filter(u => esRolComite(u.rolNombre) && u.rolEspecifico && 
+             u.id !== excludeUserId && u.id !== user?.id)
       .map(u => u.rolEspecifico);
   };
 
@@ -211,21 +225,31 @@ const UserManagement = () => {
     setOpenCreateModal(true);
   };
 
-  const handleEditUser = (u) => {
+  const handleEditRegion = (u) => {
+    // Prevenir edición del propio usuario
+    if (u.id === user?.id) {
+      mostrarSnackbar('No puedes cambiar la región de tu propio usuario', 'warning');
+      return;
+    }
+    
     setSelectedUser({
       id: u.id,
       nombre: u.nombre,
       email: u.email,
       rolNombre: u.rolNombre || '',
       regionNombre: u.regionNombre || '',
-      rolEspecifico: u.rolEspecifico || '',
-      activo: u.estado === 'ACTIVO'
+      rolEspecifico: u.rolEspecifico || ''
     });
-    setPassword('');
     setOpenEditModal(true);
   };
 
   const handleChangeRole = (u) => {
+    // Prevenir cambio de rol del propio usuario
+    if (u.id === user?.id) {
+      mostrarSnackbar('No puedes cambiar el rol de tu propio usuario', 'warning');
+      return;
+    }
+    
     setSelectedUser({
       id: u.id,
       nombre: u.nombre,
@@ -282,33 +306,32 @@ const UserManagement = () => {
     }
   };
 
-  // Guardar usuario (edición)
-  const handleUpdateUser = async (userData) => {
-    const esComite = esRolComite(userData.rolNombre);
-    
-    if (esComite && !userData.rolEspecifico) {
-      mostrarSnackbar('Debe seleccionar un cargo específico para el rol de Comité', 'error');
-      return;
-    }
-
+  // Guardar cambio de región (solo actualiza la región)
+  const handleUpdateRegion = async (userData) => {
     try {
-      const updatedUserDTO = {
-        email: userData.email,
-        nombre: userData.nombre,
-        activo: userData.activo,
-        rolNombre: userData.rolNombre,
-        rolEspecifico: esComite ? userData.rolEspecifico : null,
+      // Solo actualizamos la región, obtenemos el usuario actual para mantener el resto
+      const usuarioActual = await usuarioService.findById(userData.id);
+      
+      const updateData = {
+        ...usuarioActual,
         regionNombre: userData.regionNombre,
-        instanciaId: user?.instanciaId || 1,
+        instanciaId: user?.instanciaId || usuarioActual.instanciaId || 1,
       };
 
-      await usuarioService.update(userData.id, updatedUserDTO);
+      // Eliminar campos sensibles que no deben enviarse
+      delete updateData.password;
+
+      await usuarioService.update(userData.id, updateData);
       await cargarUsuarios();
-      mostrarSnackbar('Usuario actualizado exitosamente', 'success');
+      
+      mostrarSnackbar(
+        `Región de ${usuarioActual.nombre} actualizada a ${userData.regionNombre}`,
+        'success'
+      );
       handleCloseModals();
     } catch (error) {
-      console.error('Error en actualización:', error);
-      mostrarSnackbar(error.error || 'Error al actualizar el usuario', 'error');
+      console.error('Error al actualizar región:', error);
+      mostrarSnackbar(error.error || error.message || 'Error al actualizar la región', 'error');
     }
   };
 
@@ -348,6 +371,12 @@ const UserManagement = () => {
   };
 
   const handleToggleStatus = async (id) => {
+    // Prevenir desactivación del propio usuario
+    if (id === user?.id) {
+      mostrarSnackbar('No puedes desactivar tu propio usuario', 'warning');
+      return;
+    }
+    
     const u = users.find(u => u.id === id);
     const nuevoEstado = !(u.estado === 'ACTIVO');
     try {
@@ -375,6 +404,9 @@ const UserManagement = () => {
             <Typography variant="body2" sx={{ color: colors.text.secondary }}>
               Administre los usuarios del sistema - {filteredUsers.length} usuarios encontrados
               {user?.instanciaNombre && ` - Instancia: ${user.instanciaNombre}`}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.primary.light, mt: 0.5, display: 'block' }}>
+              Nota: Tu usuario no aparece en la lista por seguridad
             </Typography>
           </Box>
           <Button
@@ -454,7 +486,7 @@ const UserManagement = () => {
               ) : paginatedUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                    <Typography>No se encontraron usuarios</Typography>
+                    <Typography>No se encontraron otros usuarios</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -537,15 +569,21 @@ const UserManagement = () => {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Cambiar rol">
-                          <IconButton size="small" onClick={() => handleChangeRole(u)}
-                            sx={{ color: colors.accents.purple }}>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleChangeRole(u)}
+                            sx={{ color: colors.accents.purple }}
+                          >
                             <SwapHorizIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Editar">
-                          <IconButton size="small" onClick={() => handleEditUser(u)}
-                            sx={{ color: colors.accents.blue }}>
-                            <EditIcon fontSize="small" />
+                        <Tooltip title="Cambiar región">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleEditRegion(u)}
+                            sx={{ color: colors.primary.main }}
+                          >
+                            <LocationIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={u.estado === 'ACTIVO' ? 'Desactivar' : 'Activar'}>
@@ -611,20 +649,16 @@ const UserManagement = () => {
         ocupadosComite={getCargosOcupados()}
       />
 
-      {/* Modal para editar usuario */}
-      <CreateUserModal
+      {/* Modal para cambiar región */}
+      <EditUserModal
         open={openEditModal}
         onClose={handleCloseModals}
-        onSave={handleUpdateUser}
-        mode="edit"
+        onSave={handleUpdateRegion}
         user={selectedUser}
-        availableRoles={availableRoles}
         availableRegions={availableRegions}
-        loadingRoles={loadingRoles}
         loadingRegions={loadingRegions}
-        userInstanciaId={user?.instanciaId}
         userInstanciaNombre={user?.instanciaNombre}
-        ocupadosComite={getCargosOcupados(selectedUser?.id)}
+        getRoleColor={getRoleColor}
       />
 
       {/* Modal para cambiar rol */}

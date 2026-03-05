@@ -1,3 +1,4 @@
+// src/pages/admin/SystemConfig.jsx
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -63,21 +64,20 @@ import {
     Person as PersonIcon,
     LocationOn as LocationOnIcon,
     Group as GroupIcon,
-    PersonAdd as PersonAddIcon,
-    PersonRemove as PersonRemoveIcon
+    PersonAdd as PersonAddIcon
 } from '@mui/icons-material';
 
 // Importar componentes separados
 import CreateRegion from './../../components/regionAdmin/CreateRegion';
 import EditRegion from './../../components/regionAdmin/EditRegion';
-import CreateAsociacion from './../../components/asociacionAdmin/CreateAsociacion';
 import AsigAsociacion from './../../components/asociacionAdmin/AsigAsociacion';
+import CreateUsuarioAsociacion from '../../components/asociacionAdmin/CreateUsuarioAsociacion';
 
 import rolService from '../../services/rol';
 import asociacionService from '../../services/asociacion';
 import regionesService from '../../services/regiones';
 
-// Paleta corporativa (del prototipo)
+// Paleta corporativa
 const colors = {
     primary: {
         dark: '#0D2A4D',
@@ -151,21 +151,20 @@ const SystemConfig = () => {
     const [regiones, setRegiones] = useState([]);
 
     // Estados para el diálogo de asociaciones
-    const [asociacionDialogOpen, setAsociacionDialogOpen] = useState(false);
-    const [editingAsociacion, setEditingAsociacion] = useState(null);
-    const [savingAsociacion, setSavingAsociacion] = useState(false);
     const [togglingAsociacion, setTogglingAsociacion] = useState(null);
     const [loadingRegionesForSelect, setLoadingRegionesForSelect] = useState(false);
 
-    // ── Nuevo estado para gestión de usuarios de asociación ─────────────────
+    // ── Estado para gestión de usuarios de asociación ─────────────────────
     const [usuariosAsociacionDialogOpen, setUsuariosAsociacionDialogOpen] = useState(false);
     const [selectedAsociacionForUsuarios, setSelectedAsociacionForUsuarios] = useState(null);
     const [usuariosAsociacion, setUsuariosAsociacion] = useState([]);
     const [loadingUsuariosAsociacion, setLoadingUsuariosAsociacion] = useState(false);
     const [errorUsuariosAsociacion, setErrorUsuariosAsociacion] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
-    // Nuevo estado para controlar qué usuario se está desvinculando
     const [desvinculandoUsuario, setDesvinculandoUsuario] = useState(null);
+
+    // ── Estado para el diálogo unificado de creación usuario+asociación ──
+    const [usuarioAsociacionDialogOpen, setUsuarioAsociacionDialogOpen] = useState(false);
 
     // ── Estado Regiones ─────────────────────────────────────────────────────
     const [regionesList, setRegionesList] = useState([]);
@@ -391,79 +390,6 @@ const SystemConfig = () => {
         }
     };
 
-    const handleOpenAsociacionDialog = (asociacion = null) => {
-        setEditingAsociacion(asociacion);
-        setAsociacionDialogOpen(true);
-    };
-
-    const handleCloseAsociacionDialog = () => {
-        if (savingAsociacion) return;
-        setAsociacionDialogOpen(false);
-        setEditingAsociacion(null);
-        setSavingAsociacion(false);
-    };
-
-    const handleSaveAsociacion = async (formData) => {
-        setSavingAsociacion(true);
-        try {
-            const payload = {
-                nombre: formData.nombre.trim(),
-                idInstancia: 1,
-                idRegion: formData.idRegion || null,
-                codigo: formData.codigo?.trim() || null,
-                representanteLegal: formData.representanteLegal?.trim() || null
-            };
-
-            if (editingAsociacion) {
-                payload.activa = editingAsociacion.activa;
-                const updatedAsociacion = await asociacionService.update(
-                    editingAsociacion.idAsociacion,
-                    payload
-                );
-
-                const region = regiones.find(r => r.idRegion === updatedAsociacion.idRegion);
-                setAsociaciones(prev =>
-                    prev.map(a =>
-                        a.idAsociacion === editingAsociacion.idAsociacion
-                            ? {
-                                ...a,
-                                ...updatedAsociacion,
-                                nombreRegion: region?.nombre || 'No especificada'
-                            }
-                            : a
-                    )
-                );
-                notify('Asociación actualizada exitosamente');
-            } else {
-                const newAsociacion = await asociacionService.create(payload);
-
-                const region = regiones.find(r => r.idRegion === newAsociacion.idRegion);
-                const enrichedAsociacion = {
-                    ...newAsociacion,
-                    nombreRegion: region?.nombre || 'No especificada'
-                };
-
-                setAsociaciones(prev =>
-                    [...prev, enrichedAsociacion].sort((a, b) => a.idAsociacion - b.idAsociacion)
-                );
-                notify('Asociación creada exitosamente');
-            }
-            handleCloseAsociacionDialog();
-        } catch (error) {
-            console.error('Error al guardar asociación:', error);
-            let errorMessage = 'Error al guardar la asociación';
-            if (error) {
-                if (typeof error === 'string') errorMessage = error;
-                else if (error.message) errorMessage = error.message;
-                else if (error.mensaje) errorMessage = error.mensaje;
-                else if (error.error) errorMessage = error.error;
-            }
-            notify(errorMessage, 'error');
-        } finally {
-            setSavingAsociacion(false);
-        }
-    };
-
     const handleToggleAsociacionStatus = async (id) => {
         const asociacion = asociaciones.find(a => a.idAsociacion === id);
         if (!asociacion) return;
@@ -500,7 +426,7 @@ const SystemConfig = () => {
     };
 
     // ══════════════════════════════════════════════════════════════════════
-    // GESTIÓN DE USUARIOS DE ASOCIACIÓN - MODIFICADO
+    // GESTIÓN DE USUARIOS DE ASOCIACIÓN
     // ══════════════════════════════════════════════════════════════════════
     const handleOpenUsuariosAsociacionDialog = async (asociacion) => {
         setSelectedAsociacionForUsuarios(asociacion);
@@ -602,6 +528,17 @@ const SystemConfig = () => {
         } finally {
             setDesvinculandoUsuario(null);
         }
+    };
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Callback: flujo usuario+asociación completado
+    // ══════════════════════════════════════════════════════════════════════
+    const handleUsuarioAsociacionComplete = (resultado) => {
+        notify(
+            `Usuario "${resultado.usuario.nombre}" y asociación "${resultado.asociacion.nombre}" creados y relacionados exitosamente`,
+            'success'
+        );
+        fetchAsociaciones();
     };
 
     // ══════════════════════════════════════════════════════════════════════
@@ -740,7 +677,6 @@ const SystemConfig = () => {
         notify('Evaluador asignado exitosamente');
     };
 
-    const toggleChangesPanel = () => setShowChangesPanel(prev => !prev);
     const systemHealth = config.maintenanceMode ? 90 : 100;
 
     const filteredAsociaciones = asociaciones
@@ -815,9 +751,7 @@ const SystemConfig = () => {
                         py: 0.5,
                         bgcolor: '#e6f0ff',
                         color: colors.primary.dark,
-                        '& .MuiAlert-icon': {
-                            color: colors.accents.blue
-                        }
+                        '& .MuiAlert-icon': { color: colors.accents.blue }
                     }}
                 >
                     Los cambios en la configuración afectarán a todos los usuarios del sistema. Cambios no guardados: {changes.length}
@@ -936,13 +870,9 @@ const SystemConfig = () => {
                                     minHeight: 48,
                                     textTransform: 'none',
                                     fontSize: '0.85rem',
-                                    '&.Mui-selected': {
-                                        color: colors.primary.main
-                                    }
+                                    '&.Mui-selected': { color: colors.primary.main }
                                 },
-                                '& .MuiTabs-indicator': {
-                                    backgroundColor: colors.primary.main
-                                }
+                                '& .MuiTabs-indicator': { backgroundColor: colors.primary.main }
                             }}
                         >
                             {tabs.map((tab, i) => (
@@ -1054,24 +984,12 @@ const SystemConfig = () => {
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>
-                                                    ID
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '30%' }}>
-                                                    Nombre del Rol
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '40%' }}>
-                                                    Descripción
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">
-                                                    Global
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">
-                                                    Estatus
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }} align="center">
-                                                    Acciones
-                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '30%' }}>Nombre del Rol</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '40%' }}>Descripción</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">Global</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">Estatus</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }} align="center">Acciones</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -1112,52 +1030,32 @@ const SystemConfig = () => {
                                                         }}
                                                     >
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {rol.id}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>{rol.id}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
-                                                                {rol.nombre}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{rol.nombre}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {rol.descripcion || 'Sin descripción'}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>{rol.descripcion || 'Sin descripción'}</Typography>
                                                         </TableCell>
                                                         <TableCell align="center">
                                                             <Chip
                                                                 label={rol.esGlobal ? 'SÍ' : 'NO'}
                                                                 size="small"
-                                                                sx={{
-                                                                    bgcolor: rol.esGlobal ? colors.accents.purple : colors.primary.light,
-                                                                    color: 'white',
-                                                                    fontWeight: 600,
-                                                                    minWidth: 40
-                                                                }}
+                                                                sx={{ bgcolor: rol.esGlobal ? colors.accents.purple : colors.primary.light, color: 'white', fontWeight: 600, minWidth: 40 }}
                                                             />
                                                         </TableCell>
                                                         <TableCell align="center">
                                                             <Chip
                                                                 label={rol.activo ? 'ACTIVO' : 'INACTIVO'}
                                                                 size="small"
-                                                                sx={{
-                                                                    bgcolor: rol.activo ? colors.secondary.main : colors.primary.dark,
-                                                                    color: 'white',
-                                                                    fontWeight: 600,
-                                                                    minWidth: 80
-                                                                }}
+                                                                sx={{ bgcolor: rol.activo ? colors.secondary.main : colors.primary.dark, color: 'white', fontWeight: 600, minWidth: 80 }}
                                                             />
                                                         </TableCell>
                                                         <TableCell align="center">
                                                             <Stack direction="row" spacing={0.5} justifyContent="center">
                                                                 <Tooltip title="Editar rol">
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        sx={{ color: colors.accents.blue }}
-                                                                        onClick={() => handleOpenRolDialog(rol)}
-                                                                    >
+                                                                    <IconButton size="small" sx={{ color: colors.accents.blue }} onClick={() => handleOpenRolDialog(rol)}>
                                                                         <EditIcon fontSize="small" />
                                                                     </IconButton>
                                                                 </Tooltip>
@@ -1167,9 +1065,7 @@ const SystemConfig = () => {
                                                                         sx={{ color: rol.activo ? colors.semaforo.rojo : colors.secondary.main }}
                                                                         onClick={() => handleToggleRoleStatus(rol.id)}
                                                                     >
-                                                                        {rol.activo ?
-                                                                            <BlockIcon fontSize="small" /> :
-                                                                            <CheckCircleIcon fontSize="small" />}
+                                                                        {rol.activo ? <BlockIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
                                                                     </IconButton>
                                                                 </Tooltip>
                                                             </Stack>
@@ -1307,35 +1203,22 @@ const SystemConfig = () => {
                                                         }}
                                                     >
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {region.idRegion}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>{region.idRegion}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
-                                                                {region.nombre}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{region.nombre}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {region.pais || 'No especificado'}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>{region.pais || 'No especificado'}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {region.estado || 'No especificado'}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>{region.estado || 'No especificado'}</Typography>
                                                         </TableCell>
                                                         <TableCell align="center">
                                                             <Chip
                                                                 label={region.activa ? 'ACTIVA' : 'INACTIVA'}
                                                                 size="small"
-                                                                sx={{
-                                                                    bgcolor: region.activa ? colors.secondary.main : colors.primary.dark,
-                                                                    color: 'white',
-                                                                    fontWeight: 600,
-                                                                    minWidth: 80
-                                                                }}
+                                                                sx={{ bgcolor: region.activa ? colors.secondary.main : colors.primary.dark, color: 'white', fontWeight: 600, minWidth: 80 }}
                                                             />
                                                         </TableCell>
                                                         <TableCell align="center">
@@ -1379,19 +1262,21 @@ const SystemConfig = () => {
                         {/* TAB 4: Comité */}
                         {activeTab === 4 && (
                             <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>
-                                    Módulo de Comité
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>
-                                    Contenido en desarrollo
-                                </Typography>
+                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>Módulo de Comité</Typography>
+                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>Contenido en desarrollo</Typography>
                             </Box>
                         )}
 
-                        {/* TAB 5: Asociaciones - CON BOTÓN DE GESTIÓN QUE CAMBIA SEGÚN ESTADO */}
+                        {/* ════════════════════════════════════════
+                            TAB 5: Asociaciones
+                            Un solo botón principal que abre el flujo
+                            unificado CreateUsuarioAsociacion
+                        ════════════════════════════════════════ */}
                         {activeTab === 5 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {/* Barra de controles */}
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    {/* Filtros */}
                                     <Box sx={{ display: 'flex', gap: 1 }}>
                                         {['todos', 'activos', 'inactivos'].map(f => (
                                             <Chip
@@ -1416,6 +1301,8 @@ const SystemConfig = () => {
                                             />
                                         ))}
                                     </Box>
+
+                                    {/* Estadísticas + botón único */}
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                         <Typography variant="body2" sx={{ color: colors.text.secondary }}>
                                             Total: {filteredAsociaciones.length}
@@ -1423,18 +1310,25 @@ const SystemConfig = () => {
                                         <Typography variant="body2" sx={{ color: colors.text.secondary }}>
                                             Activas: {asociaciones.filter(a => a.activa).length}
                                         </Typography>
+
+                                        {/* ── ÚNICO BOTÓN de acción ── */}
                                         <Button
                                             variant="contained"
-                                            startIcon={<AddIcon />}
-                                            onClick={() => handleOpenAsociacionDialog()}
+                                            startIcon={<PersonAddIcon />}
+                                            onClick={() => setUsuarioAsociacionDialogOpen(true)}
                                             size="small"
-                                            sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
+                                            sx={{
+                                                bgcolor: colors.primary.main,
+                                                '&:hover': { bgcolor: colors.primary.dark },
+                                                fontWeight: 600
+                                            }}
                                         >
                                             Nueva Asociación
                                         </Button>
                                     </Box>
                                 </Box>
 
+                                {/* Buscador */}
                                 <TextField
                                     placeholder="Buscar por nombre, código, representante o región..."
                                     value={searchAsociaciones}
@@ -1462,17 +1356,18 @@ const SystemConfig = () => {
                                     }}
                                 />
 
+                                {/* Tabla */}
                                 <TableContainer sx={{ border: `1px solid ${colors.primary.light}`, borderRadius: 1 }}>
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Asociación</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '8%' }}>Código</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '12%' }}>Región</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '15%' }}>Representante Legal</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '8%' }} align="center">Estatus</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '32%' }} align="center">Acciones</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '22%' }}>Asociación</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }}>Código</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '14%' }}>Región</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '17%' }}>Representante Legal</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">Estatus</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '22%' }} align="center">Acciones</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -1513,27 +1408,16 @@ const SystemConfig = () => {
                                                         }}
                                                     >
                                                         <TableCell>
-                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                {asoc.idAsociacion}
-                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: colors.primary.dark }}>{asoc.idAsociacion}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Box>
-                                                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
-                                                                    {asoc.nombre}
-                                                                </Typography>
-                                                            </Box>
+                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{asoc.nombre}</Typography>
                                                         </TableCell>
                                                         <TableCell>
-                                                            {asoc.codigo ? (
-                                                                <Typography variant="body2" sx={{ color: colors.primary.dark }}>
-                                                                    {asoc.codigo}
-                                                                </Typography>
-                                                            ) : (
-                                                                <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-                                                                    -
-                                                                </Typography>
-                                                            )}
+                                                            {asoc.codigo
+                                                                ? <Typography variant="body2" sx={{ color: colors.primary.dark }}>{asoc.codigo}</Typography>
+                                                                : <Typography variant="caption" sx={{ color: colors.text.secondary }}>-</Typography>
+                                                            }
                                                         </TableCell>
                                                         <TableCell>
                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -1555,27 +1439,12 @@ const SystemConfig = () => {
                                                             <Chip
                                                                 label={asoc.activa ? 'ACTIVA' : 'INACTIVA'}
                                                                 size="small"
-                                                                sx={{
-                                                                    bgcolor: asoc.activa ? colors.secondary.main : colors.primary.dark,
-                                                                    color: 'white',
-                                                                    fontWeight: 600,
-                                                                    minWidth: 80
-                                                                }}
+                                                                sx={{ bgcolor: asoc.activa ? colors.secondary.main : colors.primary.dark, color: 'white', fontWeight: 600, minWidth: 80 }}
                                                             />
                                                         </TableCell>
                                                         <TableCell align="center">
-                                                            <Stack direction="row" spacing={0.5} justifyContent="center" flexWrap="wrap">
-                                                                <Tooltip title="Editar asociación">
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        sx={{ color: colors.accents.blue }}
-                                                                        onClick={() => handleOpenAsociacionDialog(asoc)}
-                                                                        disabled={togglingAsociacion === asoc.idAsociacion}
-                                                                    >
-                                                                        <EditIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                </Tooltip>
-                                                                <Tooltip title="Gestionar usuarios de la asociación">
+                                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                                <Tooltip title="Gestionar usuarios">
                                                                     <IconButton
                                                                         size="small"
                                                                         sx={{ color: colors.accents.purple }}
@@ -1613,12 +1482,8 @@ const SystemConfig = () => {
                         {/* TAB 6: Agentes Pendientes */}
                         {activeTab === 6 && (
                             <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>
-                                    Módulo de Agentes Pendientes
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>
-                                    Contenido en desarrollo
-                                </Typography>
+                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>Módulo de Agentes Pendientes</Typography>
+                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>Contenido en desarrollo</Typography>
                             </Box>
                         )}
 
@@ -1647,22 +1512,9 @@ const SystemConfig = () => {
                                             disableSwap
                                             size="small"
                                             sx={{
-                                                '& .MuiSlider-thumb': {
-                                                    height: 20,
-                                                    width: 20,
-                                                    backgroundColor: '#fff',
-                                                    border: '2px solid currentColor',
-                                                },
-                                                '& .MuiSlider-track': {
-                                                    height: 8,
-                                                    borderRadius: 4,
-                                                },
-                                                '& .MuiSlider-rail': {
-                                                    height: 8,
-                                                    borderRadius: 4,
-                                                    opacity: 0.3,
-                                                    backgroundColor: '#bfbfbf',
-                                                },
+                                                '& .MuiSlider-thumb': { height: 20, width: 20, backgroundColor: '#fff', border: '2px solid currentColor' },
+                                                '& .MuiSlider-track': { height: 8, borderRadius: 4 },
+                                                '& .MuiSlider-rail': { height: 8, borderRadius: 4, opacity: 0.3, backgroundColor: '#bfbfbf' }
                                             }}
                                         />
                                     </Box>
@@ -1670,34 +1522,22 @@ const SystemConfig = () => {
                                         <Grid item xs={4}>
                                             <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#ffebee' }}>
                                                 <ErrorIcon sx={{ color: colors.semaforo.rojo, fontSize: 32, mb: 1 }} />
-                                                <Typography variant="subtitle2" sx={{ color: colors.semaforo.rojo, fontWeight: 'bold' }}>
-                                                    ROJO
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: colors.semaforo.rojo }}>
-                                                    {'<'} {config.redThreshold}%
-                                                </Typography>
+                                                <Typography variant="subtitle2" sx={{ color: colors.semaforo.rojo, fontWeight: 'bold' }}>ROJO</Typography>
+                                                <Typography variant="caption" sx={{ color: colors.semaforo.rojo }}>{'<'} {config.redThreshold}%</Typography>
                                             </Paper>
                                         </Grid>
                                         <Grid item xs={4}>
                                             <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#fff8e1' }}>
                                                 <WarningIcon sx={{ color: colors.semaforo.amarillo, fontSize: 32, mb: 1 }} />
-                                                <Typography variant="subtitle2" sx={{ color: colors.semaforo.amarillo, fontWeight: 'bold' }}>
-                                                    AMARILLO
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: colors.semaforo.amarillo }}>
-                                                    {config.redThreshold}% - {config.yellowThreshold}%
-                                                </Typography>
+                                                <Typography variant="subtitle2" sx={{ color: colors.semaforo.amarillo, fontWeight: 'bold' }}>AMARILLO</Typography>
+                                                <Typography variant="caption" sx={{ color: colors.semaforo.amarillo }}>{config.redThreshold}% - {config.yellowThreshold}%</Typography>
                                             </Paper>
                                         </Grid>
                                         <Grid item xs={4}>
                                             <Paper sx={{ p: 2, textAlign: 'center', bgcolor: '#e8f5e9' }}>
                                                 <CheckCircleIcon sx={{ color: colors.semaforo.verde, fontSize: 32, mb: 1 }} />
-                                                <Typography variant="subtitle2" sx={{ color: colors.semaforo.verde, fontWeight: 'bold' }}>
-                                                    VERDE
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: colors.semaforo.verde }}>
-                                                    {'>'} {config.yellowThreshold}%
-                                                </Typography>
+                                                <Typography variant="subtitle2" sx={{ color: colors.semaforo.verde, fontWeight: 'bold' }}>VERDE</Typography>
+                                                <Typography variant="caption" sx={{ color: colors.semaforo.verde }}>{'>'} {config.yellowThreshold}%</Typography>
                                             </Paper>
                                         </Grid>
                                     </Grid>
@@ -1711,11 +1551,11 @@ const SystemConfig = () => {
                                                     sx={{
                                                         '& .MuiSwitch-switchBase.Mui-checked': {
                                                             color: colors.primary.main,
-                                                            '&:hover': { backgroundColor: '#e8f0fe' },
+                                                            '&:hover': { backgroundColor: '#e8f0fe' }
                                                         },
                                                         '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                                            backgroundColor: colors.primary.main,
-                                                        },
+                                                            backgroundColor: colors.primary.main
+                                                        }
                                                     }}
                                                 />
                                             }
@@ -1736,14 +1576,12 @@ const SystemConfig = () => {
                 </Paper>
             </Box>
 
-            {/* ── Diálogo de Roles ── */}
-            <Dialog
-                open={rolDialogOpen}
-                onClose={handleCloseRolDialog}
-                maxWidth="sm"
-                fullWidth
-                PaperProps={{ sx: { borderRadius: 2 } }}
-            >
+            {/* ════════════════════════════════════════
+                DIÁLOGOS
+            ════════════════════════════════════════ */}
+
+            {/* ── Diálogo Roles ── */}
+            <Dialog open={rolDialogOpen} onClose={handleCloseRolDialog} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
                 <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.light}` }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <HowToRegIcon sx={{ color: colors.primary.main }} />
@@ -1765,9 +1603,7 @@ const SystemConfig = () => {
                             size="small"
                             sx={{
                                 '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
+                                '& .MuiOutlinedInput-root': { '&.Mui-focused fieldset': { borderColor: colors.primary.main } }
                             }}
                         />
                         <TextField
@@ -1780,9 +1616,7 @@ const SystemConfig = () => {
                             size="small"
                             sx={{
                                 '& .MuiInputLabel-root': { color: colors.text.secondary },
-                                '& .MuiOutlinedInput-root': {
-                                    '&.Mui-focused fieldset': { borderColor: colors.primary.main }
-                                }
+                                '& .MuiOutlinedInput-root': { '&.Mui-focused fieldset': { borderColor: colors.primary.main } }
                             }}
                         />
                         <Box sx={{ mt: 1, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: `1px solid ${colors.primary.light}` }}>
@@ -1794,11 +1628,7 @@ const SystemConfig = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 2, borderTop: `1px solid ${colors.primary.light}` }}>
-                    <Button
-                        onClick={handleCloseRolDialog}
-                        sx={{ color: colors.text.secondary }}
-                        size="small"
-                    >
+                    <Button onClick={handleCloseRolDialog} sx={{ color: colors.text.secondary }} size="small">
                         Cancelar
                     </Button>
                     <Button
@@ -1813,17 +1643,18 @@ const SystemConfig = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* ── Diálogo de Asociaciones - USANDO EL COMPONENTE SEPARADO ── */}
-            <CreateAsociacion
-                open={asociacionDialogOpen}
-                onClose={handleCloseAsociacionDialog}
-                onSave={handleSaveAsociacion}
-                editingAsociacion={editingAsociacion}
-                saving={savingAsociacion}
-                regiones={regiones}
+            {/* ── Modal unificado: Nuevo Usuario Asociación ── */}
+            <CreateUsuarioAsociacion
+                open={usuarioAsociacionDialogOpen}
+                onClose={() => setUsuarioAsociacionDialogOpen(false)}
+                onComplete={handleUsuarioAsociacionComplete}
+                availableRoles={roles.map(r => r.nombre)}
+                availableRegions={regionesList.map(r => ({ id: r.idRegion, nombre: r.nombre }))}
+                loadingRoles={loadingRoles}
+                loadingRegions={loadingRegiones}
             />
 
-            {/* ── NUEVO: Diálogo para gestionar usuarios de asociación - AHORA ES EL COMPONENTE SEPARADO ── */}
+            {/* ── Diálogo para gestionar usuarios de asociación ── */}
             <AsigAsociacion
                 open={usuariosAsociacionDialogOpen}
                 onClose={handleCloseUsuariosAsociacionDialog}
@@ -1832,7 +1663,9 @@ const SystemConfig = () => {
                 loading={loadingUsuariosAsociacion}
                 error={errorUsuariosAsociacion}
                 onRelacionar={handleRelacionarUsuario}
+                onDesvincular={handleDesvincularUsuario}
                 actionLoading={actionLoading}
+                desvinculandoUsuario={desvinculandoUsuario}
             />
 
             {/* ── Diálogo para CREAR Región ── */}
@@ -1853,38 +1686,24 @@ const SystemConfig = () => {
             />
 
             {/* ── Diálogo de Asignación ── */}
-            <Dialog
-                open={assignDialogOpen}
-                onClose={() => setAssignDialogOpen(false)}
-                maxWidth="sm"
-                fullWidth
-                PaperProps={{ sx: { borderRadius: 2 } }}
-            >
+            <Dialog open={assignDialogOpen} onClose={() => setAssignDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
                 <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.light}` }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <AssignmentIndIcon sx={{ color: colors.primary.main }} />
-                        <Typography variant="h6" sx={{ color: colors.primary.dark }}>
-                            Asignar Evaluador
-                        </Typography>
+                        <Typography variant="h6" sx={{ color: colors.primary.dark }}>Asignar Evaluador</Typography>
                     </Box>
                 </DialogTitle>
                 <DialogContent>
                     {selectedAgent && (
                         <Box sx={{ mt: 2 }}>
                             <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: `1px solid ${colors.primary.light}` }}>
-                                <Typography variant="subtitle2" sx={{ color: colors.primary.dark, mb: 1 }}>
-                                    Agente Seleccionado:
-                                </Typography>
+                                <Typography variant="subtitle2" sx={{ color: colors.primary.dark, mb: 1 }}>Agente Seleccionado:</Typography>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <Avatar sx={{ width: 40, height: 40, bgcolor: colors.primary.main, fontSize: '0.9rem' }}>
-                                        AG
-                                    </Avatar>
+                                    <Avatar sx={{ width: 40, height: 40, bgcolor: colors.primary.main, fontSize: '0.9rem' }}>AG</Avatar>
                                     <Box>
-                                        <Typography variant="body1" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
-                                            {selectedAgent.nombre}
-                                        </Typography>
+                                        <Typography variant="body1" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{selectedAgent.nombre}</Typography>
                                         <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-                                            {selectedAgent.documentos_pendientes} documentos pendientes • {selectedAgent.region}
+                                            {selectedAgent.documentos_pendientes} documentos pendientes · {selectedAgent.region}
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -1895,11 +1714,7 @@ const SystemConfig = () => {
                                     value={selectedEvaluator}
                                     label="Seleccionar Evaluador"
                                     onChange={e => setSelectedEvaluator(e.target.value)}
-                                    sx={{
-                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: colors.primary.main
-                                        }
-                                    }}
+                                    sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: colors.primary.main } }}
                                 >
                                     <MenuItem value=""><em>Seleccionar evaluador...</em></MenuItem>
                                     <MenuItem value="Juan Pérez López">Juan Pérez López</MenuItem>
@@ -1911,13 +1726,7 @@ const SystemConfig = () => {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: 2, borderTop: `1px solid ${colors.primary.light}` }}>
-                    <Button
-                        onClick={() => setAssignDialogOpen(false)}
-                        sx={{ color: colors.text.secondary }}
-                        size="small"
-                    >
-                        Cancelar
-                    </Button>
+                    <Button onClick={() => setAssignDialogOpen(false)} sx={{ color: colors.text.secondary }} size="small">Cancelar</Button>
                     <Button
                         onClick={handleConfirmAssignment}
                         variant="contained"

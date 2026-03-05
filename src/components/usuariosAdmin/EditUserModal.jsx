@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Grid, TextField, Button, FormControl, InputLabel,
-  Select, MenuItem, FormControlLabel, Switch, InputAdornment,
-  IconButton, Box, Typography, Avatar, Chip, Alert, Divider,
-  FormHelperText
+  Grid, Button, FormControl, InputLabel,
+  Select, MenuItem, Box, Typography, Avatar, Chip, Alert,
+  IconButton, Divider
 } from '@mui/material';
 import {
-  Close as CloseIcon, PersonAdd as PersonAddIcon,
-  Edit as EditIcon, Lock as LockIcon,
-  Visibility as VisibilityIcon, VisibilityOff as VisibilityOffIcon,
-  Info as InfoIcon, SwapHoriz as SwapHorizIcon,
-  Warning as WarningIcon
+  Close as CloseIcon, LocationOn as LocationIcon,
+  Info as InfoIcon, SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 
 const colors = {
@@ -20,8 +16,6 @@ const colors = {
   accents: { blue: '#0099FF', purple: '#6C5CE7' },
   text: { primary: '#0D2A4D', secondary: '#3A6EA5' }
 };
-
-const CARGOS_COMITE = ['Presidente', 'Secretario Tecnico', 'Vocal A', 'Vocal B'];
 
 // Función para normalizar y comparar si es rol comité
 const esRolComite = (rolNombre) => {
@@ -46,137 +40,65 @@ const getRoleColor = (rolNombre) => {
   }
 };
 
-// Componente selector de cargo para comité
-const ComiteCargoSelect = ({ user, onChange, excludeId = null, size = 'small', ocupados = [] }) => {
-  return (
-    <FormControl fullWidth size={size} required>
-      <InputLabel id="cargo-comite-label">Cargo en Comité *</InputLabel>
-      <Select
-        labelId="cargo-comite-label"
-        value={user?.rolEspecifico || ''}
-        label="Cargo en Comité *"
-        onChange={(e) => onChange(e.target.value)}
-        renderValue={(selected) =>
-          selected ? selected : <em style={{ color: '#999' }}>Seleccione un cargo</em>
-        }
-      >
-        <MenuItem value="" disabled><em>Seleccione un cargo</em></MenuItem>
-        {CARGOS_COMITE.map((cargo) => {
-          const ocupado = ocupados.includes(cargo);
-          return (
-            <MenuItem key={cargo} value={cargo} disabled={ocupado}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <span>{cargo}</span>
-                {ocupado && (
-                  <Chip
-                    label="Ocupado"
-                    size="small"
-                    icon={<WarningIcon sx={{ fontSize: '0.7rem !important' }} />}
-                    sx={{
-                      height: 18, fontSize: '0.6rem',
-                      bgcolor: '#ff980020', color: '#e65100',
-                      border: '1px solid #ff980040', ml: 1
-                    }}
-                  />
-                )}
-              </Box>
-            </MenuItem>
-          );
-        })}
-      </Select>
-      <FormHelperText>
-        {ocupados.length === CARGOS_COMITE.length
-          ? 'Todos los cargos del comité están ocupados'
-          : `${CARGOS_COMITE.length - ocupados.length} cargo(s) disponible(s)`}
-      </FormHelperText>
-    </FormControl>
-  );
-};
-
-// Modal para crear/editar usuario
+// Modal para cambiar región del usuario
 const EditUserModal = ({
   open,
   onClose,
   onSave,
-  mode = 'add',
   user,
-  password,
-  onPasswordChange,
-  showPassword,
-  onTogglePasswordVisibility,
-  availableRoles = [],
   availableRegions = [],
-  loadingRoles = false,
   loadingRegions = false,
-  userInstanciaId,
   userInstanciaNombre,
-  ocupadosComite = [],
   getRoleColor: getRoleColorProp = getRoleColor
 }) => {
-  const [localUser, setLocalUser] = useState(user || {
-    nombre: '',
-    email: '',
-    rolNombre: availableRoles.length > 0 ? availableRoles[0] : '',
-    regionNombre: availableRegions.length > 0 ? availableRegions[0] : '',
-    rolEspecifico: '',
-    activo: true
-  });
+  const [selectedRegion, setSelectedRegion] = useState(user?.regionNombre || '');
+  const [saving, setSaving] = useState(false);
 
   // Actualizar estado local cuando cambia el user prop
   React.useEffect(() => {
     if (user) {
-      setLocalUser(user);
-    } else {
-      setLocalUser({
-        nombre: '',
-        email: '',
-        rolNombre: availableRoles.length > 0 ? availableRoles[0] : '',
-        regionNombre: availableRegions.length > 0 ? availableRegions[0] : '',
-        rolEspecifico: '',
-        activo: true
-      });
+      setSelectedRegion(user.regionNombre || '');
     }
-  }, [user, availableRoles, availableRegions]);
+  }, [user]);
 
-  const handleChange = (field, value) => {
-    setLocalUser(prev => ({ ...prev, [field]: value }));
-  };
+  const handleSave = async () => {
+    if (!selectedRegion) {
+      return;
+    }
 
-  const handleRolChange = (nuevoRol) => {
-    setLocalUser({
-      ...localUser,
-      rolNombre: nuevoRol,
-      rolEspecifico: esRolComite(nuevoRol) ? '' : null
-    });
-  };
-
-  const isComite = esRolComite(localUser?.rolNombre);
-
-  const handleSave = () => {
-    onSave(localUser, password);
+    setSaving(true);
+    try {
+      // Crear objeto solo con la región a actualizar
+      const userData = {
+        id: user.id,
+        regionNombre: selectedRegion
+      };
+      await onSave(userData);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isFormValid = () => {
-    return (
-      localUser?.rolNombre &&
-      localUser?.nombre &&
-      localUser?.email &&
-      (!isComite || localUser?.rolEspecifico) &&
-      (mode !== 'add' || password)
-    );
+    return selectedRegion && selectedRegion !== user?.regionNombre;
   };
+
+  if (!user) return null;
+
+  const roleColor = getRoleColorProp(user.rolNombre);
+  const isComite = esRolComite(user.rolNombre);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{
-        bgcolor: mode === 'add' ? colors.primary.main : colors.accents.blue,
+        bgcolor: colors.primary.main,
         color: 'white',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {mode === 'add' ? <PersonAddIcon /> : <EditIcon />}
+          <LocationIcon />
           <Typography variant="h6">
-            {mode === 'add' ? 'Nuevo Usuario' : 'Editar Usuario'}
+            Cambiar Región de Usuario
           </Typography>
         </Box>
         <IconButton onClick={onClose} sx={{ color: 'white' }}>
@@ -185,133 +107,93 @@ const EditUserModal = ({
       </DialogTitle>
 
       <DialogContent sx={{ mt: 2 }}>
+        {/* Información del usuario */}
+        <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ color: colors.primary.dark, mb: 1 }}>
+            Usuario Seleccionado:
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar sx={{
+              width: 48, height: 48,
+              bgcolor: roleColor,
+              fontSize: '1rem', fontWeight: 'bold'
+            }}>
+              {user.nombre?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography variant="body1" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
+                {user.nombre}
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block' }}>
+                {user.email}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+                <Chip
+                  label={user.rolNombre}
+                  size="small"
+                  sx={{
+                    bgcolor: `${roleColor}15`,
+                    color: roleColor,
+                    fontSize: '0.7rem', height: 20
+                  }}
+                />
+                {isComite && user.rolEspecifico && (
+                  <Chip
+                    label={user.rolEspecifico}
+                    size="small"
+                    sx={{
+                      bgcolor: `${colors.accents.purple}15`,
+                      color: colors.accents.purple,
+                      fontSize: '0.7rem', height: 20
+                    }}
+                  />
+                )}
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            Solo puedes modificar la región del usuario. Los demás datos permanecerán igual.
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+            Región actual: <strong>{user.regionNombre || 'No asignada'}</strong>
+          </Typography>
+        </Alert>
+
         <Grid container spacing={2}>
           <Grid item xs={12}>
-            <TextField 
-              fullWidth 
-              label="Nombre completo" 
-              size="small" 
-              required
-              value={localUser?.nombre || ''}
-              onChange={(e) => handleChange('nombre', e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField 
-              fullWidth 
-              label="Email" 
-              type="email" 
-              size="small" 
-              required
-              value={localUser?.email || ''}
-              onChange={(e) => handleChange('email', e.target.value)}
-            />
-          </Grid>
-
-          {mode === 'add' && (
-            <Grid item xs={12}>
-              <TextField
-                fullWidth 
-                label="Contraseña" 
-                size="small" 
-                required
-                type={showPassword ? 'text' : 'password'}
-                value={password || ''}
-                onChange={onPasswordChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockIcon fontSize="small" sx={{ color: colors.primary.main }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={onTogglePasswordVisibility} edge="end" size="small">
-                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </Grid>
-          )}
-
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth size="small">
-              <InputLabel id="rol-label">Rol</InputLabel>
-              <Select
-                labelId="rol-label"
-                value={localUser?.rolNombre || ''}
-                label="Rol"
-                onChange={(e) => handleRolChange(e.target.value)}
-              >
-                {loadingRoles ? (
-                  <MenuItem disabled>Cargando roles...</MenuItem>
-                ) : availableRoles.length > 0 ? (
-                  availableRoles.map((rolNombre) => (
-                    <MenuItem key={rolNombre} value={rolNombre}>{rolNombre}</MenuItem>
-                  ))
-                ) : (
-                  <MenuItem value=""><em>No hay roles disponibles</em></MenuItem>
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth size="small">
-              <InputLabel id="region-label">Región</InputLabel>
+            <FormControl fullWidth>
+              <InputLabel id="region-label">Nueva Región</InputLabel>
               <Select
                 labelId="region-label"
-                value={localUser?.regionNombre || ''}
-                label="Región"
-                onChange={(e) => handleChange('regionNombre', e.target.value)}
+                value={selectedRegion}
+                label="Nueva Región"
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                disabled={loadingRegions}
               >
                 {loadingRegions ? (
                   <MenuItem disabled>Cargando regiones...</MenuItem>
                 ) : availableRegions.length > 0 ? (
                   availableRegions.map((region) => (
-                    <MenuItem key={region} value={region}>{region}</MenuItem>
+                    <MenuItem key={region} value={region}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <LocationIcon sx={{ fontSize: 16, color: colors.text.secondary }} />
+                        <Typography>{region}</Typography>
+                        {region === user.regionNombre && (
+                          <Chip label="Actual" size="small" sx={{ height: 18, fontSize: '0.65rem', ml: 1 }} />
+                        )}
+                      </Box>
+                    </MenuItem>
                   ))
                 ) : (
-                  <MenuItem value=""><em>No hay regiones disponibles</em></MenuItem>
+                  <MenuItem disabled>No hay regiones disponibles</MenuItem>
                 )}
               </Select>
-              {!loadingRegions && availableRegions.length === 0 && userInstanciaId && (
-                <FormHelperText error>
-                  No hay regiones activas disponibles para esta instancia
-                </FormHelperText>
-              )}
             </FormControl>
-          </Grid>
-
-          {isComite && (
-            <Grid item xs={12}>
-              <ComiteCargoSelect
-                user={localUser}
-                onChange={(cargo) => handleChange('rolEspecifico', cargo)}
-                excludeId={mode === 'edit' ? localUser.id : null}
-                ocupados={ocupadosComite}
-                size="small"
-              />
-            </Grid>
-          )}
-
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={localUser?.activo !== false}
-                  onChange={(e) => handleChange('activo', e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': { color: colors.secondary.main },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: colors.secondary.main }
-                  }}
-                />
-              }
-              label="Usuario activo"
-            />
           </Grid>
         </Grid>
 
@@ -332,24 +214,23 @@ const EditUserModal = ({
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={!isFormValid()}
-          sx={{ bgcolor: mode === 'add' ? colors.primary.main : colors.accents.blue }}
+          disabled={!isFormValid() || saving}
+          sx={{ bgcolor: colors.primary.main }}
         >
-          {mode === 'add' ? 'Crear Usuario' : 'Guardar Cambios'}
+          {saving ? 'Guardando...' : 'Actualizar Región'}
         </Button>
       </DialogActions>
     </Dialog>
   );
 };
 
-// Modal para cambiar rol
+// Modal para cambiar rol (se mantiene igual pero con todas las importaciones necesarias)
 const ChangeRoleModal = ({
   open,
   onClose,
   onSave,
   user,
   availableRoles = [],
-  availableRegions = [],
   loadingRoles = false,
   ocupadosComite = [],
   getRoleColor: getRoleColorProp = getRoleColor
@@ -475,13 +356,41 @@ const ChangeRoleModal = ({
 
           {isComite && (
             <Grid item xs={12}>
-              <ComiteCargoSelect
-                user={localUser}
-                onChange={(cargo) => setLocalUser({ ...localUser, rolEspecifico: cargo })}
-                excludeId={localUser.id}
-                ocupados={ocupadosComite}
-                size="medium"
-              />
+              <FormControl fullWidth>
+                <InputLabel id="cargo-comite-label">Cargo en Comité *</InputLabel>
+                <Select
+                  labelId="cargo-comite-label"
+                  value={localUser.rolEspecifico || ''}
+                  label="Cargo en Comité *"
+                  onChange={(e) => setLocalUser({ ...localUser, rolEspecifico: e.target.value })}
+                  renderValue={(selected) =>
+                    selected ? selected : <em style={{ color: '#999' }}>Seleccione un cargo</em>
+                  }
+                >
+                  <MenuItem value="" disabled><em>Seleccione un cargo</em></MenuItem>
+                  {['Presidente', 'Secretario Tecnico', 'Vocal A', 'Vocal B'].map((cargo) => {
+                    const ocupado = ocupadosComite.includes(cargo);
+                    return (
+                      <MenuItem key={cargo} value={cargo} disabled={ocupado}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span>{cargo}</span>
+                          {ocupado && (
+                            <Chip
+                              label="Ocupado"
+                              size="small"
+                              sx={{
+                                height: 18, fontSize: '0.6rem',
+                                bgcolor: '#ff980020', color: '#e65100',
+                                border: '1px solid #ff980040', ml: 1
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
             </Grid>
           )}
         </Grid>
