@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from "../../../context/AuthContext"; 
+import { getTodosApartados } from '../../../services/apartado';
 import {
   Box,
   Grid,
@@ -58,7 +60,8 @@ import {
   FiberManualRecord as FiberManualRecordIcon,
   Stop as StopIcon,
   Replay as ReplayIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Folder as FolderIcon
 } from '@mui/icons-material';
 
 // Paleta corporativa del UserManagement
@@ -91,6 +94,7 @@ const colors = {
 };
 
 
+
 const PruebaVidaRecorder = ({ onVideoCaptured, videoFile, setVideoFile, setSnackbar }) => {
   const [recording, setRecording] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -103,6 +107,7 @@ const PruebaVidaRecorder = ({ onVideoCaptured, videoFile, setVideoFile, setSnack
   const [grabacionTimer, setGrabacionTimer] = useState(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  
 
   useEffect(() => {
     if (cameraActive && streamRef.current && videoRef.current) {
@@ -629,6 +634,14 @@ const PruebaVidaRecorder = ({ onVideoCaptured, videoFile, setVideoFile, setSnack
 
 const Expediente = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Obtener usuario del contexto
+  
+  // ==============================================
+  // NUEVOS ESTADOS PARA APARTADOS DINÁMICOS
+  // ==============================================
+  const [apartadosDinamicos, setApartadosDinamicos] = useState([]);
+  const [loadingApartados, setLoadingApartados] = useState(false);
+  
   const [editMode, setEditMode] = useState(false);
   const [expanded, setExpanded] = useState('panel1');
   const [snackbar, setSnackbar] = useState({
@@ -640,8 +653,8 @@ const Expediente = () => {
   // Nuevo estado para Prueba de Vida
 const [pruebaVida, setPruebaVida] = useState({
   videoArchivo: null,
-  fechaGrabacion: null,  // nombre más limpio
-  estado: 'pendiente' // Valores posibles: 'pendiente', 'completado', 'aprobado'
+  fechaGrabacion: null,
+  estado: 'pendiente'
 });
 
 // Función para manejar video capturado
@@ -715,15 +728,7 @@ const handleVideoCaptured = (videoFile) => {
   });
 
   // Estados para otras secciones - COMPLETAMENTE VACÍO
-  const [documentosData, setDocumentosData] = useState({
-    documentacion: [],
-    profesional: [],
-    legal: [],
-    laboral: [],
-    seguridad: [],
-    digital: [],
-    otros: []
-  });
+  const [documentosData, setDocumentosData] = useState({});
 
   const [addDialog, setAddDialog] = useState({
     open: false,
@@ -777,22 +782,205 @@ const handleVideoCaptured = (videoFile) => {
     itemIndex: null
   });
 
-  // Definición de documentos únicos (solo se permite uno) - SOLO PARA LÓGICA INTERNA
-  const documentosUnicos = [
-    'Identificación oficial (INE, pasaporte)',
-    'Comprobante de domicilio (reciente)',
-    'Acta de nacimiento',
-    'Fotografía digital reciente',
-    'CV Actualizado',
-    'Constancia de Situación Fiscal',
-    'Opinión de Cumplimiento',
-    'Certificado de Antecedentes',
-    'Declaración Patrimonial',
-    'Constancia de No Inhabilitación',
-    'Firma Digital',
-    'Certificado Digital SAT',
-    'Tokens de Seguridad'
-  ];
+  // ==============================================
+  // EFECTO PARA CARGAR APARTADOS DINÁMICOS
+  // ==============================================
+  useEffect(() => {
+  const cargarApartados = async () => {
+    if (!user?.instanciaId) return;
+
+    setLoadingApartados(true);
+
+    try {
+      const todos = await getTodosApartados();
+      
+      // Filtrar solo los que NO tienen instancia (globales)
+      const globales = todos.filter(a => !a.idInstancia);
+      
+      const apartadosTransformados = globales.map(apartado => ({
+        id: `apartado_${apartado.idApartado}`,
+        idApartado: apartado.idApartado,
+        nombre: apartado.nombre,
+        titulo: apartado.nombre,
+        descripcion: apartado.descripcion || '',
+        icono: apartado.icono || 'description',
+        orden: apartado.orden || 0,
+        obligatorio: apartado.obligatorio || false,
+        esGlobal: true,
+        documentos: [],
+      }));
+
+      setApartadosDinamicos(apartadosTransformados);
+
+    } catch (error) {
+      console.error('Error cargando apartados:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error al cargar los apartados',
+        severity: 'error'
+      });
+    } finally {
+      setLoadingApartados(false);
+    }
+  };
+
+  cargarApartados();
+}, [user?.instanciaId]);
+
+  // ==============================================
+  // FUNCIÓN PARA OBTENER EL ICONO SEGÚN EL NOMBRE
+  // ==============================================
+  const getIconForApartado = (icono) => {
+    const iconMap = {
+      'description': <DescriptionIcon />,
+      'folder': <FolderIcon />,
+      'security': <SecurityIcon />,
+      'work': <WorkIcon />,
+      'business': <BusinessIcon />,
+      'cloud': <CloudUploadIcon />,
+      'verified': <VerifiedIcon />,
+      'person': <PersonIcon />,
+      'gavel': <GavelIcon />,
+      'school': <SchoolIcon />,
+      'file': <DescriptionIcon />,
+      'document': <DescriptionIcon />,
+      'certificate': <VerifiedIcon />,
+      'assignment': <DescriptionIcon />,
+      'article': <DescriptionIcon />,
+      'book': <SchoolIcon />,
+      'menu_book': <SchoolIcon />,
+      'fact_check': <VerifiedIcon />,
+      'check_circle': <CheckCircleIcon />,
+      'warning': <WarningIcon />,
+      'error': <ErrorIcon />,
+      'info': <InfoIcon />
+    };
+    return iconMap[icono?.toLowerCase()] || <DescriptionIcon />;
+  };
+
+  // ==============================================
+  // FUNCIÓN PARA RENDERIZAR APARTADO DINÁMICO
+  // ==============================================
+  const renderApartadoDinamico = (apartado) => {
+    return (
+      <Accordion
+        key={apartado.id}
+        expanded={expanded === apartado.id}
+        onChange={handleAccordionChange(apartado.id)}
+        sx={{
+          mb: 2,
+          border: '2px solid',
+          borderColor: apartado.obligatorio ? colors.status.warning : colors.primary.light,
+          borderRadius: '8px !important',
+          '&:before': { display: 'none' }
+        }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+            {/* Icono */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              backgroundColor: apartado.esGlobal ? '#f3e5f5' : '#e3f2fd',
+              color: apartado.esGlobal ? colors.accents.purple : colors.primary.main
+            }}>
+              {getIconForApartado(apartado.icono)}
+            </Box>
+            
+            {/* Título y descripción */}
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography sx={{ fontWeight: '700', color: colors.text.primary }}>
+                {apartado.nombre}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                {apartado.descripcion && (
+                  <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+                    {apartado.descripcion}
+                  </Typography>
+                )}
+                {apartado.esGlobal && (
+                  <Chip 
+                    label="Global" 
+                    size="small" 
+                    sx={{ 
+                      height: '18px', 
+                      fontSize: '0.6rem',
+                      backgroundColor: colors.accents.purple,
+                      color: 'white'
+                    }} 
+                  />
+                )}
+              </Box>
+            </Box>
+            
+            {/* Badges */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {apartado.obligatorio && (
+                <Chip 
+                  label="Obligatorio" 
+                  size="small" 
+                  color="error" 
+                  sx={{ height: '20px', fontSize: '0.65rem' }}
+                />
+              )}
+              <Chip 
+                label={`${apartado.documentos?.length || 0} docs`}
+                size="small"
+                color={apartado.documentos?.length > 0 ? "success" : "default"}
+                sx={{ height: '24px' }}
+              />
+            </Box>
+          </Box>
+        </AccordionSummary>
+        
+        <AccordionDetails>
+          {/* Contenido del apartado */}
+          {apartado.documentos?.length > 0 ? (
+            <List>
+              {apartado.documentos.map((doc, idx) => (
+                <ListItem key={idx}>
+                  <ListItemIcon>
+                    <DescriptionIcon sx={{ color: colors.primary.main }} />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={doc.nombre}
+                    secondary={`Subido: ${doc.fechaSubida || 'fecha desconocida'}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              No hay documentos cargados en este apartado
+            </Alert>
+          )}
+          
+          {/* Botón para agregar documento */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                console.log('Agregar documento a:', apartado.nombre);
+                setSnackbar({
+                  open: true,
+                  message: `Funcionalidad para agregar documentos a "${apartado.nombre}"`,
+                  severity: 'info'
+                });
+              }}
+              sx={{ textTransform: 'none' }}
+            >
+              Agregar Documento
+            </Button>
+          </Box>
+        </AccordionDetails>
+      </Accordion>
+    );
+  };
 
   const handleAccordionChange = (panel) => (event, isExpanded) => {
     setExpanded(isExpanded ? panel : false);
@@ -932,76 +1120,6 @@ const handleVideoCaptured = (videoFile) => {
             }
           }));
         }
-      } else {
-        // Otras secciones
-        // Verificar si es un documento único (solo para lógica interna)
-        const esUnico = documentosUnicos.includes(itemName);
-        
-        if (esUnico) {
-          // Para documentos únicos, reemplazar el existente
-          const documentosExistentes = documentosData[sectionId]?.filter(doc => doc.nombre === itemName) || [];
-          
-          if (documentosExistentes.length > 0) {
-            // Preguntar si desea reemplazar
-            if (window.confirm(`Ya existe un documento para "${itemName}". ¿Desea reemplazarlo?`)) {
-              // Eliminar el documento existente
-              const nuevosDocumentos = documentosData[sectionId]?.filter(doc => doc.nombre !== itemName) || [];
-              // Agregar el nuevo
-              setDocumentosData(prev => ({
-                ...prev,
-                [sectionId]: [...nuevosDocumentos, nuevoDocumento]
-              }));
-            } else {
-              setSnackbar({
-                open: true,
-                message: 'Operación cancelada',
-                severity: 'info'
-              });
-              setAddDialog({
-                open: false,
-                sectionId: '',
-                subseccion: '',
-                tipoDocumento: '',
-                archivo: null,
-                nombreArchivo: '',
-                fecha: new Date().toISOString().split('T')[0],
-                horas: '',
-                institucion: '',
-                itemName: ''
-              });
-              return;
-            }
-          } else {
-            // No existe documento, agregar normalmente
-            setDocumentosData(prev => ({
-              ...prev,
-              [sectionId]: [...(prev[sectionId] || []), nuevoDocumento]
-            }));
-          }
-        } else {
-          // Para documentos múltiples, siempre agregar
-          setDocumentosData(prev => ({
-            ...prev,
-            [sectionId]: [...(prev[sectionId] || []), nuevoDocumento]
-          }));
-        }
-
-        // Actualizar el status del item en informacionComplementaria
-        const updatedSections = informacionComplementaria.map(section => {
-          if (section.id === sectionId) {
-            return {
-              ...section,
-              items: section.items.map(item => {
-                if (item.name === addDialog.itemName) {
-                  return { ...item, status: 'completo' };
-                }
-                return item;
-              })
-            };
-          }
-          return section;
-        });
-        setInformacionComplementaria(updatedSections);
       }
 
       setSnackbar({
@@ -1119,36 +1237,6 @@ const handleVideoCaptured = (videoFile) => {
       }));
       // Reiniciar estado de validación para cumplimiento organizacional
       reiniciarEstadoValidacion('cumplimiento_organizacional');
-    } else {
-      // Otras secciones
-      setDocumentosData(prev => ({
-        ...prev,
-        [seccion]: (prev[seccion] || []).filter((_, idx) => idx !== itemIndex)
-      }));
-
-      // Reiniciar estado de validación para esta sección
-      reiniciarEstadoValidacion(seccion);
-
-      // Verificar si quedan documentos para este item
-      const documentosRestantes = documentosData[seccion]?.filter((_, idx) => idx !== itemIndex).filter(doc => doc.nombre === itemName) || [];
-      
-      // Actualizar el status del item en informacionComplementaria
-      const updatedSections = informacionComplementaria.map(section => {
-        if (section.id === seccion && itemName) {
-          return {
-            ...section,
-            items: section.items.map(item => {
-              if (item.name === itemName) {
-                // Si no quedan documentos, poner status pendiente
-                return { ...item, status: documentosRestantes.length === 0 ? 'pendiente' : 'completo' };
-              }
-              return item;
-            })
-          };
-        }
-        return section;
-      });
-      setInformacionComplementaria(updatedSections);
     }
 
     setSnackbar({
@@ -1323,71 +1411,9 @@ const handleVideoCaptured = (videoFile) => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Lista de apartados - TODOS CON STATUS PENDIENTE
+  // Lista de apartados fijos que se conservan
   const [informacionComplementaria, setInformacionComplementaria] = useState([
-  
     { 
-      id: 'documentacion',
-      title: 'DOCUMENTACIÓN OFICIAL',
-      icon: <DescriptionIcon />,
-      items: [
-        { name: 'Identificación oficial (INE, pasaporte)', status: 'pendiente' },
-        { name: 'Comprobante de domicilio (reciente)', status: 'pendiente' },
-        { name: 'Acta de nacimiento', status: 'pendiente' },
-        { name: 'Fotografía digital reciente', status: 'pendiente' }
-      ]
-    },
-    { 
-      id: 'profesional',
-      title: 'INFORMACIÓN PROFESIONAL',
-      icon: <WorkIcon />,
-      items: [
-        { name: 'CV Actualizado', status: 'pendiente' },
-        { name: 'Títulos Profesionales', status: 'pendiente' },
-        { name: 'Cursos y Certificaciones', status: 'pendiente' }
-      ]
-    },
-    { 
-      id: 'legal',
-      title: 'DOCUMENTACIÓN LEGAL Y FISCAL',
-      icon: <BusinessIcon />,
-      items: [
-        { name: 'Constancia de Situación Fiscal', status: 'pendiente' },
-        { name: 'Opinión de Cumplimiento', status: 'pendiente' },
-        { name: 'Poderes Notariales', status: 'pendiente' }
-      ]
-    },
-    { 
-      id: 'laboral',
-      title: 'INFORMACIÓN LABORAL',
-      icon: <WorkIcon />,
-      items: [
-        { name: 'Contrato Laboral', status: 'pendiente' },
-        { name: 'Cartas Recomendación', status: 'pendiente' },
-        { name: 'Historial Laboral', status: 'pendiente' }
-      ]
-    },
-    { 
-      id: 'seguridad',
-      title: 'INFORMACIÓN DE SEGURIDAD Y CUMPLIMIENTO',
-      icon: <SecurityIcon />,
-      items: [
-        { name: 'Certificado de Antecedentes', status: 'pendiente' },
-        { name: 'Declaración Patrimonial', status: 'pendiente' },
-        { name: 'Constancia de No Inhabilitación', status: 'pendiente' }
-      ]
-    },
-    { 
-      id: 'digital',
-      title: 'DOCUMENTACIÓN DIGITAL',
-      icon: <CloudUploadIcon />,
-      items: [
-        { name: 'Firma Digital', status: 'pendiente' },
-        { name: 'Certificado Digital SAT', status: 'pendiente' },
-        { name: 'Tokens de Seguridad', status: 'pendiente' }
-      ]
-    },
-      { 
       id: 'certificados',
       title: 'CERTIFICADOS DE NIVEL GREMIAL',
       icon: <DescriptionIcon />,
@@ -1398,16 +1424,6 @@ const handleVideoCaptured = (videoFile) => {
       title: 'CUMPLIMIENTO ORGANIZACIONAL',
       icon: <VerifiedIcon />,
       items: []
-    },
-    { 
-      id: 'otros',
-      title: 'OTROS ELEMENTOS RECOMENDADOS',
-      icon: <AddIcon />,
-      items: [
-        { name: 'Pólizas de Seguro', status: 'pendiente' },
-        { name: 'Referencias Bancarias', status: 'pendiente' },
-        { name: 'Cartas de Presentación', status: 'pendiente' }
-      ]
     }
   ]);
 
@@ -1415,56 +1431,20 @@ const handleVideoCaptured = (videoFile) => {
     // Calcular cumplimiento basado en certificados
     const totalHorasFormacion = certificadosData.formacionEtica.horasRequeridas;
     const horasFormacion = certificadosData.formacionEtica.horasAcumuladas;
-    const porcentajeFormacion = totalHorasFormacion > 0 ? (horasFormacion / totalHorasFormacion) * 25 : 0;
+    const porcentajeFormacion = totalHorasFormacion > 0 ? (horasFormacion / totalHorasFormacion) * 35 : 0;
     
     const totalHorasTecnica = certificadosData.actualizacionTecnica.horasRequeridas;
     const horasTecnica = certificadosData.actualizacionTecnica.horasAcumuladas;
-    const porcentajeTecnica = totalHorasTecnica > 0 ? (horasTecnica / totalHorasTecnica) * 25 : 0;
+    const porcentajeTecnica = totalHorasTecnica > 0 ? (horasTecnica / totalHorasTecnica) * 35 : 0;
     
-    // Documentos de cumplimiento (10% cada uno)
-    const porcentajeSeguridad = cumplimientoData.seguridadCadenaSuministro.documento ? 10 : 0;
-    const porcentajeAntisobornos = cumplimientoData.antisobornos.documento ? 10 : 0;
+    // Documentos de cumplimiento (15% cada uno)
+    const porcentajeSeguridad = cumplimientoData.seguridadCadenaSuministro.documento ? 15 : 0;
+    const porcentajeAntisobornos = cumplimientoData.antisobornos.documento ? 15 : 0;
     
-    // Otras secciones (30% restante)
-    const otrasSecciones = informacionComplementaria.filter(s => s.id !== 'certificados' && s.id !== 'cumplimiento_organizacional');
-    let totalItems = 0;
-    let itemsCompletados = 0;
-    
-    otrasSecciones.forEach(section => {
-      section.items.forEach(item => {
-        totalItems++;
-        // Verificar si hay documentos cargados para este item
-        const tieneDocumento = documentosData[section.id]?.some(doc => doc.nombre === item.name);
-        if (tieneDocumento || item.status === 'completo') {
-          itemsCompletados++;
-        }
-      });
-    });
-    
-    const porcentajeOtros = totalItems > 0 ? (itemsCompletados / totalItems) * 30 : 0;
-    
-    return Math.min(100, Math.round(porcentajeFormacion + porcentajeTecnica + porcentajeSeguridad + porcentajeAntisobornos + porcentajeOtros));
+    return Math.min(100, Math.round(porcentajeFormacion + porcentajeTecnica + porcentajeSeguridad + porcentajeAntisobornos));
   };
 
   const compliance = calculateCompliance();
-
-  // Función para verificar si un documento existe
-  const tieneDocumento = (sectionId, itemName) => {
-    if (sectionId === 'certificados' || sectionId === 'cumplimiento_organizacional') {
-      return false;
-    }
-    return documentosData[sectionId]?.some(doc => doc.nombre === itemName) || false;
-  };
-
-  // Función para obtener los documentos de un item
-  const getDocumentosPorItem = (sectionId, itemName) => {
-    return documentosData[sectionId]?.filter(doc => doc.nombre === itemName) || [];
-  };
-
-  // Función para verificar si un documento es único (solo para lógica interna)
-  const esDocumentoUnico = (itemName) => {
-    return documentosUnicos.includes(itemName);
-  };
 
   // Función para contar documentos totales en certificados
   const certificadosTienenDocumentos = () => {
@@ -1958,235 +1938,6 @@ const handleVideoCaptured = (videoFile) => {
     );
   };
 
-  // Función para renderizar cualquier sección con items
-  const renderSeccionConItems = (section) => {
-    const estadoValidacion = obtenerEstadoValidacion(section.id);
-    
-    // Calcular progreso basado en documentos subidos
-    let completedItems = 0;
-    section.items.forEach(item => {
-      const tieneDoc = tieneDocumento(section.id, item.name);
-      if (tieneDoc) completedItems++;
-    });
-    
-    const totalItems = section.items.length;
-    const completionPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-    
-    const tieneDocumentos = completedItems > 0;
-    
-    return (
-      <Accordion 
-        key={section.id}
-        expanded={expanded === section.id}
-        onChange={handleAccordionChange(section.id)}
-        sx={{ 
-          mb: 2,
-          border: '2px solid',
-          borderColor: completionPercentage === 100 ? colors.status.success : colors.status.warning,
-          borderRadius: '8px !important',
-          boxShadow: `0 2px 12px ${completionPercentage === 100 ? colors.status.success + '20' : colors.status.warning + '20'}`,
-          '&:before': { display: 'none' }
-        }}
-      >
-        <AccordionSummary 
-          expandIcon={<ExpandMoreIcon />}
-          sx={{ 
-            backgroundColor: expanded === section.id ? '#f8f9fa' : 'white',
-            borderRadius: '8px',
-            minHeight: '70px',
-            transition: 'all 0.2s'
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-            <Box sx={{ 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              backgroundColor: completionPercentage === 100 ? '#e8f5e9' : '#fff3e0',
-              color: completionPercentage === 100 ? colors.status.success : colors.status.warning
-            }}>
-              {section.icon}
-            </Box>
-            
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography sx={{ fontWeight: '700', color: colors.text.primary, fontSize: '1rem', mb: 0.5 }}>
-                {section.title}
-              </Typography>
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ textAlign: 'center', minWidth: '60px' }}>
-                <Typography variant="h6" sx={{ color: completionPercentage === 100 ? colors.status.success : colors.status.warning, fontWeight: 'bold', fontSize: '1.1rem' }}>
-                  {Math.round(completionPercentage)}%
-                </Typography>
-                <Typography variant="caption" sx={{ color: colors.text.secondary, fontSize: '0.7rem' }}>
-                  Completado
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip label={`${completedItems}/${totalItems}`} size="small" color={completionPercentage === 100 ? "success" : "warning"} sx={{ height: '24px', fontSize: '0.75rem', fontWeight: '600' }} />
-                {estadoValidacion.enviado && <Chip icon={<CheckCircleIcon />} label="Enviado" size="small" color="info" sx={{ height: '24px' }} />}
-              </Box>
-            </Box>
-          </Box>
-        </AccordionSummary>
-        <AccordionDetails sx={{ pt: 3, pb: 3 }}>
-          
-          {estadoValidacion.enviado && (
-            <Alert severity="info" sx={{ mb: 3, backgroundColor: '#f8f9fa' }} icon={<VerifiedIcon />}>
-              <Typography variant="body2"><strong>Documentos enviados</strong></Typography>
-              <Typography variant="body2" sx={{ mt: 0.5 }}>Los documentos de esta sección se enviaron el {estadoValidacion.fechaEnvio}</Typography>
-            </Alert>
-          )}
-          
-          <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 3, lineHeight: 1.6 }}>
-            Documentación requerida para el expediente. Seleccione cada documento para cargarlo.
-          </Typography>
-          
-          <List dense sx={{ py: 0, mb: 3 }}>
-            {section.items.map((item, index) => {
-              const documentosItem = getDocumentosPorItem(section.id, item.name);
-              const tieneDoc = documentosItem.length > 0;
-              // Solo usar esDocumentoUnico para lógica interna, no para mostrar
-              
-              return (
-                <ListItem 
-                  key={index}
-                  sx={{ 
-                    py: 2,
-                    px: 2,
-                    mb: 1,
-                    borderRadius: 1,
-                    backgroundColor: '#fff',
-                    border: `1px solid ${colors.primary.main}20`,
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    '&:hover': {
-                      backgroundColor: '#f8f9fa',
-                      borderColor: colors.primary.main
-                    }
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: tieneDoc ? 1 : 0 }}>
-                    <ListItemIcon sx={{ minWidth: 44 }}>
-                      {tieneDoc ? (
-                        <CheckCircleIcon sx={{ color: colors.status.success, fontSize: '1.5rem', backgroundColor: '#e8f5e9', borderRadius: '50%', p: 0.5 }} />
-                      ) : (
-                        <WarningIcon sx={{ color: colors.status.warning, fontSize: '1.5rem', backgroundColor: '#fff3e0', borderRadius: '50%', p: 0.5 }} />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={
-                        <Typography sx={{
-                          color: tieneDoc ? colors.text.primary : colors.text.secondary,
-                          fontWeight: tieneDoc ? '600' : '500',
-                          fontSize: '0.95rem',
-                          lineHeight: 1.4
-                        }}>
-                          {item.name}
-                        </Typography>
-                      }
-                    />
-                    
-                    {/* Botón para agregar documento - la lógica de único se aplica internamente */}
-                    <Button
-                      startIcon={<AddIcon />}
-                      size="small"
-                      variant="outlined"
-                      onClick={() => handleOpenAddDialog(section.id, item.name)}
-                      disabled={esDocumentoUnico(item.name) && tieneDoc}
-                      sx={{ 
-                        fontSize: '0.75rem', 
-                        textTransform: 'none',
-                        ml: 2,
-                        color: colors.primary.main,
-                        borderColor: colors.primary.main,
-                        '&.Mui-disabled': {
-                          backgroundColor: '#f5f5f5',
-                          color: '#bdbdbd',
-                          borderColor: '#e0e0e0'
-                        }
-                      }}
-                    >
-                      {tieneDoc ? 'Agregar otro' : 'Agregar'}
-                    </Button>
-                  </Box>
-
-                  {/* Mostrar documentos subidos para este item */}
-                  {tieneDoc && (
-                    <Box sx={{ pl: 7, pr: 2, pb: 1 }}>
-                      {documentosItem.map((doc, docIndex) => (
-                        <Paper key={docIndex} variant="outlined" sx={{ p: 1.5, mb: 1, backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <FilePresentIcon sx={{ color: colors.primary.main, fontSize: '1.2rem' }} />
-                            <Box>
-                              <Typography variant="caption" sx={{ fontWeight: '600', display: 'block' }}>
-                                {doc.nombreArchivo}
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: colors.text.secondary, fontSize: '0.7rem' }}>
-                                Subido: {doc.fechaSubida}
-                              </Typography>
-                            </Box>
-                          </Box>
-                          <Box>
-                            <Tooltip title="Ver">
-                              <IconButton size="small" onClick={() => handleVerDocumento(doc, section.id)} sx={{ color: colors.primary.main }}>
-                                <VisibilityIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Descargar">
-                              <IconButton size="small" onClick={() => handleDescargarDocumento(doc)} sx={{ color: colors.status.success }}>
-                                <DownloadIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Eliminar">
-                              <IconButton size="small" onClick={() => handleEliminarDocumento(section.id, doc.id, doc, item.name, 0, docIndex)} sx={{ color: colors.status.error }}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        </Paper>
-                      ))}
-                    </Box>
-                  )}
-                </ListItem>
-              );
-            })}
-          </List>
-          
-          <Box sx={{ mt: 3, p: 2.5, backgroundColor: '#f8f9fa', borderRadius: 2, border: `1px solid ${colors.primary.main}20` }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box>
-                <Typography variant="body1" sx={{ fontWeight: '600', color: colors.text.primary, mb: 0.5 }}>
-                  Validación de Documentos
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-                  Envíe los documentos para su registro
-                </Typography>
-              </Box>
-              
-              <Button variant="contained" startIcon={<SendIcon />} onClick={() => handleAbrirValidacionDialog(section.id, section.title)}
-                disabled={estadoValidacion.enviado || !tieneDocumentos}
-                sx={{ textTransform: 'none', px: 3, py: 1, bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}>
-                {estadoValidacion.enviado ? 'Enviados' : 'Enviar'}
-              </Button>
-            </Box>
-            
-            {!tieneDocumentos && !estadoValidacion.enviado && (
-              <Alert severity="warning" sx={{ mt: 2, py: 1 }}>
-                <Typography variant="body2">Agregue al menos un documento antes de enviar</Typography>
-              </Alert>
-            )}
-          </Box>
-        </AccordionDetails>
-      </Accordion>
-    );
-  };
-
   return (
     <Box>
       {/* Header */}
@@ -2200,8 +1951,6 @@ const handleVideoCaptured = (videoFile) => {
           </Typography>
         </Box>
 
-        
-        
         <Stack direction="row" spacing={2}>
           <Button variant={editMode ? "contained" : "outlined"} startIcon={<EditIcon />} onClick={() => setEditMode(!editMode)} sx={{ textTransform: 'none', color: editMode ? 'white' : colors.primary.main, borderColor: colors.primary.main, bgcolor: editMode ? colors.primary.main : 'transparent', '&:hover': { bgcolor: editMode ? colors.primary.dark : `${colors.primary.main}10` } }}>
             {editMode ? 'Guardar Cambios' : 'Modo Edición'}
@@ -2277,7 +2026,7 @@ const handleVideoCaptured = (videoFile) => {
                 <Grid item xs={6}>
                   <Paper sx={{ p: 1.5, textAlign: 'center', borderRadius: 2, height: '100%' }}>
                     <Typography variant="h5" sx={{ color: colors.status.error, fontWeight: 'bold', mb: 0.5 }}>
-                      {Object.values(documentosData).flat().length}
+                      {Object.values(documentosData).flat()?.length || 0}
                     </Typography>
                     <Typography variant="caption" sx={{ color: colors.text.secondary, fontWeight: '500', fontSize: '0.7rem' }}>
                       Documentos
@@ -2315,129 +2064,154 @@ const handleVideoCaptured = (videoFile) => {
           # INFORMACIÓN COMPLEMENTARIA
         </Typography>
 
+        {/* Mostrar loading */}
+        {loadingApartados && (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <LinearProgress sx={{ maxWidth: '300px', mx: 'auto', mb: 2 }} />
+            <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+              Cargando apartados...
+            </Typography>
+          </Box>
+        )}
+
+        {/* Renderizar apartados dinámicos */}
+        {!loadingApartados && apartadosDinamicos.length > 0 && (
+          <>
+            <Typography variant="subtitle2" sx={{ color: colors.primary.main, mb: 2 }}>
+              Apartados disponibles ({apartadosDinamicos.length})
+            </Typography>
+            {apartadosDinamicos.map(apartado => renderApartadoDinamico(apartado))}
+          </>
+        )}
+
+        {/* Mensaje si no hay apartados dinámicos */}
+        {!loadingApartados && apartadosDinamicos.length === 0 && user?.instanciaId && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            No hay apartados configurados para esta instancia
+          </Alert>
+        )}
+
         <Accordion
-  expanded={expanded === 'prueba_vida'}
-  onChange={handleAccordionChange('prueba_vida')}
-  sx={{
-    mb: 2,
-    border: '2px solid',
-    borderColor: pruebaVida.estado === 'completado'
-      ? colors.status.success
-      : colors.status.warning,
-    borderRadius: '8px !important',
-    boxShadow: `0 2px 12px ${pruebaVida.estado === 'completado'
-      ? colors.status.success + '20'
-      : colors.status.warning + '20'}`,
-    '&:before': { display: 'none' }
-  }}
->
-  <AccordionSummary
-    expandIcon={<ExpandMoreIcon />}
-    sx={{
-      backgroundColor: expanded === 'prueba_vida' ? '#f8f9fa' : 'white',
-      borderRadius: '8px',
-      minHeight: '70px'
-    }}
-  >
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-      <Box sx={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 40, height: 40, borderRadius: '50%',
-        backgroundColor: pruebaVida.estado === 'completado' ? '#e8f5e9' : '#fff3e0',
-        color: pruebaVida.estado === 'completado' ? colors.status.success : colors.status.warning
-      }}>
-        <VideoCallIcon />
-      </Box>
-
-      <Box sx={{ flexGrow: 1 }}>
-        <Typography sx={{ fontWeight: '700', color: colors.text.primary, fontSize: '1rem', mb: 0.5 }}>
-          PRUEBA DE VIDA
-        </Typography>
-        <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-          {pruebaVida.estado === 'completado'
-            ? `Completado • ${pruebaVida.fechaGrabacion}`
-            : 'Grabación de video requerida'}
-        </Typography>
-      </Box>
-
-      <Chip
-        label={pruebaVida.estado === 'completado' ? 'COMPLETADO' : 'PENDIENTE'}
-        size="small"
-        color={pruebaVida.estado === 'completado' ? 'success' : 'warning'}
-        icon={pruebaVida.estado === 'completado' ? <CheckCircleIcon /> : <WarningIcon />}
-        sx={{ height: '24px', fontSize: '0.75rem', fontWeight: '600' }}
-      />
-    </Box>
-  </AccordionSummary>
-
-  <AccordionDetails sx={{ pt: 3, pb: 3 }}>
-    <Alert severity="info" sx={{ mb: 3, backgroundColor: `${colors.primary.main}10` }}>
-      <Typography variant="body2">
-        <strong>Requisito para agentes:</strong> Capture un video corto para verificar
-        su identidad y presencia.
-        {pruebaVida.estado !== 'completado' &&
-          ' Complete este paso antes de continuar con el resto del expediente.'}
-      </Typography>
-    </Alert>
-
-    <PruebaVidaRecorder
-      onVideoCaptured={handleVideoCaptured}
-      videoFile={pruebaVida.videoArchivo}
-      setVideoFile={(file) => setPruebaVida(prev => ({ ...prev, videoArchivo: file }))}
-    />
-
-    {pruebaVida.videoArchivo && (
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        <Button
-          variant="outlined"
-          startIcon={<VisibilityIcon />}
-          onClick={() => {
-            const url = URL.createObjectURL(pruebaVida.videoArchivo);
-            window.open(url, '_blank');
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          expanded={expanded === 'prueba_vida'}
+          onChange={handleAccordionChange('prueba_vida')}
+          sx={{
+            mb: 2,
+            border: '2px solid',
+            borderColor: pruebaVida.estado === 'completado'
+              ? colors.status.success
+              : colors.status.warning,
+            borderRadius: '8px !important',
+            boxShadow: `0 2px 12px ${pruebaVida.estado === 'completado'
+              ? colors.status.success + '20'
+              : colors.status.warning + '20'}`,
+            '&:before': { display: 'none' }
           }}
-          sx={{ textTransform: 'none', color: colors.primary.main }}
         >
-          Ver Video
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={() => {
-            const url = URL.createObjectURL(pruebaVida.videoArchivo);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = pruebaVida.videoArchivo.name;
-            a.click();
-            URL.revokeObjectURL(url);
-            setSnackbar({
-              open: true,
-              message: '✓ Descargando video...',
-              severity: 'success'
-            });
-          }}
-          sx={{ textTransform: 'none', color: colors.status.success }}
-        >
-          Descargar
-        </Button>
-      </Box>
-    )}
-  </AccordionDetails>
-</Accordion>
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{
+              backgroundColor: expanded === 'prueba_vida' ? '#f8f9fa' : 'white',
+              borderRadius: '8px',
+              minHeight: '70px'
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+              <Box sx={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 40, borderRadius: '50%',
+                backgroundColor: pruebaVida.estado === 'completado' ? '#e8f5e9' : '#fff3e0',
+                color: pruebaVida.estado === 'completado' ? colors.status.success : colors.status.warning
+              }}>
+                <VideoCallIcon />
+              </Box>
+
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography sx={{ fontWeight: '700', color: colors.text.primary, fontSize: '1rem', mb: 0.5 }}>
+                  PRUEBA DE VIDA
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+                  {pruebaVida.estado === 'completado'
+                    ? `Completado • ${pruebaVida.fechaGrabacion}`
+                    : 'Grabación de video requerida'}
+                </Typography>
+              </Box>
+
+              <Chip
+                label={pruebaVida.estado === 'completado' ? 'COMPLETADO' : 'PENDIENTE'}
+                size="small"
+                color={pruebaVida.estado === 'completado' ? 'success' : 'warning'}
+                icon={pruebaVida.estado === 'completado' ? <CheckCircleIcon /> : <WarningIcon />}
+                sx={{ height: '24px', fontSize: '0.75rem', fontWeight: '600' }}
+              />
+            </Box>
+          </AccordionSummary>
+
+          <AccordionDetails sx={{ pt: 3, pb: 3 }}>
+            <Alert severity="info" sx={{ mb: 3, backgroundColor: `${colors.primary.main}10` }}>
+              <Typography variant="body2">
+                <strong>Requisito para agentes:</strong> Capture un video corto para verificar
+                su identidad y presencia.
+                {pruebaVida.estado !== 'completado' &&
+                  ' Complete este paso antes de continuar con el resto del expediente.'}
+              </Typography>
+            </Alert>
+
+            <PruebaVidaRecorder
+              onVideoCaptured={handleVideoCaptured}
+              videoFile={pruebaVida.videoArchivo}
+              setVideoFile={(file) => setPruebaVida(prev => ({ ...prev, videoArchivo: file }))}
+            />
+
+            {pruebaVida.videoArchivo && (
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<VisibilityIcon />}
+                  onClick={() => {
+                    const url = URL.createObjectURL(pruebaVida.videoArchivo);
+                    window.open(url, '_blank');
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  }}
+                  sx={{ textTransform: 'none', color: colors.primary.main }}
+                >
+                  Ver Video
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={() => {
+                    const url = URL.createObjectURL(pruebaVida.videoArchivo);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = pruebaVida.videoArchivo.name;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setSnackbar({
+                      open: true,
+                      message: '✓ Descargando video...',
+                      severity: 'success'
+                    });
+                  }}
+                  sx={{ textTransform: 'none', color: colors.status.success }}
+                >
+                  Descargar
+                </Button>
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
         
-        {/* Renderizar apartados */}
+        {/* Renderizar apartados fijos existentes */}
         {informacionComplementaria.map((section) => {
           if (section.id === 'certificados') {
             return renderCertificados();
           } else if (section.id === 'cumplimiento_organizacional') {
             return renderCumplimientoOrganizacional();
           } else {
-            return renderSeccionConItems(section);
+            return null;
           }
         })}
       </Box>
-
-      
 
       {/* Diálogo para agregar documento */}
       <Dialog open={addDialog.open} onClose={() => setAddDialog({...addDialog, open: false})} maxWidth="sm" fullWidth>

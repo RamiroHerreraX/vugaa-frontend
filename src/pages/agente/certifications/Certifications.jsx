@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { crearCertificacionCompleta } from '../../../services/certificaciones';
+import { useAuth } from "../../../context/AuthContext";
+// Agrega al import del service
+import { getCertificacionesPorExpediente, eliminarCertificacionCompleta ,editarCertificacionCompleta   } from '../../../services/certificaciones';
 import {
   Box,
   Grid,
@@ -36,7 +40,8 @@ import {
   InputAdornment,
   Tooltip,
   Avatar,
-  Snackbar
+  Snackbar,
+  CircularProgress
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -108,7 +113,353 @@ const colors = {
   }
 };
 
+
+
+// ========== CONSTANTES ==========
+const PROGRAMAS = {
+  formacionEtica: 1,
+  actualizacionTecnica: 2,
+  otros: 3
+};
+
+// ========== MODAL MODIFICADO ==========
+const AddCertificationModal = ({ 
+  open, 
+  onClose, 
+  onSave, 
+  nuevaCertificacion, 
+  onFieldChange, 
+  onFileChange, 
+  uploading, 
+  uploadProgress,
+  onRemoveFile,
+  saving,
+  colors 
+}) => (
+  <Dialog 
+    open={open} 
+    onClose={onClose}
+    maxWidth="sm"
+    fullWidth
+    PaperProps={{ sx: { borderRadius: 2 } }}
+  >
+    <DialogTitle sx={{ 
+      bgcolor: colors.primary.main,
+      color: 'white',
+      py: 2,
+      px: 3,
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <AddIcon />
+        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+          Agregar Nueva Certificación
+        </Typography>
+      </Box>
+      <IconButton onClick={onClose} size="small" sx={{ color: 'white' }} disabled={saving}>
+        <CloseIcon />
+      </IconButton>
+    </DialogTitle>
+    
+    <DialogContent sx={{ py: 3, px: 3 }}>
+      <Grid container spacing={2.5}>
+        {/* Subsección - Se convierte en idPrograma */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
+            Subsección <span style={{ color: colors.status.error }}>*</span>
+          </Typography>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={nuevaCertificacion.subseccion}
+            onChange={onFieldChange('subseccion')}
+            required
+            disabled={saving}
+          >
+            <MenuItem value="formacionEtica">Formación Ética y Cumplimiento</MenuItem>
+            <MenuItem value="actualizacionTecnica">Actualización Técnica y Aduanera</MenuItem>
+            <MenuItem value="otros">Otros</MenuItem>
+          </TextField>
+        </Grid>
+
+        {/* Nombre de la Certificación */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
+            Nombre de la Certificación <span style={{ color: colors.status.error }}>*</span>
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            value={nuevaCertificacion.tipoDocumento}
+            onChange={onFieldChange('tipoDocumento')}
+            placeholder="Ej: Curso de Ética Profesional"
+            required
+            disabled={saving}
+          />
+        </Grid>
+
+        {/* Institución */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
+            Institución <span style={{ color: colors.status.error }}>*</span>
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            value={nuevaCertificacion.institucion}
+            onChange={onFieldChange('institucion')}
+            placeholder="Ej: Instituto de Ética Empresarial"
+            required
+            disabled={saving}
+          />
+        </Grid>
+
+        {/* Horas */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
+            Horas <span style={{ color: colors.status.error }}>*</span>
+          </Typography>
+          <TextField
+            fullWidth
+            type="number"
+            size="small"
+            value={nuevaCertificacion.horas}
+            onChange={onFieldChange('horas')}
+            placeholder="Ej: 20"
+            required
+            inputProps={{ min: 1 }}
+            disabled={saving}
+          />
+        </Grid>
+
+        {/* Fecha */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
+            Fecha de Expedición
+          </Typography>
+          <TextField
+            fullWidth
+            type="date"
+            size="small"
+            value={nuevaCertificacion.fecha}
+            onChange={onFieldChange('fecha')}
+            InputLabelProps={{ shrink: true }}
+            disabled={saving}
+          />
+        </Grid>
+
+        {/* Archivo */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
+            Archivo <span style={{ color: colors.status.error }}>*</span>
+          </Typography>
+          
+          <Paper 
+            variant="outlined" 
+            sx={{ 
+              p: 3,
+              border: `2px dashed ${nuevaCertificacion.archivo ? colors.status.success : colors.primary.main}40`,
+              borderRadius: 2,
+              backgroundColor: nuevaCertificacion.archivo ? '#f8f9fa' : 'transparent',
+              transition: 'all 0.2s',
+              cursor: saving ? 'default' : 'pointer',
+              textAlign: 'center',
+              opacity: saving ? 0.7 : 1,
+              '&:hover': saving ? {} : {
+                borderColor: colors.primary.main,
+                backgroundColor: '#f8f9fa'
+              }
+            }}
+            onClick={() => !saving && document.getElementById('add-file-upload').click()}
+          >
+            <input
+              id="add-file-upload"
+              type="file"
+              style={{ display: 'none' }}
+              onChange={onFileChange}
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              disabled={saving}
+            />
+            
+            {nuevaCertificacion.archivo ? (
+              <>
+                <CheckCircleIcon sx={{ color: colors.status.success, fontSize: 40, mb: 1 }} />
+                <Typography variant="body1" sx={{ color: colors.text.primary, fontWeight: '500' }}>
+                  {nuevaCertificacion.nombreArchivo}
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
+                  Archivo seleccionado correctamente
+                </Typography>
+                {uploading && (
+                  <Box sx={{ mt: 2 }}>
+                    <LinearProgress variant="determinate" value={uploadProgress} sx={{ height: 6, borderRadius: 3 }} />
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                      {uploadProgress}% completado
+                    </Typography>
+                  </Box>
+                )}
+                {!saving && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveFile();
+                    }}
+                    sx={{ mt: 1, color: colors.status.error, borderColor: colors.status.error }}
+                    disabled={saving}
+                  >
+                    Quitar archivo
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <CloudUploadIcon sx={{ color: colors.primary.main, fontSize: 40, mb: 1 }} />
+                <Typography variant="body1" sx={{ color: colors.text.primary, fontWeight: '500' }}>
+                  Haz clic para seleccionar un archivo
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
+                  Formatos: PDF, DOC, DOCX, JPG, PNG (Máx. 10MB)
+                </Typography>
+              </>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Información */}
+        <Grid item xs={12}>
+          <Alert severity="info" sx={{ backgroundColor: `${colors.primary.main}10`, fontSize: '0.85rem' }}>
+            <Typography variant="body2">
+              <strong>Nota:</strong> La certificación se agregará en estado "En revisión" hasta que sea validada por el comité.
+            </Typography>
+          </Alert>
+        </Grid>
+      </Grid>
+    </DialogContent>
+    
+    <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${colors.primary.main}20` }}>
+      <Button 
+        onClick={onClose}
+        variant="outlined"
+        disabled={saving}
+        sx={{ 
+          textTransform: 'none',
+          color: colors.primary.main,
+          borderColor: colors.primary.main
+        }}
+      >
+        Cancelar
+      </Button>
+      <Button 
+        onClick={onSave}
+        variant="contained"
+        disabled={
+          saving ||
+          !nuevaCertificacion.tipoDocumento || 
+          !nuevaCertificacion.archivo || 
+          !nuevaCertificacion.horas || 
+          !nuevaCertificacion.institucion || 
+          !nuevaCertificacion.subseccion
+        }
+        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
+        sx={{ 
+          textTransform: 'none',
+          bgcolor: colors.primary.main,
+          '&:hover': { bgcolor: colors.primary.dark },
+          '&.Mui-disabled': {
+            bgcolor: '#e0e0e0'
+          }
+        }}
+      >
+        {saving ? 'Guardando...' : 'Agregar Certificación'}
+      </Button>
+    </DialogActions>
+  </Dialog>
+);
+
+const EditCertificationModal = ({
+  open,
+  onClose,
+  onSave,
+  editForm,
+  onFieldChange,
+  colors
+}) => (
+  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
+    PaperProps={{ sx: { borderRadius: 2 } }}>
+    <DialogTitle sx={{ bgcolor: colors.status.warning, color: 'white', py: 2, px: 3,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <EditIcon />
+        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Editar Certificación</Typography>
+      </Box>
+      <IconButton onClick={onClose} size="small" sx={{ color: 'white' }}>
+        <CloseIcon />
+      </IconButton>
+    </DialogTitle>
+
+    <DialogContent sx={{ py: 3, px: 3 }}>
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <TextField fullWidth label="Tipo de certificación" size="small" margin="normal"
+            value={editForm.tipo}
+            onChange={(e) => onFieldChange('tipo', e.target.value)} />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Número de certificación" size="small" margin="normal"
+            value={editForm.numero}
+            onChange={(e) => onFieldChange('numero', e.target.value)} />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Subsección" size="small" margin="normal"
+            value={editForm.subseccion}
+            onChange={(e) => onFieldChange('subseccion', e.target.value)} />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Fecha de emisión" type="date" size="small"
+            margin="normal" InputLabelProps={{ shrink: true }}
+            value={editForm.fechaEmision}
+            onChange={(e) => onFieldChange('fechaEmision', e.target.value)} />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Autoridad emisora" size="small" margin="normal"
+            value={editForm.autoridad}
+            onChange={(e) => onFieldChange('autoridad', e.target.value)} />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Horas" type="number" size="small" margin="normal"
+            value={editForm.horasAcreditadas}
+            onChange={(e) => onFieldChange('horasAcreditadas', e.target.value)} />
+        </Grid>
+        <Grid item xs={12}>
+          <TextField fullWidth label="Comentarios" multiline rows={3} size="small"
+            margin="normal"
+            value={editForm.descripcion}
+            onChange={(e) => onFieldChange('descripcion', e.target.value)} />
+        </Grid>
+      </Grid>
+    </DialogContent>
+
+    <DialogActions sx={{ p: 2.5, borderTop: `1px solid ${colors.primary.main}20` }}>
+      <Button onClick={onClose} variant="outlined"
+        sx={{ color: colors.primary.main, borderColor: colors.primary.main }}>
+        Cancelar
+      </Button>
+      <Button onClick={onSave} variant="contained"
+        sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}>
+        Guardar Cambios
+      </Button>
+    </DialogActions>
+  </Dialog>
+);
+
 const Certifications = () => {
+  const { user } = useAuth(); // Asumiendo que tienes el usuario en contexto
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
@@ -120,11 +471,24 @@ const Certifications = () => {
     severity: 'success'
   });
 
+  const handleEditFormChange = (campo, valor) => {
+    setEditForm({ ...editForm, [campo]: valor });
+  };
+
   // Estados para modales
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewCert, setPreviewCert] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editCert, setEditCert] = useState(null);
+  const [editForm, setEditForm] = useState({
+  tipo:             '',
+  numero:           '',
+  subseccion:       '',
+  fechaEmision:     '',
+  autoridad:        '',
+  horasAcreditadas: '',
+  descripcion:      ''
+});
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const [deleteCert, setDeleteCert] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -175,59 +539,54 @@ const Certifications = () => {
    
   };
 
+
+
   // Datos de certificaciones - SOLO LAS DOS SOLICITADAS
-  const [certifications, setCertifications] = useState([
-    { 
-      id: 1, 
-      type: 'CURSO DE ÉTICA PROFESIONAL Y CÓDIGO DE CONDUCTA', 
-      number: 'CET-2025-001', 
-      issueDate: '20/02/2026', 
-      expirationDate: '20/02/2028', 
-      status: 'En revisión',
-      progress: 100,
-      documents: 1,
-      lastUpdate: '24/02/2026',
-      subseccion: 'Formación Ética y Cumplimiento',
-      horas: 20,
-      tipo: 'Curso de Ética',
-      autoridad: 'Instituto de Ética Empresarial',
-      vigencia: '3 años',
-      ambito: 'Nacional',
-      comentarios: 'Curso completado satisfactoriamente',
-      historial: [
-        { fecha: '15/06/2025', accion: 'Finalización', usuario: 'Usuario' },
-        { fecha: '20/06/2025', accion: 'Certificación emitida', usuario: 'Instituto' }
-      ],
-      documentosAsociados: [
-        { id: 'd1', nombre: 'certificado_etica_profesional.pdf', tipo: 'PDF', tamaño: '0.8 MB', fecha: '15/06/2025' }
-      ]
-    },
-    { 
-      id: 2, 
-      type: 'DIPLOMADO EN COMERCIO EXTERIOR Y LEGISLACIÓN ADUANERA', 
-      number: 'DCE-2025-002', 
-      issueDate: '10/02/2026', 
-      expirationDate: '10/02/2028', 
-      status: 'En revisión',
-      progress: 100,
-      documents: 1,
-      lastUpdate: '24/02/2026',
-      subseccion: 'Actualización Técnica y Aduanera',
-      horas: 80,
-      tipo: 'Diplomado',
-      autoridad: 'Universidad Aduanera de México',
-      vigencia: '3 años',
-      ambito: 'Internacional',
-      comentarios: 'Diplomado completado con excelencia',
-      historial: [
-        { fecha: '10/02/2025', accion: 'Finalización', usuario: 'Usuario' },
-        { fecha: '15/02/2025', accion: 'Certificación emitida', usuario: 'Universidad' }
-      ],
-      documentosAsociados: [
-        { id: 'd2', nombre: 'diplomado_comercio_exterior.pdf', tipo: 'PDF', tamaño: '1.5 MB', fecha: '10/02/2025' }
-      ]
+ const [certifications, setCertifications] = useState([]);
+
+ const idExpediente = 1; // ← ficticio por ahora
+
+useEffect(() => {
+  const cargarCertificaciones = async () => {
+    try {
+      const data = await getCertificacionesPorExpediente(idExpediente);
+      const mapped = data.map(cert => ({
+        id:          cert.idCertExp,
+        idCertificacion: cert.idCertificacion,
+        type:        cert.nombreCertificacion?.toUpperCase() || '—',
+        number:      `CERT-${cert.idCertExp}`,
+        issueDate:       cert.fechaEmision ? new Date(cert.fechaEmision).toLocaleDateString('es-MX') : '—',
+        issueDateRaw:    cert.fechaEmision || '',
+        expirationDate: cert.fechaExpiracion || '—',
+        status:      cert.estado === 'EN_REVISION' ? 'En revisión' :
+                     cert.estado === 'VIGENTE'     ? 'Aceptados'   :
+                     cert.estado === 'RECHAZADA'   ? 'Rechazado'   : cert.estado,
+        progress:    cert.estado === 'VIGENTE' ? 100 : 30,
+        documents:   1,
+        lastUpdate:  cert.fechaCreacion || '—',
+        subseccion:  cert.nombrePrograma || '—',
+        horas:       cert.horasAcreditadas || 0,
+        tipo:        cert.nombreCertificacion || '—',
+        autoridad:   cert.institucion || '—',
+        vigencia:    '3 años',
+        ambito:      'Nacional',
+        comentarios: cert.descripcion || '',
+        documentosAsociados: [{
+          id:     cert.mongoDocumentoId || `d${cert.idCertExp}`,
+          nombre: cert.nombreArchivo || 'documento',
+          tipo:   'PDF',
+          tamaño: '—',
+          fecha:  cert.fechaEmision || '—'
+        }]
+      }));
+      setCertifications(mapped);
+    } catch (error) {
+      console.error('Error cargando certificaciones:', error);
     }
-  ]);
+  };
+
+  cargarCertificaciones();
+}, []);
 
   // Función para simular carga de archivo
   const simulateUpload = () => {
@@ -252,9 +611,18 @@ const Certifications = () => {
   };
 
   const handleOpenEdit = (cert) => {
-    setEditCert(cert);
-    setEditModalOpen(true);
-  };
+  setEditCert(cert);
+  setEditForm({
+    tipo:             cert.type || '',
+    numero:           cert.number || '',
+    subseccion:       cert.subseccion || '',
+    fechaEmision:     cert.issueDateRaw || '',
+    autoridad:        cert.autoridad || '',
+    horasAcreditadas: cert.horas || '',
+    descripcion:      cert.comentarios || ''
+  });
+  setEditModalOpen(true);
+};
 
   const handleOpenDelete = (cert) => {
     setDeleteCert(cert);
@@ -339,69 +707,175 @@ const Certifications = () => {
   };
 
   // Función para guardar nueva certificación
-  const handleGuardarNuevaCertificacion = () => {
-    if (nuevaCertificacion.tipoDocumento && nuevaCertificacion.archivo && nuevaCertificacion.horas && nuevaCertificacion.institucion && nuevaCertificacion.subseccion) {
-      
-      const nuevaCert = {
-        id: certifications.length + 1,
-        type: nuevaCertificacion.tipoDocumento.toUpperCase(),
-        number: `CERT-${new Date().getFullYear()}-${String(certifications.length + 1).padStart(3, '0')}`,
-        issueDate: new Date(nuevaCertificacion.fecha).toLocaleDateString('es-MX'),
-        expirationDate: new Date(new Date(nuevaCertificacion.fecha).setFullYear(new Date(nuevaCertificacion.fecha).getFullYear() + 3)).toLocaleDateString('es-MX'),
-        status: 'En revisión',
-        progress: 30,
-        documents: 1,
-        lastUpdate: new Date().toLocaleDateString('es-MX'),
-        subseccion: nuevaCertificacion.subseccion === 'formacionEtica' ? 'Formación Ética y Cumplimiento' : 'Actualización Técnica y Aduanera',
-        horas: parseInt(nuevaCertificacion.horas),
-        tipo: nuevaCertificacion.tipoDocumento,
-        autoridad: nuevaCertificacion.institucion,
-        vigencia: '3 años',
-        ambito: 'Nacional',
-        comentarios: 'Certificación en proceso de validación',
-        historial: [
-          { fecha: new Date().toLocaleDateString('es-MX'), accion: 'Creación', usuario: 'Usuario' }
-        ],
-        documentosAsociados: [
-          { 
-            id: `d${Date.now()}`, 
-            nombre: nuevaCertificacion.nombreArchivo, 
-            tipo: nuevaCertificacion.archivo?.type?.includes('pdf') ? 'PDF' : 'Documento', 
-            tamaño: `${Math.round(nuevaCertificacion.archivo?.size / 1024 / 1024 * 10) / 10} MB`, 
-            fecha: new Date().toLocaleDateString('es-MX') 
-          }
-        ]
-      };
+  const handleGuardarNuevaCertificacion = async () => {
+  // Validar campos requeridos
+  if (!nuevaCertificacion.subseccion || !nuevaCertificacion.tipoDocumento || 
+      !nuevaCertificacion.institucion || !nuevaCertificacion.horas || 
+      !nuevaCertificacion.archivo) {
+    setSnackbar({
+      open: true,
+      message: 'Por favor complete todos los campos requeridos',
+      severity: 'warning'
+    });
+    return;
+  }
 
-      setCertifications([...certifications, nuevaCert]);
-      
-     
-
-      handleCloseAdd();
-    } else {
-      setSnackbar({
-        open: true,
-        message: 'Por favor complete todos los campos requeridos',
-        severity: 'warning'
-      });
-    }
-  };
-
-  // Función para guardar cambios en edición
-  const handleSaveEdit = () => {
-    // Simular guardado
+  setSaving(true);
+  
+  try {
+    // PASO 1: Simular subida a MongoDB (aquí iría tu servicio real)
+    // En producción, aquí llamarías a un servicio que sube a MongoDB
+    // y retorna el mongoDocumentoId
+    const mongoDocumentoId = `mock-mongo-${Date.now()}`;
     
-    handleCloseEdit();
-  };
+    // PASO 2: Obtener IDs del contexto de autenticación
+    const idInstancia = user?.instanciaId; // Ajusta según tu contexto
+    const idExpediente = 1; // Ajusta según tu contexto
+    const idPrograma = PROGRAMAS[nuevaCertificacion.subseccion] || PROGRAMAS.otros;
 
+    // PASO 3: Llamar al servicio que crea la certificación completa
+    const nuevaCert = await crearCertificacionCompleta(
+      {
+        nombre: nuevaCertificacion.tipoDocumento,
+        institucion: nuevaCertificacion.institucion,
+        horas: parseInt(nuevaCertificacion.horas),
+        fecha: nuevaCertificacion.fecha,
+        nombreArchivo: nuevaCertificacion.nombreArchivo,
+        descripcion: '' // Campo opcional
+      },
+      idInstancia,
+      idExpediente,
+      idPrograma,
+      mongoDocumentoId
+    );
+
+    // PASO 4: Agregar a la lista local para feedback inmediato
+    const nuevaCertLocal = {
+      id: nuevaCert.idCertExp || certifications.length + 1,
+      idCertificacion: nuevaCert.idCertificacion,
+      type: nuevaCertificacion.tipoDocumento.toUpperCase(),
+      number: `CERT-${new Date().getFullYear()}-${String(certifications.length + 1).padStart(3, '0')}`,
+      issueDate: new Date(nuevaCertificacion.fecha).toLocaleDateString('es-MX'),
+      expirationDate: nuevaCert.fechaExpiracion || '—',
+      status: 'En revisión',
+      progress: 30,
+      documents: 1,
+      lastUpdate: new Date().toLocaleDateString('es-MX'),
+      subseccion: nuevaCert.nombrePrograma || 
+                 (nuevaCertificacion.subseccion === 'formacionEtica' ? 'Formación Ética y Cumplimiento' : 'Actualización Técnica y Aduanera'),
+      horas: parseInt(nuevaCertificacion.horas),
+      tipo: nuevaCertificacion.tipoDocumento,
+      autoridad: nuevaCertificacion.institucion,
+      vigencia: '3 años',
+      ambito: 'Nacional',
+      comentarios: 'Certificación en proceso de validación',
+      documentosAsociados: [
+        { 
+          id: nuevaCert.mongoDocumentoId || `d${Date.now()}`, 
+          nombre: nuevaCertificacion.nombreArchivo, 
+          tipo: nuevaCertificacion.archivo?.type?.includes('pdf') ? 'PDF' : 'Documento', 
+          tamaño: `${Math.round(nuevaCertificacion.archivo?.size / 1024 / 1024 * 10) / 10} MB`, 
+          fecha: new Date().toLocaleDateString('es-MX') 
+        }
+      ]
+    };
+
+    setCertifications([...certifications, nuevaCertLocal]);
+    
+    setSnackbar({
+      open: true,
+      message: 'Certificación agregada correctamente',
+      severity: 'success'
+    });
+
+    handleCloseAdd();
+
+  } catch (error) {
+    console.error('Error al guardar certificación:', error);
+    setSnackbar({
+      open: true,
+      message: error.response?.data?.message || 'Error al guardar la certificación',
+      severity: 'error'
+    });
+  } finally {
+    setSaving(false);
+  }
+};
+
+ const handleSaveEdit = async () => {
+  if (!editCert) return;
+
+   console.log('editCert completo:', editCert); // ← agrega esto
+  console.log('idCertificacion:', editCert.idCertificacion);
+  console.log('idCertExp (id):', editCert.id);
+
+  try {
+    await editarCertificacionCompleta({
+      idCertificacion: editCert.idCertificacion,
+      idCertExp:       editCert.id,
+      nombre:          editForm.tipo,
+      institucion:     editForm.autoridad,
+      horas:           parseInt(editForm.horasAcreditadas),
+      fechaEmision:    editForm.fechaEmision,
+      descripcion:     editForm.descripcion ?? '',
+    });
+
+    // Actualiza la lista local para reflejar los cambios sin recargar
+    setCertifications(certifications.map(c =>
+      c.id === editCert.id
+        ? {
+            ...c,
+            type:        editForm.tipo.toUpperCase(),
+            autoridad:   editForm.autoridad,
+            subseccion:  editForm.subseccion,
+            issueDate:   editForm.fechaEmision,
+            horas:       parseInt(editForm.horasAcreditadas),
+            comentarios: editForm.descripcion,
+          }
+        : c
+    ));
+
+    setSnackbar({
+      open:     true,
+      message:  'Certificación actualizada correctamente',
+      severity: 'success'
+    });
+
+    handleCloseEdit();
+
+  } catch (error) {
+    console.error('Error al actualizar:', error);
+    setSnackbar({
+      open:     true,
+      message:  error.response?.data?.message || 'Error al actualizar la certificación',
+      severity: 'error'
+    });
+  }
+};
   // Función para confirmar eliminación
-  const handleConfirmDelete = () => {
-    if (deleteCert) {
-      setCertifications(certifications.filter(c => c.id !== deleteCert.id));
-      
-      handleCloseDelete();
-    }
-  };
+ const handleConfirmDelete = async () => {
+  if (!deleteCert) return;
+  try {
+    await eliminarCertificacionCompleta(deleteCert.id, deleteCert.idCertificacion);
+
+    setCertifications(certifications.filter(c => c.id !== deleteCert.id));
+
+    setSnackbar({
+      open:     true,
+      message:  'Certificación eliminada correctamente',
+      severity: 'success'
+    });
+
+    handleCloseDelete();
+  } catch (error) {
+    console.error('Error al eliminar:', error);
+    setSnackbar({
+      open:     true,
+      message:  error.response?.data?.message || 'Error al eliminar la certificación',
+      severity: 'error'
+    });
+  }
+};
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
@@ -655,234 +1129,7 @@ const Certifications = () => {
   );
 
   // Modal para agregar nueva certificación
-  const AddCertificationModal = () => (
-    <Dialog 
-      open={addModalOpen} 
-      onClose={handleCloseAdd}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
-    >
-      <DialogTitle sx={{ 
-        bgcolor: colors.primary.main,
-        color: 'white',
-        py: 2,
-        px: 3,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <AddIcon />
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            Agregar Nueva Certificación
-          </Typography>
-        </Box>
-        <IconButton onClick={handleCloseAdd} size="small" sx={{ color: 'white' }}>
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-      
-      <DialogContent sx={{ py: 3, px: 3 }}>
-        <Grid container spacing={2.5}>
-          {/* Subsección */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-              Subsección <span style={{ color: colors.status.error }}>*</span>
-            </Typography>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              value={nuevaCertificacion.subseccion}
-              onChange={handleNuevaCertificacionChange('subseccion')}
-              required
-            >
-              <MenuItem value="formacionEtica">Formación Ética y Cumplimiento</MenuItem>
-              <MenuItem value="actualizacionTecnica">Actualización Técnica y Aduanera</MenuItem>
-              <MenuItem value="otros">Otros</MenuItem>
-            </TextField>
-          </Grid>
-
-          {/* Nombre de la Certificación */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-              Nombre de la Certificación <span style={{ color: colors.status.error }}>*</span>
-            </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              value={nuevaCertificacion.tipoDocumento}
-              onChange={handleNuevaCertificacionChange('tipoDocumento')}
-              placeholder="Ej: Curso de Ética Profesional"
-              required
-            />
-          </Grid>
-
-          {/* Institución */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-              Institución <span style={{ color: colors.status.error }}>*</span>
-            </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              value={nuevaCertificacion.institucion}
-              onChange={handleNuevaCertificacionChange('institucion')}
-              placeholder="Ej: Instituto de Ética Empresarial"
-              required
-            />
-          </Grid>
-
-          {/* Horas */}
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-              Horas <span style={{ color: colors.status.error }}>*</span>
-            </Typography>
-            <TextField
-              fullWidth
-              type="number"
-              size="small"
-              value={nuevaCertificacion.horas}
-              onChange={handleNuevaCertificacionChange('horas')}
-              placeholder="Ej: 20"
-              required
-              inputProps={{ min: 1 }}
-            />
-          </Grid>
-
-          {/* Fecha */}
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-              Fecha de Expedición
-            </Typography>
-            <TextField
-              fullWidth
-              type="date"
-              size="small"
-              value={nuevaCertificacion.fecha}
-              onChange={handleNuevaCertificacionChange('fecha')}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-
-          {/* Archivo */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-              Archivo <span style={{ color: colors.status.error }}>*</span>
-            </Typography>
-            
-            <Paper 
-              variant="outlined" 
-              sx={{ 
-                p: 3,
-                border: `2px dashed ${nuevaCertificacion.archivo ? colors.status.success : colors.primary.main}40`,
-                borderRadius: 2,
-                backgroundColor: nuevaCertificacion.archivo ? '#f8f9fa' : 'transparent',
-                transition: 'all 0.2s',
-                cursor: 'pointer',
-                textAlign: 'center',
-                '&:hover': {
-                  borderColor: colors.primary.main,
-                  backgroundColor: '#f8f9fa'
-                }
-              }}
-              onClick={() => document.getElementById('add-file-upload').click()}
-            >
-              <input
-                id="add-file-upload"
-                type="file"
-                style={{ display: 'none' }}
-                onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              />
-              
-              {nuevaCertificacion.archivo ? (
-                <>
-                  <CheckCircleIcon sx={{ color: colors.status.success, fontSize: 40, mb: 1 }} />
-                  <Typography variant="body1" sx={{ color: colors.text.primary, fontWeight: '500' }}>
-                    {nuevaCertificacion.nombreArchivo}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
-                    Archivo seleccionado correctamente
-                  </Typography>
-                  {uploading && (
-                    <Box sx={{ mt: 2 }}>
-                      <LinearProgress variant="determinate" value={uploadProgress} sx={{ height: 6, borderRadius: 3 }} />
-                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                        {uploadProgress}% completado
-                      </Typography>
-                    </Box>
-                  )}
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNuevaCertificacion({...nuevaCertificacion, archivo: null, nombreArchivo: ''});
-                    }}
-                    sx={{ mt: 1, color: colors.status.error, borderColor: colors.status.error }}
-                  >
-                    Quitar archivo
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <CloudUploadIcon sx={{ color: colors.primary.main, fontSize: 40, mb: 1 }} />
-                  <Typography variant="body1" sx={{ color: colors.text.primary, fontWeight: '500' }}>
-                    Haz clic para seleccionar un archivo
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block', mt: 1 }}>
-                    Formatos: PDF, DOC, DOCX, JPG, PNG (Máx. 10MB)
-                  </Typography>
-                </>
-              )}
-            </Paper>
-          </Grid>
-
-          {/* Información */}
-          <Grid item xs={12}>
-            <Alert severity="info" sx={{ backgroundColor: `${colors.primary.main}10`, fontSize: '0.85rem' }}>
-              <Typography variant="body2">
-                <strong>Nota:</strong> La certificación se agregará en estado "En revisión" hasta que sea validada por el comité.
-              </Typography>
-            </Alert>
-          </Grid>
-        </Grid>
-      </DialogContent>
-      
-      <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${colors.primary.main}20` }}>
-        <Button 
-          onClick={handleCloseAdd}
-          variant="outlined"
-          sx={{ 
-            textTransform: 'none',
-            color: colors.primary.main,
-            borderColor: colors.primary.main
-          }}
-        >
-          Cancelar
-        </Button>
-        <Button 
-          onClick={handleGuardarNuevaCertificacion}
-          variant="contained"
-          disabled={!nuevaCertificacion.tipoDocumento || !nuevaCertificacion.archivo || !nuevaCertificacion.horas || !nuevaCertificacion.institucion || !nuevaCertificacion.subseccion}
-          sx={{ 
-            textTransform: 'none',
-            bgcolor: colors.primary.main,
-            '&:hover': { bgcolor: colors.primary.dark },
-            '&.Mui-disabled': {
-              bgcolor: '#e0e0e0'
-            }
-          }}
-        >
-          Agregar Certificación
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
+ 
 
   // Modal de vista previa
   const PreviewModal = () => (
@@ -1211,127 +1458,7 @@ const Certifications = () => {
     </Dialog>
   );
 
-  // Modal de edición
-  const EditModal = () => (
-    <Dialog 
-      open={editModalOpen} 
-      onClose={handleCloseEdit}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
-    >
-      {editCert && (
-        <>
-          <DialogTitle sx={{ 
-            bgcolor: colors.status.warning,
-            color: 'white',
-            py: 2,
-            px: 3,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <EditIcon />
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                Editar Certificación
-              </Typography>
-            </Box>
-            <IconButton onClick={handleCloseEdit} size="small" sx={{ color: 'white' }}>
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          
-          <DialogContent sx={{ py: 3, px: 3 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Tipo de certificación"
-                  defaultValue={editCert.type}
-                  size="small"
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Número de certificación"
-                  defaultValue={editCert.number}
-                  size="small"
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Subsección"
-                  defaultValue={editCert.subseccion}
-                  size="small"
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Fecha de emisión"
-                  type="date"
-                  defaultValue={editCert.issueDate.split('/').reverse().join('-')}
-                  size="small"
-                  margin="normal"
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-               
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Autoridad emisora"
-                  defaultValue={editCert.autoridad}
-                  size="small"
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Horas"
-                  type="number"
-                  defaultValue={editCert.horas}
-                  size="small"
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Comentarios"
-                  defaultValue={editCert.comentarios}
-                  multiline
-                  rows={3}
-                  size="small"
-                  margin="normal"
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          
-          <DialogActions sx={{ p: 2.5, borderTop: `1px solid ${colors.primary.main}20` }}>
-            <Button onClick={handleCloseEdit} variant="outlined" sx={{ color: colors.primary.main, borderColor: colors.primary.main }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEdit} variant="contained" sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}>
-              Guardar Cambios
-            </Button>
-          </DialogActions>
-        </>
-      )}
-    </Dialog>
-  );
+  
 
   // Modal de confirmación de eliminación
   const DeleteConfirmModal = () => (
@@ -1760,9 +1887,27 @@ const Certifications = () => {
       </Paper>
 
       {/* Modales */}
-      <AddCertificationModal />
+      <AddCertificationModal 
+  open={addModalOpen}
+  onClose={handleCloseAdd}
+  onSave={handleGuardarNuevaCertificacion}
+  nuevaCertificacion={nuevaCertificacion}
+  onFieldChange={handleNuevaCertificacionChange}
+  onFileChange={handleFileChange}
+  uploading={uploading}
+  uploadProgress={uploadProgress}
+  onRemoveFile={() => setNuevaCertificacion({...nuevaCertificacion, archivo: null, nombreArchivo: ''})}
+  colors={colors}
+/>
       <PreviewModal />
-      <EditModal />
+      <EditCertificationModal
+        open={editModalOpen}
+        onClose={handleCloseEdit}
+        onSave={handleSaveEdit}
+        editForm={editForm}
+        onFieldChange={handleEditFormChange}
+        colors={colors}
+      />
       <DeleteConfirmModal />
 
       {/* Snackbar */}
