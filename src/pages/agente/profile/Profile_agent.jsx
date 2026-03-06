@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useAuth } from '../../../context/AuthContext'; 
+import usuarioService from '../../../services/usuarioService';
 import {
   Box,
   Grid,
@@ -84,6 +86,8 @@ const colors = {
   }
 };
 
+
+
 const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [addDialog, setAddDialog] = useState(false);
@@ -91,6 +95,53 @@ const Profile = () => {
   const [certificadoDialog, setCertificadoDialog] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const { user } = useAuth();
+
+ 
+
+useEffect(() => {
+  const cargarPerfil = async () => {
+    if (!user?.id) return;
+
+    // Cargar datos de usuarios (nombre, email)
+    setFormData(prev => ({
+      ...prev,
+      nombre: user.nombre || '',
+    }));
+
+    // Cargar datos de perfil_agente
+    const perfil = await usuarioService.obtenerPerfilAgente(user.id);
+    if (perfil) {
+      setFormData(prev => ({
+        ...prev,
+        curp:                perfil.curp                || '',
+        rfc:                 perfil.rfc                 || '',
+        patenteAduanal:      perfil.patenteAduanal      || '',
+        fechaNacimiento:     perfil.fechaNacimiento     || '',
+        lugarNacimiento:     perfil.lugarNacimiento     || '',
+        nacionalidad:        perfil.nacionalidad        || '',
+        estadoCivil:         perfil.estadoCivil         || '',
+        domicilioFiscal:     perfil.domicilioFiscal     || '',
+        domicilioParticular: perfil.domicilioParticular || '',
+        telefono:            perfil.telefono            || '',
+        telefonoAlternativo: perfil.telefonoAlternativo || '',
+        emailAlternativo:    perfil.emailAlternativo    || '',
+      }));
+    }
+
+    // Cargar datos del profile card
+    setProfile(prev => ({
+      ...prev,
+      nombre:       user.nombre        || '',
+      email:        user.email         || '',
+      rol:          user.rol           || '',
+      region:       user.regionNombre  || '',
+    }));
+  };
+
+  cargarPerfil();
+}, [user]);
+
   const [newAduana, setNewAduana] = useState({
     nombre: '',
     tipo: 'Secundaria',
@@ -124,20 +175,23 @@ const Profile = () => {
   });
   
   const [formData, setFormData] = useState({
-    nombre: 'Luis Rodríguez',
-    curp: 'RODL800101HDFXYZ01',
-    rfc: 'RODL800101ABC',
-    fechaNacimiento: '01/01/1980',
-    lugarNacimiento: 'Ciudad de México',
-    nacionalidad: 'Mexicana',
-    estadoCivil: 'Casado',
-    domicilioFiscal: 'Av. Principal 123, Col. Centro, CDMX',
-    domicilioParticular: 'Calle Secundaria 456, Col. Juárez, CDMX',
-    telefono: '+52 55 1234 5678',
-    telefonoAlternativo: '+52 55 9876 5432',
-    email: 'luis.rodriguez@ejemplo.com',
-    emailAlternativo: 'contacto@agenteaduana.com'
-  });
+  nombre:              '',
+  curp:                '',
+  rfc:                 '',
+  patenteAduanal:      '',
+  fechaNacimiento:     '',
+  lugarNacimiento:     '',
+  nacionalidad:        '',
+  estadoCivil:         '',
+  domicilioFiscal:     '',
+  domicilioParticular: '',
+  telefono:            '',
+  telefonoAlternativo: '',
+  emailAlternativo:    '',
+  passwordActual:      '',
+  passwordNuevo:       '',
+  confirmarPassword:   '',
+});
 
   const [preferences, setPreferences] = useState({
     idioma: 'es',
@@ -170,9 +224,73 @@ const Profile = () => {
     });
   };
 
-  const handleSave = () => {
+const handleSave = async () => {
+  // Validar contraseña si se quiere cambiar
+  if (formData.passwordNuevo) {
+    if (formData.passwordNuevo !== formData.confirmarPassword) {
+      console.error('Las contraseñas no coinciden');
+      return;
+    }
+    if (!formData.passwordActual) {
+      console.error('Debes ingresar tu contraseña actual');
+      return;
+    }
+  }
+
+  try {
+    // Actualizar perfil_agente + expediente + perfilCompleto
+    await usuarioService.completarPerfil(
+      user.id,
+      user.instanciaId,
+      {
+        curp:                formData.curp,
+        rfc:                 formData.rfc,
+        patenteAduanal:      formData.patenteAduanal,
+        fechaNacimiento:     formData.fechaNacimiento,
+        lugarNacimiento:     formData.lugarNacimiento,
+        nacionalidad:        formData.nacionalidad,
+        estadoCivil:         formData.estadoCivil,
+        domicilioFiscal:     formData.domicilioFiscal,
+        domicilioParticular: formData.domicilioParticular,
+        telefono:            formData.telefono,
+        telefonoAlternativo: formData.telefonoAlternativo,
+        emailAlternativo:    formData.emailAlternativo,
+      }
+    );
+
+    // Actualizar nombre y contraseña en usuarios
+    await usuarioService.update(user.id, {
+      id:               user.id,
+      nombre:           formData.nombre,
+      email:            user.email,
+      activo:           true,
+      bloqueado:        false,
+      intentosFallidos: 0,
+      ...(formData.passwordNuevo && { password: formData.passwordNuevo }),
+    });
+
+    // Actualizar localStorage
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    localStorage.setItem('user', JSON.stringify({
+      ...storedUser,
+      nombre:         formData.nombre,
+      perfilCompleto: true,
+    }));
+
+    // Limpiar campos de contraseña
+    setFormData(prev => ({
+      ...prev,
+      passwordActual:    '',
+      passwordNuevo:     '',
+      confirmarPassword: '',
+    }));
+
     setEditMode(false);
-  };
+
+  } catch (error) {
+    console.error('Error al guardar perfil:', error);
+  }
+};
 
   const handleAduanaChange = (field) => (e) => {
     setNewAduana({
@@ -891,6 +1009,64 @@ const handleDownloadCertificate = async () => {
                         sx={{ mb: 2 }}
                       />
                     </Grid>
+
+                    {/* Cambio de contraseña */}
+<Grid item xs={12}>
+  <Divider sx={{ my: 1 }}>
+    <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+      Cambio de Contraseña (opcional)
+    </Typography>
+  </Divider>
+</Grid>
+
+<Grid item xs={12} sm={4}>
+  <TextField
+    label="Contraseña Actual"
+    type="password"
+    fullWidth
+    value={formData.passwordActual}
+    onChange={handleInputChange('passwordActual')}
+    disabled={!editMode}
+    size="small"
+    sx={{ mb: 2 }}
+  />
+</Grid>
+
+<Grid item xs={12} sm={4}>
+  <TextField
+    label="Nueva Contraseña"
+    type="password"
+    fullWidth
+    value={formData.passwordNuevo}
+    onChange={handleInputChange('passwordNuevo')}
+    disabled={!editMode}
+    size="small"
+    sx={{ mb: 2 }}
+  />
+</Grid>
+
+<Grid item xs={12} sm={4}>
+  <TextField
+    label="Confirmar Nueva Contraseña"
+    type="password"
+    fullWidth
+    value={formData.confirmarPassword}
+    onChange={handleInputChange('confirmarPassword')}
+    disabled={!editMode}
+    size="small"
+    sx={{ mb: 2 }}
+    error={formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== ''}
+    helperText={
+      formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== ''
+        ? 'Las contraseñas no coinciden'
+        : ''
+    }
+  />
+</Grid>
+
+<Grid item xs={12}>
+  <Divider sx={{ my: 1 }} />
+</Grid>
                     
                     <Grid item xs={12} sm={6}>
                       <TextField
@@ -903,6 +1079,18 @@ const handleDownloadCertificate = async () => {
                         sx={{ mb: 2 }}
                       />
                     </Grid>
+
+                    <Grid item xs={12} sm={6}>
+  <TextField
+    label="Patente Aduanal"
+    fullWidth
+    value={formData.patenteAduanal}
+    onChange={handleInputChange('patenteAduanal')}
+    disabled={!editMode}
+    size="small"
+    sx={{ mb: 2 }}
+  />
+</Grid>
                     
                     <Grid item xs={12} sm={6}>
                       <TextField
@@ -1014,17 +1202,16 @@ const handleDownloadCertificate = async () => {
                     </Grid>
                     
                     <Grid item xs={12}>
-                      <TextField
-                        label="Correo Electrónico Principal"
-                        fullWidth
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange('email')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
+  <TextField
+    label="Correo Electrónico Principal"
+    fullWidth
+    type="email"
+    value={user?.email || ''}
+    disabled
+    size="small"
+    sx={{ mb: 2 }}
+  />
+</Grid>
                     
                     <Grid item xs={12}>
                       <TextField
