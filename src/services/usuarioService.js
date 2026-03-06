@@ -322,6 +322,19 @@ async obtenerPerfilAgente(usuarioId) {
     }
   }
 
+
+  async cambiarPassword(id, passwordActual, passwordNuevo) {
+  try {
+    const response = await API.patch(`/usuarios/${id}/cambiar-password`, null, {
+      params: { passwordActual, passwordNuevo }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error en cambiarPassword:', error);
+    throw error.response?.data || { error: 'Error al cambiar la contraseña' };
+  }
+}
+
 }
 
 

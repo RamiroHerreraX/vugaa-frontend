@@ -37,9 +37,9 @@ const RUTAS_PERFIL = {
   admin: '/admin/profile',
   comite: '/committee/profile',
   asociacion: '/association/profile',
-  agente: '/dashboard/profile',
-  profesionista: '/dashboard/profile',
-  empresario: '/dashboard/profile'
+  agente: '/dashboard/perfil',
+  profesionista: '/dashboard/perfil',
+  empresario: '/dashboard/perfil'
 };
 
 // Iconos por rol

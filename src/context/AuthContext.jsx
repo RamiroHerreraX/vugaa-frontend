@@ -55,6 +55,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  const updateUser = (campos) => {
+  const updatedUser = { ...user, ...campos };
+  setUser(updatedUser);
+  localStorage.setItem('user', JSON.stringify(updatedUser));
+};
+
   useEffect(() => {
     loadUser();
   }, [loadUser]);
@@ -92,6 +98,7 @@ export const AuthProvider = ({ children }) => {
 
           // NUEVO CAMPO
           perfilCompleto: response.data.perfilCompleto ?? false
+          
         };
 
         const expiration = Date.now() + (response.data.expiresIn || 86400000);
@@ -207,7 +214,9 @@ export const AuthProvider = ({ children }) => {
       tokenExpiration,
 
       // 🔵 LOGICA DE PERFIL
-      perfilIncompleto: user ? !user.perfilCompleto : false
+      perfilIncompleto: user ? !user.perfilCompleto : false,
+      updateUser
+      
     }}>
       {children}
     </AuthContext.Provider>

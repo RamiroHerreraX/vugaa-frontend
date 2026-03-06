@@ -29,7 +29,8 @@ import {
   Tabs,
   Tab,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  LinearProgress, Alert, Snackbar, Fade, Collapse
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -54,7 +55,11 @@ import {
   ContactPhone as ContactPhoneIcon,
   Download as DownloadIcon,
   PictureAsPdf as PdfIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  CheckCircle as CheckCircleIcon,
+  ArrowForward as ArrowForwardIcon, ArrowBack as ArrowBackIcon,
+  Lock as LockIcon, Person as PersonIcon, Home as HomeIcon,
+   VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 
 // Paleta corporativa del UserManagement
@@ -95,7 +100,38 @@ const Profile = () => {
   const [certificadoDialog, setCertificadoDialog] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+  // Nuevos estados
+const [activeStep, setActiveStep]         = useState(0);
+const [showSuggestion, setShowSuggestion] = useState(false);
+const [saving, setSaving]                 = useState(false);
+const [showPass, setShowPass]             = useState({ actual: false, nuevo: false, confirmar: false });
+const [snackbar, setSnackbar]             = useState({ open: false, message: '', severity: 'success' });
+
+// Constantes fuera del componente (antes del const Profile = ...)
+const STEPS = [
+  { id: 0, label: 'Datos Personales', icon: <PersonIcon />,  fields: ['nombre','curp','rfc','patenteAduanal','fechaNacimiento','lugarNacimiento','nacionalidad','estadoCivil'] },
+  { id: 1, label: 'Contacto',         icon: <PhoneIcon />,   fields: ['telefono','telefonoAlternativo','emailAlternativo'] },
+  { id: 2, label: 'Domicilios',       icon: <HomeIcon />,    fields: ['domicilioFiscal','domicilioParticular'] },
+  { id: 3, label: 'Seguridad',        icon: <LockIcon />,    fields: ['passwordActual','passwordNuevo','confirmarPassword'] },
+];
+
+const getStepCompletion = (step, formData) => {
+  if (step.id === 3) return null;
+  const relevant = step.fields.filter(f => !['passwordActual','passwordNuevo','confirmarPassword'].includes(f));
+  const filled = relevant.filter(f => formData[f] && formData[f].toString().trim() !== '');
+  return Math.round((filled.length / relevant.length) * 100);
+};
+
+const fieldSx = {
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 2,
+    '&:hover fieldset': { borderColor: colors.primary.light },
+    '&.Mui-focused fieldset': { borderColor: colors.primary.main },
+    '&.Mui-disabled': { bgcolor: `${colors.primary.main}04` }
+  },
+  '& .MuiInputLabel-root.Mui-focused': { color: colors.primary.main }
+};
 
  
 
@@ -227,18 +263,18 @@ useEffect(() => {
 const handleSave = async () => {
   // Validar contraseña si se quiere cambiar
   if (formData.passwordNuevo) {
-    if (formData.passwordNuevo !== formData.confirmarPassword) {
-      console.error('Las contraseñas no coinciden');
-      return;
-    }
     if (!formData.passwordActual) {
       console.error('Debes ingresar tu contraseña actual');
+      return;
+    }
+    if (formData.passwordNuevo !== formData.confirmarPassword) {
+      console.error('Las contraseñas no coinciden');
       return;
     }
   }
 
   try {
-    // Actualizar perfil_agente + expediente + perfilCompleto
+    // 1. Actualizar perfil_agente + expediente + perfilCompleto
     await usuarioService.completarPerfil(
       user.id,
       user.instanciaId,
@@ -258,7 +294,7 @@ const handleSave = async () => {
       }
     );
 
-    // Actualizar nombre y contraseña en usuarios
+    // 2. Actualizar nombre en usuarios
     await usuarioService.update(user.id, {
       id:               user.id,
       nombre:           formData.nombre,
@@ -266,18 +302,24 @@ const handleSave = async () => {
       activo:           true,
       bloqueado:        false,
       intentosFallidos: 0,
-      ...(formData.passwordNuevo && { password: formData.passwordNuevo }),
     });
 
-    // Actualizar localStorage
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-    localStorage.setItem('user', JSON.stringify({
-      ...storedUser,
-      nombre:         formData.nombre,
-      perfilCompleto: true,
-    }));
+    // 3. Cambiar contraseña si se proporcionó
+    if (formData.passwordNuevo) {
+      await usuarioService.cambiarPassword(
+        user.id,
+        formData.passwordActual,
+        formData.passwordNuevo
+      );
+    }
 
-    // Limpiar campos de contraseña
+    // 4. Actualizar localStorage
+   updateUser({ 
+  nombre: formData.nombre, 
+  perfilCompleto: true 
+});
+
+    // 5. Limpiar campos de contraseña
     setFormData(prev => ({
       ...prev,
       passwordActual:    '',
@@ -847,508 +889,370 @@ const handleDownloadCertificate = async () => {
 </Grid>
 
       {/* ===== DATOS GENERALES ===== */}
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          {/* Header con Tabs */}
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            mb: 3,
-            pb: 2,
-            borderBottom: `2px solid ${colors.primary.dark}`
-          }}>
-            <Box sx={{ width: '100%' }}>
-              <Typography variant="h5" sx={{ 
-                color: colors.primary.dark, 
-                fontWeight: 'bold',
-                mb: 2
+     {/* ===== INFORMACIÓN DEL AGENTE ADUANAL - WIZARD ===== */}
+<Card sx={{
+  borderRadius: 3,
+  boxShadow: `0 4px 24px ${colors.primary.main}12`,
+  border: `1px solid ${colors.primary.main}15`,
+  mb: 4
+}}>
+  <CardContent sx={{ p: 0 }}>
+
+    {/* Cabecera con gradiente */}
+    <Box sx={{
+      p: 3,
+      background: `linear-gradient(135deg, ${colors.primary.dark} 0%, ${colors.primary.main} 100%)`,
+      borderRadius: '12px 12px 0 0',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+    }}>
+      <Box>
+        <Typography variant="h6" fontWeight={700} sx={{ color: 'white' }}>
+          📋 Información del Agente Aduanal
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+          Completa cada sección para tener un perfil completo
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        {!editMode ? (
+          <Button startIcon={<EditIcon />} onClick={() => setEditMode(true)}
+            sx={{
+              color: 'white', border: '1px solid rgba(255,255,255,0.4)',
+              borderRadius: 2, textTransform: 'none', fontWeight: 600, px: 2,
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', borderColor: 'white' }
+            }}>
+            Modificar
+          </Button>
+        ) : (
+          <>
+            <Button onClick={() => { setEditMode(false); setShowSuggestion(false); }}
+              sx={{
+                color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 2, textTransform: 'none',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
               }}>
-                📋 Información del Agente Aduanal
-              </Typography>
-              
-              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={activeTab} onChange={handleTabChange} sx={{ minHeight: 36 }}>
-                  <Tab 
-                    label="Datos Personales" 
-                    icon={<ContactPhoneIcon sx={{ fontSize: 18 }} />}
-                    iconPosition="start"
-                    sx={{ 
-                      fontSize: '0.85rem', 
-                      minHeight: 40,
-                      color: colors.text.secondary,
-                      '&.Mui-selected': {
-                        color: colors.primary.main
-                      }
-                    }}
-                  />
-                  <Tab 
-                    label="Información de Contacto" 
-                    icon={<EmailIcon sx={{ fontSize: 18 }} />}
-                    iconPosition="start"
-                    sx={{ 
-                      fontSize: '0.85rem', 
-                      minHeight: 40,
-                      color: colors.text.secondary,
-                      '&.Mui-selected': {
-                        color: colors.primary.main
-                      }
-                    }}
-                  />
-                  <Tab 
-                    label="Información Fiscal" 
-                    icon={<AccountBalanceIcon sx={{ fontSize: 18 }} />}
-                    iconPosition="start"
-                    sx={{ 
-                      fontSize: '0.85rem', 
-                      minHeight: 40,
-                      color: colors.text.secondary,
-                      '&.Mui-selected': {
-                        color: colors.primary.main
-                      }
-                    }}
-                  />
-                </Tabs>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving} startIcon={saving ? null : <SaveIcon />}
+              sx={{
+                bgcolor: colors.secondary.main, color: 'white',
+                borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 2.5,
+                '&:hover': { bgcolor: colors.secondary.light },
+                '&:disabled': { bgcolor: `${colors.secondary.main}60`, color: 'white' }
+              }}>
+              {saving ? 'Guardando...' : 'Guardar Todo'}
+            </Button>
+          </>
+        )}
+      </Box>
+    </Box>
+
+    {/* Tabs de pasos */}
+    <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${colors.primary.main}08`, bgcolor: '#F7FAFC' }}>
+      <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
+        {STEPS.map((step, idx) => {
+          const pct = step.id !== 3 ? getStepCompletion(step, formData) : null;
+          const isActive = activeStep === idx;
+          const isDone = pct === 100;
+          return (
+            <Box key={step.id} onClick={() => setActiveStep(idx)}
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 1,
+                px: 2, py: 1.2, borderRadius: 2, cursor: 'pointer',
+                minWidth: 'fit-content', transition: 'all 0.2s',
+                bgcolor: isActive ? colors.primary.main
+                  : isDone ? `${colors.secondary.main}12` : 'white',
+                border: `1.5px solid ${isActive ? colors.primary.main
+                  : isDone ? colors.secondary.main : colors.primary.main + '20'}`,
+                '&:hover': { bgcolor: isActive ? colors.primary.main : `${colors.primary.main}08` }
+              }}>
+              <Box sx={{
+                width: 28, height: 28, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                bgcolor: isActive ? 'rgba(255,255,255,0.2)'
+                  : isDone ? colors.secondary.main : `${colors.primary.main}12`,
+                color: isActive ? 'white' : isDone ? 'white' : colors.primary.main,
+              }}>
+                {isDone && !isActive
+                  ? <CheckCircleIcon sx={{ fontSize: '0.9rem' }} />
+                  : React.cloneElement(step.icon, { sx: { fontSize: '0.9rem' } })}
+              </Box>
+              <Box>
+                <Typography variant="caption" fontWeight={700} sx={{
+                  color: isActive ? 'white' : isDone ? colors.secondary.main : colors.primary.dark,
+                  display: 'block', lineHeight: 1.2
+                }}>
+                  {step.label}
+                </Typography>
+                {pct !== null && (
+                  <Typography variant="caption" sx={{
+                    color: isActive ? 'rgba(255,255,255,0.7)' : '#8FA3B8',
+                    fontSize: '0.65rem'
+                  }}>
+                    {pct}% completo
+                  </Typography>
+                )}
               </Box>
             </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-              {!editMode ? (
-                <Button
-                  startIcon={<EditIcon />}
-                  variant="outlined"
-                  onClick={() => setEditMode(true)}
-                  sx={{ 
-                    fontWeight: '600',
-                    textTransform: 'none',
-                    fontSize: '0.85rem',
-                    color: colors.primary.main,
-                    borderColor: colors.primary.main
-                  }}
-                >
-                  MODIFICAR
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={() => setEditMode(false)} 
-                    variant="outlined"
-                    sx={{ 
-                      fontWeight: '600', 
-                      textTransform: 'none', 
-                      fontSize: '0.85rem',
-                      color: colors.primary.main,
-                      borderColor: colors.primary.main
+          );
+        })}
+      </Box>
+    </Box>
+
+    {/* Contenido del paso */}
+    <Box sx={{ p: 3 }}>
+
+      {/* Sugerencia de continuar */}
+      <Collapse in={showSuggestion && editMode && activeStep < STEPS.length - 1}>
+        <Alert severity="info"
+          action={
+            <Button size="small" endIcon={<ArrowForwardIcon />}
+              onClick={() => { setActiveStep(s => s + 1); setShowSuggestion(false); }}
+              sx={{ fontWeight: 700, textTransform: 'none' }}>
+              Continuar con {STEPS[activeStep + 1]?.label}
+            </Button>
+          }
+          onClose={() => setShowSuggestion(false)}
+          sx={{
+            mb: 3, borderRadius: 2,
+            bgcolor: `${colors.secondary.main}10`,
+            border: `1px solid ${colors.secondary.main}30`,
+            color: colors.primary.dark
+          }}>
+          ¡Sección lista! ¿Quieres continuar con <strong>{STEPS[activeStep + 1]?.label}</strong>?
+        </Alert>
+      </Collapse>
+
+      {/* PASO 0 - Datos Personales */}
+      {activeStep === 0 && (
+        <Fade in key="step0">
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>🪪 Identidad</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField label="Nombre Completo" fullWidth size="small" value={formData.nombre}
+                      onChange={handleInputChange('nombre')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="CURP" fullWidth size="small" value={formData.curp}
+                      onChange={handleInputChange('curp')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="RFC" fullWidth size="small" value={formData.rfc}
+                      onChange={handleInputChange('rfc')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Patente Aduanal" fullWidth size="small" value={formData.patenteAduanal}
+                      onChange={handleInputChange('patenteAduanal')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Fecha de Nacimiento" type="date" fullWidth size="small"
+                      value={formData.fechaNacimiento} onChange={handleInputChange('fechaNacimiento')}
+                      disabled={!editMode} InputLabelProps={{ shrink: true }} sx={fieldSx} />
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>📝 Datos Adicionales</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Lugar de Nacimiento" fullWidth size="small" value={formData.lugarNacimiento}
+                      onChange={handleInputChange('lugarNacimiento')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Nacionalidad" fullWidth size="small" value={formData.nacionalidad}
+                      onChange={handleInputChange('nacionalidad')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField select label="Estado Civil" fullWidth size="small"
+                      value={formData.estadoCivil} onChange={handleInputChange('estadoCivil')}
+                      disabled={!editMode} sx={fieldSx}>
+                      {['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Unión Libre'].map(v => (
+                        <MenuItem key={v} value={v}>{v}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Fade>
+      )}
+
+      {/* PASO 1 - Contacto */}
+      {activeStep === 1 && (
+        <Fade in key="step1">
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>📱 Teléfonos</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField label="Teléfono Principal" fullWidth size="small" value={formData.telefono}
+                      onChange={handleInputChange('telefono')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField label="Teléfono Alternativo" fullWidth size="small" value={formData.telefonoAlternativo}
+                      onChange={handleInputChange('telefonoAlternativo')} disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>✉️ Correos Electrónicos</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField label="Correo Principal (no editable)" fullWidth size="small"
+                      value={user?.email || ''} disabled sx={fieldSx} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField label="Correo Alternativo" type="email" fullWidth size="small"
+                      value={formData.emailAlternativo} onChange={handleInputChange('emailAlternativo')}
+                      disabled={!editMode} sx={fieldSx} />
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Fade>
+      )}
+
+      {/* PASO 2 - Domicilios */}
+      {activeStep === 2 && (
+        <Fade in key="step2">
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>🏢 Domicilio Fiscal</Typography>
+                <TextField label="Dirección Fiscal Oficial" fullWidth size="small"
+                  value={formData.domicilioFiscal} onChange={handleInputChange('domicilioFiscal')}
+                  disabled={!editMode} multiline rows={4} sx={fieldSx} />
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>🏠 Domicilio Particular</Typography>
+                <TextField label="Dirección Particular" fullWidth size="small"
+                  value={formData.domicilioParticular} onChange={handleInputChange('domicilioParticular')}
+                  disabled={!editMode} multiline rows={4} sx={fieldSx} />
+              </Paper>
+            </Grid>
+          </Grid>
+        </Fade>
+      )}
+
+      {/* PASO 3 - Seguridad */}
+      {activeStep === 3 && (
+        <Fade in key="step3">
+          <Grid container spacing={3} justifyContent="center">
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 0.5 }}>🔒 Cambio de Contraseña</Typography>
+                <Typography variant="caption" sx={{ color: '#8FA3B8', display: 'block', mb: 2 }}>
+                  Opcional — solo rellena si deseas cambiarla
+                </Typography>
+                <Stack spacing={2}>
+                  <TextField label="Contraseña Actual" fullWidth size="small"
+                    type={showPass.actual ? 'text' : 'password'}
+                    value={formData.passwordActual} onChange={handleInputChange('passwordActual')}
+                    disabled={!editMode}
+                    InputProps={{
+                      endAdornment: (
+                        <IconButton size="small" onClick={() => setShowPass(p => ({ ...p, actual: !p.actual }))} edge="end">
+                          {showPass.actual ? <VisibilityOffIcon sx={{ fontSize: '1rem' }} /> : <VisibilityIcon sx={{ fontSize: '1rem' }} />}
+                        </IconButton>
+                      )
                     }}
-                  >
-                    CANCELAR
-                  </Button>
-                  <Button 
-                    onClick={handleSave} 
-                    variant="contained" 
-                    startIcon={<SaveIcon />}
-                    sx={{ 
-                      fontWeight: '600', 
-                      textTransform: 'none', 
-                      fontSize: '0.85rem',
-                      bgcolor: colors.status.success,
-                      '&:hover': { bgcolor: colors.primary.dark }
+                    sx={fieldSx} />
+                  <TextField label="Nueva Contraseña" fullWidth size="small"
+                    type={showPass.nuevo ? 'text' : 'password'}
+                    value={formData.passwordNuevo} onChange={handleInputChange('passwordNuevo')}
+                    disabled={!editMode}
+                    InputProps={{
+                      endAdornment: (
+                        <IconButton size="small" onClick={() => setShowPass(p => ({ ...p, nuevo: !p.nuevo }))} edge="end">
+                          {showPass.nuevo ? <VisibilityOffIcon sx={{ fontSize: '1rem' }} /> : <VisibilityIcon sx={{ fontSize: '1rem' }} />}
+                        </IconButton>
+                      )
                     }}
-                  >
-                    GUARDAR
-                  </Button>
-                </>
-              )}
-            </Box>
-          </Box>
-
-          {/* Contenido de Tabs */}
-          {activeTab === 0 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Paper elevation={0} sx={{ 
-                  p: 3, 
-                  border: `1px solid ${colors.primary.main}20`,
-                  borderRadius: 2,
-                  bgcolor: '#f8f9fa',
-                  height: '100%'
-                }}>
-                  <Typography variant="h6" sx={{ 
-                    mb: 2, 
-                    color: colors.text.primary, 
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}>
-                    <ContactPhoneIcon sx={{ color: colors.primary.main }} />
-                    Datos Personales
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Nombre Completo"
-                        fullWidth
-                        value={formData.nombre}
-                        onChange={handleInputChange('nombre')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="CURP"
-                        fullWidth
-                        value={formData.curp}
-                        onChange={handleInputChange('curp')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-
-                    {/* Cambio de contraseña */}
-<Grid item xs={12}>
-  <Divider sx={{ my: 1 }}>
-    <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-      Cambio de Contraseña (opcional)
-    </Typography>
-  </Divider>
-</Grid>
-
-<Grid item xs={12} sm={4}>
-  <TextField
-    label="Contraseña Actual"
-    type="password"
-    fullWidth
-    value={formData.passwordActual}
-    onChange={handleInputChange('passwordActual')}
-    disabled={!editMode}
-    size="small"
-    sx={{ mb: 2 }}
-  />
-</Grid>
-
-<Grid item xs={12} sm={4}>
-  <TextField
-    label="Nueva Contraseña"
-    type="password"
-    fullWidth
-    value={formData.passwordNuevo}
-    onChange={handleInputChange('passwordNuevo')}
-    disabled={!editMode}
-    size="small"
-    sx={{ mb: 2 }}
-  />
-</Grid>
-
-<Grid item xs={12} sm={4}>
-  <TextField
-    label="Confirmar Nueva Contraseña"
-    type="password"
-    fullWidth
-    value={formData.confirmarPassword}
-    onChange={handleInputChange('confirmarPassword')}
-    disabled={!editMode}
-    size="small"
-    sx={{ mb: 2 }}
-    error={formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== ''}
-    helperText={
-      formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== ''
-        ? 'Las contraseñas no coinciden'
-        : ''
-    }
-  />
-</Grid>
-
-<Grid item xs={12}>
-  <Divider sx={{ my: 1 }} />
-</Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="RFC"
-                        fullWidth
-                        value={formData.rfc}
-                        onChange={handleInputChange('rfc')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} sm={6}>
-  <TextField
-    label="Patente Aduanal"
-    fullWidth
-    value={formData.patenteAduanal}
-    onChange={handleInputChange('patenteAduanal')}
-    disabled={!editMode}
-    size="small"
-    sx={{ mb: 2 }}
-  />
-</Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Fecha de Nacimiento"
-                        type="date"
-                        fullWidth
-                        value={formData.fechaNacimiento}
-                        onChange={handleInputChange('fechaNacimiento')}
-                        disabled={!editMode}
-                        size="small"
-                        InputLabelProps={{ shrink: true }}
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Lugar de Nacimiento"
-                        fullWidth
-                        value={formData.lugarNacimiento}
-                        onChange={handleInputChange('lugarNacimiento')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Nacionalidad"
-                        fullWidth
-                        value={formData.nacionalidad}
-                        onChange={handleInputChange('nacionalidad')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Estado Civil"
-                        select
-                        fullWidth
-                        value={formData.estadoCivil}
-                        onChange={handleInputChange('estadoCivil')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      >
-                        <MenuItem value="Soltero">Soltero</MenuItem>
-                        <MenuItem value="Casado">Casado</MenuItem>
-                        <MenuItem value="Divorciado">Divorciado</MenuItem>
-                        <MenuItem value="Viudo">Viudo</MenuItem>
-                        <MenuItem value="Unión Libre">Unión Libre</MenuItem>
-                      </TextField>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>
+                    sx={fieldSx} />
+                  <TextField label="Confirmar Nueva Contraseña" fullWidth size="small"
+                    type={showPass.confirmar ? 'text' : 'password'}
+                    value={formData.confirmarPassword} onChange={handleInputChange('confirmarPassword')}
+                    disabled={!editMode}
+                    error={formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== ''}
+                    helperText={formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== '' ? 'Las contraseñas no coinciden' : ''}
+                    InputProps={{
+                      endAdornment: (
+                        <IconButton size="small" onClick={() => setShowPass(p => ({ ...p, confirmar: !p.confirmar }))} edge="end">
+                          {showPass.confirmar ? <VisibilityOffIcon sx={{ fontSize: '1rem' }} /> : <VisibilityIcon sx={{ fontSize: '1rem' }} />}
+                        </IconButton>
+                      )
+                    }}
+                    sx={fieldSx} />
+                  {formData.passwordNuevo && formData.passwordNuevo === formData.confirmarPassword && (
+                    <Alert severity="success" sx={{ borderRadius: 2 }}>✅ Las contraseñas coinciden</Alert>
+                  )}
+                </Stack>
+              </Paper>
             </Grid>
-          )}
+          </Grid>
+        </Fade>
+      )}
 
-          {activeTab === 1 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Paper elevation={0} sx={{ 
-                  p: 3, 
-                  border: `1px solid ${colors.primary.main}20`,
-                  borderRadius: 2,
-                  bgcolor: '#f8f9fa',
-                  height: '100%'
-                }}>
-                  <Typography variant="h6" sx={{ 
-                    mb: 2, 
-                    color: colors.text.primary, 
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}>
-                    <PhoneIcon sx={{ color: colors.primary.main }} />
-                    Contacto Principal
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Teléfono Principal"
-                        fullWidth
-                        value={formData.telefono}
-                        onChange={handleInputChange('telefono')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        label="Teléfono Alternativo"
-                        fullWidth
-                        value={formData.telefonoAlternativo}
-                        onChange={handleInputChange('telefonoAlternativo')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-  <TextField
-    label="Correo Electrónico Principal"
-    fullWidth
-    type="email"
-    value={user?.email || ''}
-    disabled
-    size="small"
-    sx={{ mb: 2 }}
-  />
-</Grid>
-                    
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Correo Electrónico Alternativo"
-                        fullWidth
-                        type="email"
-                        value={formData.emailAlternativo}
-                        onChange={handleInputChange('emailAlternativo')}
-                        disabled={!editMode}
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>
+      {/* Navegación entre pasos */}
+      <Box sx={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        mt: 4, pt: 3, borderTop: `1px solid ${colors.primary.main}10`
+      }}>
+        <Button startIcon={<ArrowBackIcon />}
+          onClick={() => setActiveStep(s => Math.max(0, s - 1))}
+          disabled={activeStep === 0}
+          sx={{ color: colors.primary.main, textTransform: 'none', fontWeight: 600, '&:disabled': { color: '#8FA3B8' } }}>
+          Anterior
+        </Button>
 
-              <Grid item xs={12} md={6}>
-                <Paper elevation={0} sx={{ 
-                  p: 3, 
-                  border: `1px solid ${colors.primary.main}20`,
-                  borderRadius: 2,
-                  bgcolor: '#f8f9fa',
-                  height: '100%'
-                }}>
-                  <Typography variant="h6" sx={{ 
-                    mb: 2, 
-                    color: colors.text.primary, 
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}>
-                    <LocationIcon sx={{ color: colors.primary.main }} />
-                    Ubicación y Acceso
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Último Acceso"
-                        fullWidth
-                        value={profile.ultimoAcceso}
-                        disabled
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Miembro Desde"
-                        fullWidth
-                        value={profile.fechaRegistro}
-                        disabled
-                        size="small"
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-                      <Box sx={{ 
-                        p: 2,
-                        borderRadius: 1,
-                        bgcolor: `${colors.primary.main}10`,
-                        mt: 2
-                      }}>
-                        <Typography variant="subtitle2" fontWeight="bold" sx={{ color: colors.text.primary, mb: 0.5 }}>
-                          Estado de la Cuenta
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: colors.text.primary }}>
-                          Activa • Última actualización: Hoy
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
+        {/* Puntos indicadores */}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {STEPS.map((_, idx) => (
+            <Box key={idx} onClick={() => setActiveStep(idx)} sx={{
+              width: activeStep === idx ? 24 : 8, height: 8,
+              borderRadius: 4, cursor: 'pointer', transition: 'all 0.3s',
+              bgcolor: activeStep === idx ? colors.primary.main : `${colors.primary.main}25`,
+            }} />
+          ))}
+        </Box>
 
-          {activeTab === 2 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Paper elevation={0} sx={{ 
-                  p: 3, 
-                  border: `1px solid ${colors.primary.main}20`,
-                  borderRadius: 2,
-                  bgcolor: '#f8f9fa'
-                }}>
-                  <Typography variant="h6" sx={{ 
-                    mb: 2, 
-                    color: colors.text.primary, 
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}>
-                    <AccountBalanceIcon sx={{ color: colors.primary.main }} />
-                    Información Fiscal
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Domicilio Fiscal (Oficial)"
-                        fullWidth
-                        value={formData.domicilioFiscal}
-                        onChange={handleInputChange('domicilioFiscal')}
-                        disabled={!editMode}
-                        size="small"
-                        multiline
-                        rows={3}
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Domicilio Particular"
-                        fullWidth
-                        value={formData.domicilioParticular}
-                        onChange={handleInputChange('domicilioParticular')}
-                        disabled={!editMode}
-                        size="small"
-                        multiline
-                        rows={3}
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
-        </CardContent>
-      </Card>
+        {activeStep < STEPS.length - 1 ? (
+          <Button endIcon={<ArrowForwardIcon />}
+            onClick={() => { setShowSuggestion(true); setActiveStep(s => s + 1); }}
+            sx={{
+              bgcolor: colors.primary.main, color: 'white',
+              borderRadius: 2, textTransform: 'none', fontWeight: 600, px: 2.5,
+              '&:hover': { bgcolor: colors.primary.dark }
+            }}>
+            Siguiente
+          </Button>
+        ) : (
+          <Button endIcon={<CheckCircleIcon />}
+            onClick={editMode ? handleSave : () => setEditMode(true)}
+            sx={{
+              bgcolor: colors.secondary.main, color: 'white',
+              borderRadius: 2, textTransform: 'none', fontWeight: 600, px: 2.5,
+              '&:hover': { bgcolor: colors.secondary.light }
+            }}>
+            {editMode ? 'Guardar Todo' : 'Editar'}
+          </Button>
+        )}
+      </Box>
+    </Box>
+  </CardContent>
+</Card>
 
       {/* Diálogo para agregar nueva aduana */}
       <Dialog open={aduanaDialog} onClose={() => setAduanaDialog(false)} maxWidth="sm" fullWidth>

@@ -1,5 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from "../../../context/AuthContext";
+import PerfilIncompletoModal from "../../../components/common/PerfilIncompletoModal";
+import { useEffect, useState } from "react";
 import {
   Grid,
   Paper,
@@ -23,6 +26,8 @@ import {
   Done as DoneIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
+
+
 
 // Paleta corporativa del UserManagement
 const colors = {
@@ -53,7 +58,16 @@ const colors = {
   }
 };
 
+
+
 const UserDashboard = () => {
+  const { perfilIncompleto } = useAuth();
+const [openPerfilModal, setOpenPerfilModal] = useState(false);
+useEffect(() => {
+  if (perfilIncompleto) {
+    setOpenPerfilModal(true);
+  }
+}, [perfilIncompleto]);
   // Datos mock para el dashboard - AHORA VACÍOS
   const stats = [
     { title: 'Certificaciones Vigentes', value: '0', color: colors.status.success, icon: <CheckCircleIcon /> },
@@ -66,7 +80,14 @@ const UserDashboard = () => {
 
   const recentCertifications = [];
 
+ 
   return (
+  <>
+  <PerfilIncompletoModal
+  open={openPerfilModal}
+  onClose={() => setOpenPerfilModal(false)}
+/>
+  
     <Box sx={{ maxWidth: '1300px', px: { xs: 2, sm: 3 } }}>
       {/* Header */}
        <Box sx={{ paddingLeft: 8 }}>
@@ -597,7 +618,8 @@ const UserDashboard = () => {
           </Grid>
         </Grid>
       </Box>
-    </Box>
+         </Box>
+    </>
   );
 };
 
