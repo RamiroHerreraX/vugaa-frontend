@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -25,6 +25,11 @@ import {
   Tabs,
   Tab,
   Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -37,27 +42,18 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   LocationOn as LocationIcon,
+  PersonRemove as PersonRemoveIcon,
 } from "@mui/icons-material";
+import { parseISO, differenceInYears } from "date-fns";
 
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import ImageIcon from "@mui/icons-material/Image";
-import DescriptionIcon from "@mui/icons-material/Description";
-import InsertDriveFileIcon  from "@mui/icons-material/InsertDriveFile";
-import { useNavigate } from "react-router-dom";
-
-import {
-  parseISO,
-  differenceInYears,
-} from "date-fns";
-
-// Importar componentes separados
+import asociacionService from "../../services/asociacion";
 import AssociateUserDialog from "../../components/asociados/AssociateUserDialog";
 import AddCertificationDialog from "../../components/asociados/AddCertificationDialog";
 import UserDetailsDialog from "../../components/asociados/UserDetailsDialog";
 import DocumentsDialog from "../../components/asociados/DocumentsDialog";
 import UploadDocumentsDialog from "../../components/asociados/UploadDocumentsDialog";
+import usuarioService from "../../services/usuarioService";
 
-// Colores institucionales
 const institutionalColors = {
   primary: "#133B6B",
   secondary: "#1a4c7a",
@@ -71,210 +67,65 @@ const institutionalColors = {
   warning: "#d97706",
   error: "#dc2626",
   info: "#1976d2",
-  level1: "#6b7280",
-  level2: "#4b5563",
-  level3: "#1f2937",
 };
 
-// Niveles de reconocimiento
-const recognitionLevels = [
-  {
-    value: 1,
-    label: "Nivel I",
-    color: institutionalColors.level1,
-    icon: "I",
-    minCertifications: 1,
-    maxCertifications: 3,
-  },
-  {
-    value: 2,
-    label: "Nivel II",
-    color: institutionalColors.level2,
-    icon: "II",
-    minCertifications: 4,
-    maxCertifications: 7,
-  },
-  {
-    value: 3,
-    label: "Nivel III",
-    color: institutionalColors.level3,
-    icon: "III",
-    minCertifications: 8,
-    maxCertifications: Infinity,
-  },
-];
+const getEstadoColor = (estado) => {
+  const colors = {
+    CON_PERMISO: institutionalColors.success,
+    SIN_PERMISO: institutionalColors.warning,
+  };
+  return colors[estado] || institutionalColors.textSecondary;
+};
 
-// Datos iniciales
-const initialUsers = [
-  {
-    id: 1,
-    name: "Luis Rodríguez Lopez",
-    email: "luis.rodriguez@empresa.com",
-    role: "agente",
-    roleName: "Agente Aduanal",
-    region: "Norte",
-    phone: "+52 55 1234 5678",
-    color: "#526F78",
-    avatar: "LR",
-    department: "Operaciones",
-    joinDate: "2023-01-15",
-    uploadPermission: "permitido",
-    associationCertifications: [
-      {
-        id: 1,
-        name: "Curso de ética profesional y código de conducta",
-        type: "etica_cumplimiento",
-        hoursValue: 20,
-        status: "active",
-        documents: [
-          {
-            id: 101,
-            name: "certificado_aduanal_basico.pdf",
-            url: "/assets/Curso de ética profesional y código de conducta.pdf",
-            type: "application/pdf",
-            size: 245760,
-            uploadDate: "2024-01-20T10:30:00",
-            uploadedBy: "admin@asociacion.com",
-          },
-        ],
-      },
-      {
-        id: 2,
-        name: "Diplomado en Comercio Exterior y Legislación Aduanera",
-        type: "actualizacion_aduanera",
-        hoursValue: 40,
-        status: "active",
-        documents: [
-          {
-            id: 102,
-            name: "Diplomado en Comercio Exterior y Legislación Aduanera.pdf",
-            url: "/assets/Diplomado en Comercio Exterior y Legislación Aduanera.pdf",
-            type: "application/pdf",
-            size: 245760,
-            uploadDate: "2024-01-20T10:30:00",
-            uploadedBy: "admin@asociacion.com",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "María González López",
-    email: "maria.gonzalez@comite.com",
-    role: "comite",
-    roleName: "Miembro del Comité",
-    region: "Centro",
-    phone: "+52 55 8765 4321",
-    color: "#1a237e",
-    avatar: "MG",
-    department: "Dirección",
-    joinDate: "2022-06-10",
-    uploadPermission: "no-permitido",
-    associationCertifications: [
-      {
-        id: 1,
-        name: "Certificación de Comité",
-        type: "administrativa",
-        hoursValue: 15,
-        status: "active",
-        documents: [],
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: "Carlos López Pérez",
-    email: "carlos.lopez@consultor.com",
-    role: "profesionista",
-    roleName: "Consultor Externo",
-    region: "Sur",
-    phone: "+52 55 9999 8888",
-    color: "#2e7d32",
-    avatar: "CL",
-    department: "Consultoría",
-    joinDate: "2024-01-20",
-    uploadPermission: "permitido",
+const getEstadoIcon = (estado) => {
+  if (estado === "CON_PERMISO") return <CheckCircleIcon fontSize="small" />;
+  if (estado === "SIN_PERMISO") return <CancelIcon fontSize="small" />;
+  return null;
+};
+
+const getEstadoTexto = (estado) => {
+  const textos = {
+    CON_PERMISO: "Con permiso",
+    SIN_PERMISO: "Sin permiso",
+  };
+  return textos[estado] || estado;
+};
+
+const mapApiUserToLocal = (apiUser) => {
+  const nombreCompleto = apiUser.nombre || "";
+  const initials = nombreCompleto
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+
+  return {
+    id: apiUser.id,
+    nombre: apiUser.nombre,
+    email: apiUser.email,
+    estado: apiUser.estado,
+    permisoAsociacion: apiUser.permisoAsociacion || false,
+    regionNombre: apiUser.regionNombre || "Sin región",
+    avatar: initials || "?",
+    // Mantenemos la estructura para certificaciones aunque venga vacía del backend
     associationCertifications: [],
-  },
-  {
-    id: 4,
-    name: "Ana Torres García",
-    email: "ana.torres@auditor.com",
-    role: "profesionista",
-    roleName: "Auditor",
-    region: "Metropolitana",
-    phone: "+52 55 7777 6666",
-    color: "#2e7d32",
-    avatar: "AT",
-    department: "Auditoría",
-    joinDate: "2021-11-05",
-    uploadPermission: "no-permitido",
-    associationCertifications: [
-      {
-        id: 1,
-        name: "Certificación de Auditor",
-        type: "legal",
-        hoursValue: 30,
-        status: "active",
-        documents: [
-          {
-            id: 102,
-            name: "certificado_auditor.pdf",
-            url: "/documentos/auditor.pdf",
-            type: "application/pdf",
-            size: 182400,
-            uploadDate: "2024-05-15T14:20:00",
-            uploadedBy: "admin@asociacion.com",
-          },
-          {
-            id: 103,
-            name: "constancia_vigencia.jpg",
-            url: "/documentos/constancia.jpg",
-            type: "image/jpeg",
-            size: 512000,
-            uploadDate: "2024-05-20T09:15:00",
-            uploadedBy: "admin@asociacion.com",
-          },
-        ],
-      },
-    ],
-  },
-];
+  };
+};
 
-// Usuarios disponibles para agregar a la asociación
-const availableUsers = [
-  {
-    id: 101,
-    name: "Juan Pérez Gómez",
-    email: "juan.perez@externo.com",
-    role: "profesionista",
-    roleName: "Consultor Externo",
-  },
-  {
-    id: 102,
-    name: "Ana Ruiz Sánchez",
-    email: "ana.ruiz@consultora.com",
-    role: "profesionista",
-    roleName: "Auditor Aduanal",
-  },
-  {
-    id: 103,
-    name: "Carlos Méndez Torres",
-    email: "carlos.mendez@empresa.com",
-    role: "empresario",
-    roleName: "Representante Comercial",
-  },
-  {
-    id: 104,
-    name: "Laura Castro Díaz",
-    email: "laura.castro@legal.com",
-    role: "profesionista",
-    roleName: "Asesor Legal",
-  },
-];
+const getIdUsuarioFromStorage = () => {
+  try {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return null;
+    return JSON.parse(userStr)?.id || null;
+  } catch (e) {
+    return null;
+  }
+};
 
 const UserManagement = () => {
+  const [idAsociacion, setIdAsociacion] = useState(null);
+  const [loadingAsociacion, setLoadingAsociacion] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState("todos");
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
@@ -291,155 +142,149 @@ const UserManagement = () => {
     severity: "success",
   });
   const [loading, setLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
-
   const rowsPerPage = 10;
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
 
-  // Estados para el formulario de nueva certificación
+  // Estado diálogo confirmación quitar usuario
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    user: null,
+  });
+  const [removingUser, setRemovingUser] = useState(false);
+
   const [newCertification, setNewCertification] = useState({
     name: "",
     type: "operativa",
     hoursValue: "",
   });
-
-  // Estados para subida de documentos en certificación
   const [certificationFiles, setCertificationFiles] = useState([]);
   const [certificationUploading, setCertificationUploading] = useState(false);
   const [certificationUploadProgress, setCertificationUploadProgress] = useState(0);
-
-  // Estados para subida de documentos adicionales
   const [uploadFiles, setUploadFiles] = useState([]);
 
-  // Tipos de certificaciones
+  // Mantenemos las definiciones necesarias para los diálogos
   const certificationTypes = [
-    {
-      value: "etica_cumplimiento",
-      label: "Formación ética y cumplimiento",
-      color: "#455a64",
-    },
-    {
-      value: "actualizacion_aduanera",
-      label: "Actualización técnica aduanera",
-      color: "#1565c0",
-    },
-    {
-      value: "operativa",
-      label: "Operativa",
-      color: institutionalColors.primary,
-    },
-    {
-      value: "fiscal",
-      label: "Fiscal",
-      color: institutionalColors.success,
-    },
-    {
-      value: "legal",
-      label: "Legal",
-      color: "#9c27b0",
-    },
-    {
-      value: "administrativa",
-      label: "Administrativa",
-      color: institutionalColors.warning,
-    },
-    {
-      value: "seguridad",
-      label: "Seguridad",
-      color: institutionalColors.error,
-    },
+    { value: "etica_cumplimiento", label: "Formación ética y cumplimiento", color: "#455a64" },
+    { value: "actualizacion_aduanera", label: "Actualización técnica aduanera", color: "#1565c0" },
+    { value: "operativa", label: "Operativa", color: institutionalColors.primary },
+    { value: "fiscal", label: "Fiscal", color: institutionalColors.success },
+    { value: "legal", label: "Legal", color: "#9c27b0" },
+    { value: "administrativa", label: "Administrativa", color: institutionalColors.warning },
+    { value: "seguridad", label: "Seguridad", color: institutionalColors.error },
   ];
 
-  // Calcular estadísticas para las tabs
+  const recognitionLevels = [
+    { value: 1, label: "Nivel I", color: "#6b7280", icon: "I", minCertifications: 1, maxCertifications: 3 },
+    { value: 2, label: "Nivel II", color: "#4b5563", icon: "II", minCertifications: 4, maxCertifications: 7 },
+    { value: 3, label: "Nivel III", color: "#1f2937", icon: "III", minCertifications: 8, maxCertifications: Infinity },
+  ];
+
+  const getRoleColorStatic = (role) => {
+    const colors = {
+      admin: institutionalColors.success,
+      comite: institutionalColors.primary,
+      agente: "#526F78",
+      profesionista: "#2e7d32",
+      empresario: "#ed6c02",
+    };
+    return colors[role] || institutionalColors.textSecondary;
+  };
+
+  // Funciones necesarias para los diálogos
+  const getRecognitionLevel = (user) => 1; // Valor por defecto
+  const getRecognitionLevelInfo = (level) => recognitionLevels[0];
+  const getMembershipDuration = () => "N/A";
+  const getFileIcon = (fileType) => null;
+  const formatFileSize = (bytes) => "0 Bytes";
+  const getRoleColor = (role) => getRoleColorStatic(role);
+  const getCertificationColor = (type) =>
+    certificationTypes.find((t) => t.value === type)?.color || institutionalColors.textSecondary;
+
+  // Obtener idAsociacion
+  useEffect(() => {
+    const cargarAsociacion = async () => {
+      setLoadingAsociacion(true);
+      try {
+        const idUsuario = getIdUsuarioFromStorage();
+        if (!idUsuario) {
+          setSnackbar({
+            open: true,
+            message: "No se encontró sesión activa. Por favor inicia sesión nuevamente.",
+            severity: "error",
+          });
+          return;
+        }
+        const asociacion = await asociacionService.findByUsuarioId(idUsuario);
+        setIdAsociacion(asociacion.idAsociacion);
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: "No se pudo obtener la asociación del usuario. Verifica tu sesión.",
+          severity: "error",
+        });
+      } finally {
+        setLoadingAsociacion(false);
+      }
+    };
+    cargarAsociacion();
+  }, []);
+
+  // Cargar usuarios
+  const cargarUsuarios = useCallback(async () => {
+    if (!idAsociacion) return;
+    setLoadingUsers(true);
+
+    try {
+      const data = await usuarioService.findUsuariosDeMiAsociacion(idAsociacion);
+      const usuariosMapeados = data.map(mapApiUserToLocal);
+      setUsers(usuariosMapeados);
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error?.error || "Error al cargar los usuarios de la asociación",
+        severity: "error",
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [idAsociacion]);
+
+  useEffect(() => {
+    cargarUsuarios();
+  }, [cargarUsuarios]);
+
+  // Estadísticas
   const stats = useMemo(() => {
     const total = users.length;
-    const withPermission = users.filter(
-      (u) => u.uploadPermission === "permitido",
-    ).length;
-    const withoutPermission = users.filter(
-      (u) => u.uploadPermission === "no-permitido",
-    ).length;
-
-    return {
-      total,
-      withPermission,
-      withoutPermission,
-    };
+    const conPermiso = users.filter((u) => u.estado === "CON_PERMISO").length;
+    const sinPermiso = users.filter((u) => u.estado === "SIN_PERMISO").length;
+    return { total, conPermiso, sinPermiso };
   }, [users]);
 
-  // Función para obtener el nivel de reconocimiento del usuario
-  const getRecognitionLevel = (user) => {
-    if (!user || !user.associationCertifications) return 1;
-    const certificationsCount = user.associationCertifications.length;
-    if (certificationsCount >= 8) return 3;
-    if (certificationsCount >= 4) return 2;
-    return 1;
-  };
-
-  // Función para obtener información del nivel de reconocimiento
-  const getRecognitionLevelInfo = (level) => {
-    return recognitionLevels.find((l) => l.value === level) || recognitionLevels[0];
-  };
-
-  // Función para calcular la antigüedad en la asociación
-  const getMembershipDuration = (joinDate) => {
-    if (!joinDate) return "N/A";
-    const join = parseISO(joinDate);
-    const now = new Date();
-    const years = differenceInYears(now, join);
-    const months = Math.floor((now - join) / (1000 * 60 * 60 * 24 * 30)) % 12;
-
-    if (years === 0) {
-      return `${months} ${months === 1 ? "mes" : "meses"}`;
-    }
-    return `${years} ${years === 1 ? "año" : "años"} ${months > 0 ? `y ${months} ${months === 1 ? "mes" : "meses"}` : ""}`;
-  };
-
-  // Función para obtener el ícono según el tipo de archivo
-  const getFileIcon = (fileType) => {
-    if (fileType.includes("pdf")) return <PictureAsPdfIcon sx={{ color: "#f44336" }} />;
-    if (fileType.includes("image")) return <ImageIcon sx={{ color: "#4caf50" }} />;
-    if (fileType.includes("word") || fileType.includes("document"))
-      return <DescriptionIcon sx={{ color: "#2196f3" }} />;
-    if (fileType.includes("excel") || fileType.includes("sheet"))
-      return <DescriptionIcon sx={{ color: "#4caf50" }} />;
-    return <InsertDriveFileIcon sx={{ color: "#757575" }} />;
-  };
-
-  // Función para formatear tamaño de archivo
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  // Función de filtrado
+  // Filtrar usuarios
   const filteredUsers = useMemo(() => {
-    let filtered = users;
+    let filtrados = users;
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (user) =>
-          user.name.toLowerCase().includes(term) ||
-          user.email.toLowerCase().includes(term) ||
-          user.roleName.toLowerCase().includes(term) ||
-          user.department.toLowerCase().includes(term) ||
-          user.region.toLowerCase().includes(term),
+      filtrados = filtrados.filter(
+        (u) =>
+          u.nombre?.toLowerCase().includes(term) ||
+          u.email?.toLowerCase().includes(term) ||
+          u.regionNombre?.toLowerCase().includes(term)
       );
     }
 
     if (selectedTab === "con-permisos") {
-      filtered = filtered.filter((user) => user.uploadPermission === "permitido");
+      filtrados = filtrados.filter((u) => u.estado === "CON_PERMISO");
     } else if (selectedTab === "sin-permisos") {
-      filtered = filtered.filter((user) => user.uploadPermission === "no-permitido");
+      filtrados = filtrados.filter((u) => u.estado === "SIN_PERMISO");
     }
 
-    filtered.sort((a, b) => a.name.localeCompare(b.name));
-    return filtered;
+    return [...filtrados].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
   }, [users, searchTerm, selectedTab]);
 
   // Paginación
@@ -449,79 +294,72 @@ const UserManagement = () => {
   }, [filteredUsers, page]);
 
   // Handlers
-  const handleAddExistingUser = () => {
-    setOpenAddUserDialog(true);
-  };
+  const handleAddExistingUser = () => setOpenAddUserDialog(true);
 
   const handleAddUserToAssociation = (user) => {
-    setLoading(true);
+    const nuevoUsuario = mapApiUserToLocal(user);
+    setUsers((prev) => {
+      if (prev.some((u) => u.id === nuevoUsuario.id)) return prev;
+      return [...prev, nuevoUsuario];
+    });
+    setOpenAddUserDialog(false);
+    setSnackbar({
+      open: true,
+      message: `Usuario ${nuevoUsuario.nombre} agregado a la asociación correctamente.`,
+      severity: "success",
+    });
+  };
+
+  const handleConfirmRemoveUser = (user) => {
+    setConfirmDialog({ open: true, user });
+  };
+
+  const handleRemoveUserFromAssociation = async () => {
+    const user = confirmDialog.user;
+    if (!user) return;
+
+    setRemovingUser(true);
     try {
-      setTimeout(() => {
-        const newAssociationUser = {
-          ...user,
-          region: "Norte",
-          joinDate: new Date().toISOString().split("T")[0],
-          uploadPermission: "no-permitido",
-          associationCertifications: [],
-          avatar: user.name
-            .split(" ")
-            .map((n) => n[0])
-            .join(""),
-          color: getRoleColor(user.role),
-          phone: "N/A",
-          department: "Nuevo",
-        };
-
-        setUsers((prev) => [...prev, newAssociationUser]);
-        setOpenAddUserDialog(false);
-
-        setSnackbar({
-          open: true,
-          message: `Usuario ${user.name} agregado a la asociación correctamente.`,
-          severity: "success",
-        });
-        setLoading(false);
-      }, 500);
+      await usuarioService.quitarAsociacionUsuario(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setSnackbar({
+        open: true,
+        message: `${user.nombre} fue removido de la asociación correctamente.`,
+        severity: "success",
+      });
     } catch (error) {
       setSnackbar({
         open: true,
-        message: "Error al agregar el usuario",
+        message: error?.error || "Error al quitar el usuario de la asociación.",
         severity: "error",
       });
-      setLoading(false);
+    } finally {
+      setRemovingUser(false);
+      setConfirmDialog({ open: false, user: null });
     }
   };
 
   const handleAddCertification = (userId) => {
     const user = users.find((u) => u.id === userId);
-
-    if (user.uploadPermission !== "permitido") {
+    if (user.estado !== "CON_PERMISO") {
       setSnackbar({
         open: true,
-        message: "No puedes subir certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
+        message: "No puedes subir certificaciones. Este usuario no tiene permiso.",
         severity: "warning",
       });
       return;
     }
-
     setSelectedUser(user);
-    setNewCertification({
-      name: "",
-      type: "operativa",
-      hoursValue: "",
-    });
+    setNewCertification({ name: "", type: "operativa", hoursValue: "" });
     setCertificationFiles([]);
     setOpenCertificationDialog(true);
   };
 
-  const handleCertificationFileSelect = (event) => {
-    const files = Array.from(event.target.files);
-    setCertificationFiles((prev) => [...prev, ...files]);
-  };
+  const handleCertificationFileSelect = (e) =>
+    setCertificationFiles((p) => [...p, ...Array.from(e.target.files)]);
 
-  const handleRemoveCertificationFile = (index) => {
-    setCertificationFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+  const handleRemoveCertificationFile = (i) =>
+    setCertificationFiles((p) => p.filter((_, idx) => idx !== i));
 
   const handleSaveCertification = async () => {
     if (!newCertification.name) {
@@ -532,32 +370,19 @@ const UserManagement = () => {
       });
       return;
     }
-
-    if (!selectedUser || selectedUser.uploadPermission !== "permitido") {
-      setSnackbar({
-        open: true,
-        message: "No tienes permiso para subir certificaciones para este usuario",
-        severity: "error",
-      });
-      return;
-    }
-
+    
     setLoading(true);
-
     try {
+      // Simulamos la subida de archivos
       let documents = [];
-
       if (certificationFiles.length > 0) {
         setCertificationUploading(true);
-        setCertificationUploadProgress(0);
-
         for (let i = 0; i <= 100; i += 10) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise((r) => setTimeout(r, 100));
           setCertificationUploadProgress(i);
         }
-
-        documents = certificationFiles.map((file, index) => ({
-          id: Date.now() + index,
+        documents = certificationFiles.map((file, idx) => ({
+          id: Date.now() + idx,
           name: file.name,
           url: URL.createObjectURL(file),
           type: file.type,
@@ -565,7 +390,6 @@ const UserManagement = () => {
           uploadDate: new Date().toISOString(),
           uploadedBy: "admin@asociacion.com",
         }));
-
         setCertificationUploading(false);
       }
 
@@ -574,34 +398,30 @@ const UserManagement = () => {
         ...newCertification,
         hoursValue: newCertification.hoursValue ? parseInt(newCertification.hoursValue) : 0,
         status: "active",
-        documents: documents,
+        documents,
       };
 
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === selectedUser.id
+        prev.map((u) =>
+          u.id === selectedUser.id
             ? {
-                ...user,
-                associationCertifications: [
-                  ...(user.associationCertifications || []),
-                  certification,
-                ],
+                ...u,
+                associationCertifications: [...(u.associationCertifications || []), certification],
               }
-            : user,
-        ),
+            : u
+        )
       );
 
       setOpenCertificationDialog(false);
       setCertificationFiles([]);
-
       setSnackbar({
         open: true,
         message: documents.length > 0
-          ? `Certificación agregada correctamente con ${documents.length} documento(s)`
+          ? `Certificación agregada con ${documents.length} documento(s)`
           : "Certificación agregada correctamente",
         severity: "success",
       });
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Error al guardar la certificación",
@@ -614,15 +434,14 @@ const UserManagement = () => {
   };
 
   const handleEditCertification = (user, certification) => {
-    if (user.uploadPermission !== "permitido") {
+    if (user.estado !== "CON_PERMISO") {
       setSnackbar({
         open: true,
-        message: "No puedes editar certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
+        message: "No puedes editar certificaciones. Este usuario no tiene permiso.",
         severity: "warning",
       });
       return;
     }
-
     setSelectedUser(user);
     setSelectedCertification(certification);
     setNewCertification({
@@ -636,11 +455,10 @@ const UserManagement = () => {
 
   const handleDeleteCertification = async (userId, certificationId) => {
     const user = users.find((u) => u.id === userId);
-
-    if (user.uploadPermission !== "permitido") {
+    if (user.estado !== "CON_PERMISO") {
       setSnackbar({
         open: true,
-        message: "No puedes eliminar certificaciones. Este usuario no ha dado permiso de subida desde su dispositivo.",
+        message: "No puedes eliminar certificaciones. Este usuario no tiene permiso.",
         severity: "warning",
       });
       return;
@@ -648,27 +466,25 @@ const UserManagement = () => {
 
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
+      await new Promise((r) => setTimeout(r, 500));
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === userId
+        prev.map((u) =>
+          u.id === userId
             ? {
-                ...user,
-                associationCertifications: user.associationCertifications.filter(
-                  (c) => c.id !== certificationId,
+                ...u,
+                associationCertifications: u.associationCertifications.filter(
+                  (c) => c.id !== certificationId
                 ),
               }
-            : user,
-        ),
+            : u
+        )
       );
-
       setSnackbar({
         open: true,
         message: "Certificación eliminada correctamente",
         severity: "success",
       });
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Error al eliminar la certificación",
@@ -680,15 +496,14 @@ const UserManagement = () => {
   };
 
   const handleUploadDocuments = (user, certification) => {
-    if (user.uploadPermission !== "permitido") {
+    if (user.estado !== "CON_PERMISO") {
       setSnackbar({
         open: true,
-        message: "No puedes subir documentos. El usuario no ha dado permiso.",
+        message: "No puedes subir documentos. El usuario no tiene permiso.",
         severity: "warning",
       });
       return;
     }
-
     setSelectedUser(user);
     setSelectedCertification(certification);
     setUploadFiles([]);
@@ -696,14 +511,11 @@ const UserManagement = () => {
     setOpenUploadDialog(true);
   };
 
-  const handleFileSelect = (event) => {
-    const files = Array.from(event.target.files);
-    setUploadFiles((prev) => [...prev, ...files]);
-  };
+  const handleFileSelect = (e) =>
+    setUploadFiles((p) => [...p, ...Array.from(e.target.files)]);
 
-  const handleRemoveFile = (index) => {
-    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+  const handleRemoveFile = (i) =>
+    setUploadFiles((p) => p.filter((_, idx) => idx !== i));
 
   const handleUploadFiles = async () => {
     if (uploadFiles.length === 0) {
@@ -717,15 +529,14 @@ const UserManagement = () => {
 
     setUploading(true);
     setUploadProgress(0);
-
     try {
       for (let i = 0; i <= 100; i += 10) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((r) => setTimeout(r, 200));
         setUploadProgress(i);
       }
 
-      const newDocuments = uploadFiles.map((file, index) => ({
-        id: Date.now() + index,
+      const newDocuments = uploadFiles.map((file, idx) => ({
+        id: Date.now() + idx,
         name: file.name,
         url: URL.createObjectURL(file),
         type: file.type,
@@ -735,25 +546,18 @@ const UserManagement = () => {
       }));
 
       setUsers((prev) =>
-        prev.map((user) => {
-          if (user.id === selectedUser.id) {
-            return {
-              ...user,
-              associationCertifications: user.associationCertifications.map(
-                (cert) => {
-                  if (cert.id === selectedCertification.id) {
-                    return {
-                      ...cert,
-                      documents: [...(cert.documents || []), ...newDocuments],
-                    };
-                  }
-                  return cert;
-                },
-              ),
-            };
-          }
-          return user;
-        }),
+        prev.map((user) =>
+          user.id !== selectedUser.id
+            ? user
+            : {
+                ...user,
+                associationCertifications: user.associationCertifications.map((cert) =>
+                  cert.id === selectedCertification.id
+                    ? { ...cert, documents: [...(cert.documents || []), ...newDocuments] }
+                    : cert
+                ),
+              }
+        )
       );
 
       setSnackbar({
@@ -761,9 +565,8 @@ const UserManagement = () => {
         message: `${uploadFiles.length} archivo(s) subido(s) correctamente`,
         severity: "success",
       });
-
       setOpenUploadDialog(false);
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Error al subir los archivos",
@@ -782,44 +585,34 @@ const UserManagement = () => {
 
   const handleDeleteDocument = async (documentId) => {
     if (!selectedUser || !selectedCertification) return;
-
+    
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
+      await new Promise((r) => setTimeout(r, 500));
       setUsers((prev) =>
-        prev.map((user) => {
-          if (user.id === selectedUser.id) {
-            return {
-              ...user,
-              associationCertifications: user.associationCertifications.map(
-                (cert) => {
-                  if (cert.id === selectedCertification.id) {
-                    return {
-                      ...cert,
-                      documents: cert.documents.filter((doc) => doc.id !== documentId),
-                    };
-                  }
-                  return cert;
-                },
-              ),
-            };
-          }
-          return user;
-        }),
+        prev.map((user) =>
+          user.id !== selectedUser.id
+            ? user
+            : {
+                ...user,
+                associationCertifications: user.associationCertifications.map((cert) =>
+                  cert.id === selectedCertification.id
+                    ? { ...cert, documents: cert.documents.filter((doc) => doc.id !== documentId) }
+                    : cert
+                ),
+              }
+        )
       );
-
       setSelectedCertification((prev) => ({
         ...prev,
         documents: prev.documents.filter((doc) => doc.id !== documentId),
       }));
-
       setSnackbar({
         open: true,
         message: "Documento eliminado correctamente",
         severity: "success",
       });
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Error al eliminar el documento",
@@ -830,35 +623,53 @@ const UserManagement = () => {
     }
   };
 
-  const getRoleColor = (role) => {
-    const colors = {
-      admin: institutionalColors.success,
-      comite: institutionalColors.primary,
-      agente: "#526F78",
-      profesionista: "#2e7d32",
-      empresario: "#ed6c02",
-    };
-    return colors[role] || institutionalColors.textSecondary;
-  };
+  const handleExportCSV = () => {
+    if (!filteredUsers.length) return;
 
-  const getCertificationColor = (type) => {
-    const certType = certificationTypes.find((t) => t.value === type);
-    return certType ? certType.color : institutionalColors.textSecondary;
+    const data = filteredUsers.map((u) => ({
+      Nombre: u.nombre || "",
+      Email: u.email || "",
+      Región: u.regionNombre || "",
+      Estado: u.estado === "CON_PERMISO" ? "Con permiso" : "Sin permiso",
+      "Permiso dispositivo": u.permisoAsociacion ? "Sí" : "No",
+      Certificaciones: u.associationCertifications?.length || 0,
+    }));
+
+    const headers = Object.keys(data[0]).join(",");
+    const rows = data.map((row) => Object.values(row).join(","));
+    const csv = [headers, ...rows].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `asociados_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setSnackbar({
+      open: true,
+      message: "Datos exportados correctamente",
+      severity: "success",
+    });
   };
 
   const tabs = [
     { value: "todos", label: `TODOS (${stats.total})`, icon: <GroupIcon /> },
     {
       value: "con-permisos",
-      label: `CON PERMISOS (${stats.withPermission})`,
+      label: `CON PERMISO (${stats.conPermiso})`,
       icon: <CheckCircleIcon />,
     },
     {
       value: "sin-permisos",
-      label: `SIN PERMISOS (${stats.withoutPermission})`,
+      label: `SIN PERMISO (${stats.sinPermiso})`,
       icon: <CancelIcon />,
     },
   ];
+
+  const isInitializing = loadingAsociacion;
 
   return (
     <Box
@@ -871,7 +682,6 @@ const UserManagement = () => {
         p: 2,
       }}
     >
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
@@ -887,10 +697,53 @@ const UserManagement = () => {
         </Alert>
       </Snackbar>
 
+      {/* Diálogo de confirmación quitar usuario */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => !removingUser && setConfirmDialog({ open: false, user: null })}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle
+          sx={{
+            color: institutionalColors.error,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <PersonRemoveIcon /> Quitar de la asociación
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que deseas quitar a{" "}
+            <strong>{confirmDialog.user?.nombre}</strong> de la asociación?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={() => setConfirmDialog({ open: false, user: null })}
+            disabled={removingUser}
+            variant="outlined"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleRemoveUserFromAssociation}
+            disabled={removingUser}
+            variant="contained"
+            color="error"
+            startIcon={removingUser ? <CircularProgress size={16} color="inherit" /> : <PersonRemoveIcon />}
+          >
+            {removingUser ? "Quitando..." : "Quitar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Header */}
       <Paper
         elevation={0}
-        sx={{ p: 3, bgcolor: "background.paper", border: `1px solid #e5e7eb` }}
+        sx={{ p: 3, bgcolor: "background.paper", border: "1px solid #e5e7eb" }}
       >
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={6}>
@@ -908,10 +761,9 @@ const UserManagement = () => {
               variant="body1"
               sx={{ color: institutionalColors.textSecondary }}
             >
-              Gestión de permisos y certificaciones de usuarios asociados
+              Gestión de usuarios asociados, permisos y certificaciones
             </Typography>
           </Grid>
-
           <Grid item xs={12} md={6}>
             <Stack
               direction="row"
@@ -922,36 +774,8 @@ const UserManagement = () => {
               <Button
                 variant="outlined"
                 startIcon={<DownloadIcon />}
-                onClick={() => {
-                  const data = filteredUsers.map((user) => ({
-                    Nombre: user.name,
-                    Email: user.email,
-                    Rol: user.roleName,
-                    Región: user.region,
-                    Departamento: user.department,
-                    "Permiso Subida": user.uploadPermission === "permitido" ? "Permitido" : "No Permitido",
-                    Certificaciones: user.associationCertifications?.length || 0,
-                  }));
-
-                  const csv = [
-                    Object.keys(data[0]).join(","),
-                    ...data.map((row) => Object.values(row).join(",")),
-                  ].join("\n");
-
-                  const blob = new Blob([csv], { type: "text/csv" });
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `asociados_${new Date().toISOString().split("T")[0]}.csv`;
-                  a.click();
-
-                  setSnackbar({
-                    open: true,
-                    message: "Datos exportados correctamente",
-                    severity: "success",
-                  });
-                }}
-                disabled={loading}
+                onClick={handleExportCSV}
+                disabled={loading || loadingUsers || isInitializing || filteredUsers.length === 0}
                 sx={{
                   borderColor: institutionalColors.primary,
                   color: institutionalColors.primary,
@@ -967,7 +791,7 @@ const UserManagement = () => {
                 variant="contained"
                 startIcon={<PersonAddIcon />}
                 onClick={handleAddExistingUser}
-                disabled={loading}
+                disabled={loading || loadingUsers || isInitializing}
                 sx={{
                   bgcolor: institutionalColors.primary,
                   "&:hover": { bgcolor: institutionalColors.secondary },
@@ -980,39 +804,35 @@ const UserManagement = () => {
         </Grid>
       </Paper>
 
-      {/* Filtro de búsqueda */}
-      <Paper elevation={1} sx={{ p: 2, border: `1px solid #e5e7eb` }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Buscar asociados por nombre, email, rol, departamento o región..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ color: institutionalColors.textSecondary }} />
-                  </InputAdornment>
-                ),
-                endAdornment: searchTerm && (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchTerm("")}>
-                      <CloseIcon sx={{ color: institutionalColors.textSecondary }} />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-        </Grid>
+      {/* Búsqueda */}
+      <Paper elevation={1} sx={{ p: 2, border: "1px solid #e5e7eb" }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Buscar asociados por nombre, email o región..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setPage(1);
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: institutionalColors.textSecondary }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchTerm("")}>
+                  <CloseIcon sx={{ color: institutionalColors.textSecondary }} />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
       </Paper>
 
-      {/* Tabs y tabla (se mantiene igual) */}
+      {/* Tabla */}
       <Paper
         elevation={1}
         sx={{
@@ -1020,13 +840,13 @@ const UserManagement = () => {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          border: `1px solid #e5e7eb`,
+          border: "1px solid #e5e7eb",
         }}
       >
         <Tabs
           value={selectedTab}
-          onChange={(e, newValue) => {
-            setSelectedTab(newValue);
+          onChange={(e, v) => {
+            setSelectedTab(v);
             setPage(1);
           }}
           variant="scrollable"
@@ -1036,18 +856,20 @@ const UserManagement = () => {
             borderColor: "divider",
             bgcolor: "background.paper",
             "& .MuiTab-root.Mui-selected": {
-              color: selectedTab === "con-permisos"
-                ? institutionalColors.success
-                : selectedTab === "sin-permisos"
-                  ? institutionalColors.error
-                  : institutionalColors.primary,
+              color:
+                selectedTab === "con-permisos"
+                  ? institutionalColors.success
+                  : selectedTab === "sin-permisos"
+                    ? institutionalColors.warning
+                    : institutionalColors.primary,
             },
             "& .MuiTabs-indicator": {
-              backgroundColor: selectedTab === "con-permisos"
-                ? institutionalColors.success
-                : selectedTab === "sin-permisos"
-                  ? institutionalColors.error
-                  : institutionalColors.primary,
+              backgroundColor:
+                selectedTab === "con-permisos"
+                  ? institutionalColors.success
+                  : selectedTab === "sin-permisos"
+                    ? institutionalColors.warning
+                    : institutionalColors.primary,
             },
           }}
         >
@@ -1063,217 +885,243 @@ const UserManagement = () => {
           ))}
         </Tabs>
 
-        {/* Contenido principal - Tabla (se mantiene igual) */}
         <TableContainer sx={{ flex: 1 }}>
-          {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: 200 }}>
+          {isInitializing || loadingUsers ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                height: 300,
+                gap: 2,
+              }}
+            >
               <CircularProgress sx={{ color: institutionalColors.primary }} />
+              <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
+                {isInitializing ? "Cargando información de la asociación..." : "Cargando usuarios asociados..."}
+              </Typography>
+            </Box>
+          ) : filteredUsers.length === 0 ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 8,
+                flex: 1,
+              }}
+            >
+              <GroupIcon
+                sx={{
+                  fontSize: 64,
+                  color: institutionalColors.textSecondary,
+                  mb: 2,
+                }}
+              />
+              <Typography
+                variant="h6"
+                sx={{ color: institutionalColors.textSecondary }}
+                gutterBottom
+              >
+                No se encontraron usuarios
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ color: institutionalColors.textSecondary, mb: 3 }}
+              >
+                {searchTerm
+                  ? "Intenta con otros términos de búsqueda"
+                  : selectedTab === "todos"
+                    ? "No hay usuarios en la asociación"
+                    : selectedTab === "con-permisos"
+                      ? "No hay usuarios con permiso"
+                      : "No hay usuarios sin permiso"}
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={handleAddExistingUser}
+                sx={{
+                  bgcolor: institutionalColors.primary,
+                  "&:hover": { bgcolor: institutionalColors.secondary },
+                }}
+              >
+                Agregar Usuario
+              </Button>
             </Box>
           ) : (
             <Table stickyHeader size="medium">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Usuario</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Rol / Departamento</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Región</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Certificaciones</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>Permiso de Subida</TableCell>
-                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }} align="center">Acciones</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
+                    Usuario
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
+                    Email
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
+                    Región
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
+                    Estado
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
+                    Permiso dispositivo
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
+                    Certificaciones
+                  </TableCell>
+                  <TableCell
+                    sx={{ fontWeight: "bold", color: institutionalColors.primary }}
+                    align="center"
+                  >
+                    Acciones
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {paginatedUsers.map((user) => {
-                  const level = getRecognitionLevel(user);
-                  const levelInfo = getRecognitionLevelInfo(level);
-
-                  return (
-                    <TableRow key={user.id} hover>
-                      <TableCell>
-                        <Stack direction="row" spacing={2} alignItems="center">
-                          <Badge
-                            overlap="circular"
-                            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                            badgeContent={
-                              <Tooltip title={levelInfo.label}>
-                                <Avatar
-                                  sx={{
-                                    width: 22,
-                                    height: 22,
-                                    bgcolor: levelInfo.color,
-                                    fontSize: "0.7rem",
-                                    fontWeight: "bold",
-                                  }}
-                                >
-                                  {levelInfo.icon}
-                                </Avatar>
-                              </Tooltip>
-                            }
-                          >
-                            <Avatar
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                bgcolor: getRoleColor(user.role),
-                                fontWeight: "bold",
-                                color: "white",
-                              }}
-                            >
-                              {user.avatar}
-                            </Avatar>
-                          </Badge>
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
-                              {user.name}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
-                              {user.email}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </TableCell>
-
-                      <TableCell>
-                        <Box>
-                          <Chip
-                            label={user.roleName}
+                {paginatedUsers.map((user) => (
+                  <TableRow key={user.id} hover>
+                    <TableCell>
+                      <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            bgcolor: institutionalColors.primary,
+                            fontWeight: "bold",
+                            color: "white",
+                          }}
+                        >
+                          {user.avatar}
+                        </Avatar>
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight="bold"
+                          sx={{ color: institutionalColors.textPrimary }}
+                        >
+                          {user.nombre}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
+                        {user.email}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <LocationIcon
+                          fontSize="small"
+                          sx={{ color: institutionalColors.textSecondary }}
+                        />
+                        <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
+                          {user.regionNombre}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        icon={getEstadoIcon(user.estado)}
+                        label={getEstadoTexto(user.estado)}
+                        size="small"
+                        sx={{
+                          bgcolor: `${getEstadoColor(user.estado)}15`,
+                          color: getEstadoColor(user.estado),
+                          fontWeight: 500,
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.permisoAsociacion ? "Sí" : "No"}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          borderColor: user.permisoAsociacion
+                            ? institutionalColors.success
+                            : institutionalColors.textSecondary,
+                          color: user.permisoAsociacion
+                            ? institutionalColors.success
+                            : institutionalColors.textSecondary,
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body1" fontWeight="bold">
+                        {user.associationCertifications?.length || 0}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={0.5} justifyContent="center">
+                        <Tooltip title="Ver detalles">
+                          <IconButton
                             size="small"
-                            sx={{
-                              bgcolor: `${getRoleColor(user.role)}15`,
-                              color: getRoleColor(user.role),
-                              fontWeight: 600,
-                              mb: 0.5,
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setOpenDetailsDialog(true);
                             }}
-                          />
-                          <Typography variant="caption" display="block" sx={{ color: institutionalColors.textSecondary }}>
-                            {user.department}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <LocationIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
-                          <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                            {user.region}
-                          </Typography>
-                        </Stack>
-                      </TableCell>
-
-                      <TableCell>
-                        <Stack spacing={0.5}>
-                          <Typography variant="body1" fontWeight="bold" sx={{ color: institutionalColors.textPrimary }}>
-                            {user.associationCertifications?.length || 0}
-                          </Typography>
-                          {user.associationCertifications?.slice(0, 2).map((cert, index) => (
-                            <Chip
-                              key={index}
-                              label={cert.name}
-                              size="small"
-                              sx={{
-                                bgcolor: `${getCertificationColor(cert.type)}15`,
-                                color: getCertificationColor(cert.type),
-                                maxWidth: 120,
-                              }}
-                            />
-                          ))}
-                          {user.associationCertifications?.length > 2 && (
-                            <Chip
-                              label={`+${user.associationCertifications.length - 2} más`}
-                              size="small"
-                              variant="outlined"
-                              sx={{
-                                borderColor: institutionalColors.textSecondary,
-                                color: institutionalColors.textSecondary,
-                              }}
-                            />
-                          )}
-                        </Stack>
-                      </TableCell>
-
-                      <TableCell>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          {user.uploadPermission === "permitido" ? (
-                            <>
-                              <CheckCircleIcon sx={{ color: institutionalColors.success }} fontSize="small" />
-                              <Typography variant="body2" sx={{ color: institutionalColors.success }}>
-                                Permitido
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }} display="block">
-                                (Usuario dio permiso)
-                              </Typography>
-                            </>
-                          ) : (
-                            <>
-                              <CancelIcon sx={{ color: institutionalColors.error }} fontSize="small" />
-                              <Typography variant="body2" sx={{ color: institutionalColors.error }}>
-                                No Permitido
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }} display="block">
-                                (Usuario debe dar permiso)
-                              </Typography>
-                            </>
-                          )}
-                        </Box>
-                      </TableCell>
-
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={1} justifyContent="center">
-                          <Tooltip title="Ver detalles">
+                            sx={{ color: institutionalColors.primary }}
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip
+                          title={
+                            user.estado === "CON_PERMISO"
+                              ? "Gestionar certificaciones"
+                              : "Sin permiso para gestionar certificaciones"
+                          }
+                        >
+                          <span>
                             <IconButton
                               size="small"
                               onClick={() => {
-                                setSelectedUser(user);
-                                setOpenDetailsDialog(true);
+                                if (user.estado === "CON_PERMISO") {
+                                  handleAddCertification(user.id);
+                                } else {
+                                  setSnackbar({
+                                    open: true,
+                                    message: "No puedes gestionar certificaciones. El usuario no tiene permiso.",
+                                    severity: "warning",
+                                  });
+                                }
                               }}
-                              sx={{ color: institutionalColors.primary }}
+                              sx={{
+                                color: user.estado === "CON_PERMISO"
+                                  ? institutionalColors.success
+                                  : institutionalColors.textSecondary,
+                              }}
                             >
-                              <VisibilityIcon />
+                              <VerifiedIcon />
                             </IconButton>
-                          </Tooltip>
-
-                          <Tooltip
-                            title={
-                              user.uploadPermission === "permitido"
-                                ? "Gestionar certificaciones"
-                                : "Sin permiso del usuario para subir documentos"
-                            }
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Quitar de la asociación">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleConfirmRemoveUser(user)}
+                            sx={{
+                              color: institutionalColors.error,
+                              "&:hover": {
+                                bgcolor: `${institutionalColors.error}15`,
+                              },
+                            }}
                           >
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  if (user.uploadPermission === "permitido") {
-                                    handleAddCertification(user.id);
-                                  } else {
-                                    setSnackbar({
-                                      open: true,
-                                      message: "No puedes subir certificaciones. El usuario no ha dado permiso desde su dispositivo.",
-                                      severity: "warning",
-                                    });
-                                  }
-                                }}
-                                sx={{
-                                  color: user.uploadPermission === "permitido"
-                                    ? institutionalColors.success
-                                    : institutionalColors.textSecondary,
-                                }}
-                              >
-                                <VerifiedIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                            <PersonRemoveIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
         </TableContainer>
 
-        {/* Paginación */}
-        {filteredUsers.length > 0 && (
+        {filteredUsers.length > 0 && !loadingUsers && !isInitializing && (
           <Stack
             direction="row"
             justifyContent="space-between"
@@ -1286,12 +1134,13 @@ const UserManagement = () => {
             }}
           >
             <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
-              Mostrando {(page - 1) * rowsPerPage + 1} - {Math.min(page * rowsPerPage, filteredUsers.length)} de {filteredUsers.length} usuarios
+              Mostrando {(page - 1) * rowsPerPage + 1} -{" "}
+              {Math.min(page * rowsPerPage, filteredUsers.length)} de {filteredUsers.length} usuarios
             </Typography>
             <Pagination
               count={Math.ceil(filteredUsers.length / rowsPerPage)}
               page={page}
-              onChange={(e, value) => setPage(value)}
+              onChange={(e, v) => setPage(v)}
               color="primary"
               size="small"
               sx={{
@@ -1304,39 +1153,12 @@ const UserManagement = () => {
             />
           </Stack>
         )}
-
-        {filteredUsers.length === 0 && !loading && (
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", p: 8, flex: 1 }}>
-            <GroupIcon sx={{ fontSize: 64, color: institutionalColors.textSecondary, mb: 2 }} />
-            <Typography variant="h6" sx={{ color: institutionalColors.textSecondary }} gutterBottom>
-              No se encontraron usuarios en esta categoría
-            </Typography>
-            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, mb: 3 }}>
-              {selectedTab === "todos"
-                ? "No hay usuarios en la asociación"
-                : selectedTab === "con-permisos"
-                  ? "No hay usuarios con permisos de subida"
-                  : "Todos los usuarios tienen permisos de subida"}
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={handleAddExistingUser}
-              sx={{ bgcolor: institutionalColors.primary, "&:hover": { bgcolor: institutionalColors.secondary } }}
-            >
-              Agregar Usuarios
-            </Button>
-          </Box>
-        )}
       </Paper>
 
-      {/* Diálogos importados */}
       <AssociateUserDialog
         open={openAddUserDialog}
         onClose={() => setOpenAddUserDialog(false)}
-        availableUsers={availableUsers}
         onAddUser={handleAddUserToAssociation}
-        loading={loading}
-        getRoleColor={getRoleColor}
       />
 
       <AddCertificationDialog

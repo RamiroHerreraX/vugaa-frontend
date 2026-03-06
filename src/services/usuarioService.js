@@ -185,7 +185,9 @@ class UsuarioService {
 
   async findAsociacionByInstanciaId(instanciaId) {
     try {
-      const response = await API.get(`/usuarios/asociacion/instancia/${instanciaId}`);
+      const response = await API.get(
+        `/usuarios/asociacion/instancia/${instanciaId}`,
+      );
       return response.data;
     } catch (error) {
       console.error("Error en findAsociacionByInstanciaId:", error);
@@ -216,33 +218,80 @@ class UsuarioService {
   // Usuarios SIN asociación (para invitar)
   async findUsuariosSinAsociacion(instanciaId) {
     try {
-      const response = await API.get(`/usuarios/asociacion/sin-asociacion/${instanciaId}`);
+      const response = await API.get(
+        `/usuarios/asociacion/sin-asociacion/${instanciaId}`,
+      );
       return response.data;
     } catch (error) {
       console.error("Error en findUsuariosSinAsociacion:", error);
-      throw error.response?.data || { error: "Error al obtener usuarios sin asociación" };
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios sin asociación",
+        }
+      );
     }
   }
 
   // Usuarios que pertenecen a MI asociación
   async findUsuariosDeMiAsociacion(idAsociacion) {
     try {
-      const response = await API.get(`/usuarios/asociacion/mia/${idAsociacion}`);
+      const response = await API.get(
+        `/usuarios/asociacion/mia/${idAsociacion}`,
+      );
       return response.data;
     } catch (error) {
       console.error("Error en findUsuariosDeMiAsociacion:", error);
-      throw error.response?.data || { error: "Error al obtener usuarios de mi asociación" };
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios de mi asociación",
+        }
+      );
     }
   }
 
   // Usuarios de mi asociación que me dieron permiso para subir documentos
   async findUsuariosConPermisoDocumentos(idAsociacion) {
     try {
-      const response = await API.get(`/usuarios/asociacion/con-permiso/${idAsociacion}`);
+      const response = await API.get(
+        `/usuarios/asociacion/con-permiso/${idAsociacion}`,
+      );
       return response.data;
     } catch (error) {
       console.error("Error en findUsuariosConPermisoDocumentos:", error);
-      throw error.response?.data || { error: "Error al obtener usuarios con permiso" };
+      throw (
+        error.response?.data || {
+          error: "Error al obtener usuarios con permiso",
+        }
+      );
+    }
+  }
+
+  // Agregar o quitar usuario de una asociación
+  async actualizarAsociacionUsuario(usuarioId, asociacionId) {
+    try {
+      const response = await API.put(`/usuarios/${usuarioId}/asociacion`, {
+        asociacionId: asociacionId,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Error en actualizarAsociacionUsuario:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al actualizar la asociación del usuario",
+        }
+      );
+    }
+  }
+  async quitarAsociacionUsuario(usuarioId) {
+    try {
+      const response = await API.put(
+        `/usuarios/${usuarioId}/quitar-asociacion`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error al quitar asociación:", error);
+      throw error.response?.data || { error: "Error al quitar asociación" };
     }
   }
 }
