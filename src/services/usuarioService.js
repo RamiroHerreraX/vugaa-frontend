@@ -211,9 +211,36 @@ class UsuarioService {
     }
   }
 
-  /** ------------------ NUEVOS MÉTODOS PARA ASOCIACIONES ------------------ **/
 
-  // Usuarios SIN asociación (para invitar)
+  async completarPerfil(usuarioId, instanciaId, perfilData) {
+  try {
+    const response = await API.post(
+      `/perfil-agente/${usuarioId}/completar`,
+      perfilData,
+      { params: { instanciaId } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error en completarPerfil:', error);
+    throw error.response?.data || { error: 'Error al completar el perfil' };
+  }
+}
+
+async obtenerPerfilAgente(usuarioId) {
+  try {
+    const response = await API.get(`/perfil-agente/${usuarioId}`);
+    return response.data;
+  } catch (error) {
+    // 404 significa que aún no tiene perfil — es normal para usuarios nuevos
+    if (error.response?.status === 404) {
+      return null;
+    }
+    console.error('Error en obtenerPerfilAgente:', error);
+    return null;
+  }
+}
+
+ // Usuarios SIN asociación (para invitar)
   async findUsuariosSinAsociacion(instanciaId) {
     try {
       const response = await API.get(`/usuarios/asociacion/sin-asociacion/${instanciaId}`);
@@ -245,5 +272,10 @@ class UsuarioService {
       throw error.response?.data || { error: "Error al obtener usuarios con permiso" };
     }
   }
+
 }
+
+
+ 
+
 export default new UsuarioService();
