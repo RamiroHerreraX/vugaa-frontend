@@ -35,13 +35,13 @@ import SuperAAlerts from "./pages/superadmin/SuperAAlerts";
 
 // Páginas de Admin
 import AdminDashboard from "./pages/admin/Dashboard";
-import SystemConfig from './pages/admin/SystemConfig';
-import AdminProfile from './pages/admin/AdminProfile';
-import ConfigExpediente from './pages/admin/ConfigExpediente';
-import GeneralAlerts from './pages/admin/GeneralAlerts';
-import Reports from './pages/admin/Reports';
-import UserManagement from './pages/admin/UserManagement';
-import UserReview from './pages/admin/UserReview';
+import SystemConfig from "./pages/admin/SystemConfig";
+import AdminProfile from "./pages/admin/AdminProfile";
+import ConfigExpediente from "./pages/admin/ConfigExpediente";
+import GeneralAlerts from "./pages/admin/GeneralAlerts";
+import Reports from "./pages/admin/Reports";
+import UserManagement from "./pages/admin/UserManagement";
+import UserReview from "./pages/admin/UserReview";
 
 // Páginas de Comité
 import CommitteeDashboard from "./pages/committee/CommitteeDashboard";
@@ -54,8 +54,7 @@ import Declaraciones from "./pages/agente/expediente/Declaraciones";
 import Notificaciones from "./pages/agente/notifications/AlertsAgent";
 import Expediente from "./pages/agente/expediente/Expediente";
 import Profile from "./pages/agente/profile/Profile_agent";
-import AuditAgent from './pages/agente/auditoria/AuditAgent';
-
+import AuditAgent from "./pages/agente/auditoria/AuditAgent";
 
 // Componente protegido
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -67,6 +66,7 @@ import AssociationAuditLog from "./pages/association/AssociationAuditLog";
 import AssociationProfile from "./pages/association/AssociationProfile";
 import ExpedienteAssociation from "./pages/association/ExpedienteAsociados";
 import AlertsAsociacion from "./pages/association/AlertsAsociacion";
+import AssociationProfileI from "./pages/association/AssociationProfileI";
 
 // Crear tema de MUI
 const theme = createTheme({
@@ -131,14 +131,17 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminLayout />
                 </ProtectedRoute>
               }
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/config_expedientes" element={<ConfigExpediente />} />
+              <Route
+                path="/admin/config_expedientes"
+                element={<ConfigExpediente />}
+              />
               <Route path="/admin/alerts" element={<GeneralAlerts />} />
               <Route path="/admin/reports" element={<Reports />} />
               <Route path="/admin/users" element={<UserManagement />} />
@@ -179,6 +182,15 @@ function App() {
               <Route path="audit" element={<AssociationAuditLog />} />
             </Route>
 
+            <Route
+              path="/association/profileI"
+              element={
+                <ProtectedRoute allowedRoles={["asociacion"]}>
+                  <AssociationProfileI />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Rutas protegidas - Usuario (Agente, Profesionista, Empresario) */}
             <Route
               path="/dashboard"
@@ -198,7 +210,6 @@ function App() {
               <Route path="expediente" element={<Expediente />} />
               <Route path="perfil" element={<Profile />} />
               <Route path="auditoria-agente" element={<AuditAgent />} />
-
             </Route>
 
             {/* Ruta por defecto */}

@@ -357,6 +357,19 @@ class AsociacionService {
       return new Error("Error al realizar la petición: " + error.message);
     }
   }
+  async completarPerfil(id, data) {
+    try {
+      console.log(`Completando perfil de asociación ${id}:`, data);
+      const response = await API.put(
+        `/asociaciones/${id}/completar-perfil`,
+        data,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error en completarPerfil:", error);
+      throw this._handleError(error);
+    }
+  }
 }
 
 export default new AsociacionService();

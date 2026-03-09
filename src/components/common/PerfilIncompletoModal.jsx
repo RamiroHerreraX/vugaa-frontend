@@ -36,7 +36,7 @@ const RUTAS_PERFIL = {
   supera: '/supera/profile',
   admin: '/admin/profile',
   comite: '/committee/profile',
-  asociacion: '/association/profile',
+  asociacion: '/association/profileI',
   agente: '/dashboard/perfil',
   profesionista: '/dashboard/perfil',
   empresario: '/dashboard/perfil'
