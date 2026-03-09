@@ -51,6 +51,7 @@ import {
   Info as InfoIcon,
   Code as CodeIcon,
   Computer as ComputerIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
@@ -59,7 +60,7 @@ import { getTodosApartados, desactivarApartado } from "../../services/apartado";
 
 import {
   getDocumentosPorApartado,
-  eliminarDocumento,
+  toggleEstadoDocumento,
 } from "../../services/documentoExpediente";
 
 // Importar los modales
@@ -89,10 +90,10 @@ const ConfigExpediente = () => {
     message: "",
     severity: "success",
   });
-  
+
   // Estado para controlar si hay una actualización pendiente
   const [pendingUpdate, setPendingUpdate] = useState(false);
-  
+
   // Estado para controlar la pestaña activa (documentos o programas)
   const [activeTab, setActiveTab] = useState(0);
 
@@ -125,7 +126,7 @@ const ConfigExpediente = () => {
         cargarApartados();
         setPendingUpdate(false);
       }, 2000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [pendingUpdate]);
@@ -148,7 +149,7 @@ const ConfigExpediente = () => {
             const documentos = await getDocumentosPorApartado(
               apartado.idApartado,
             );
-            
+
             // Cargar programas
             const programas = await getProgramasPorApartado(
               apartado.idApartado,
@@ -350,28 +351,34 @@ const ConfigExpediente = () => {
       apartados.find((a) => a.idApartado === apartadoId)?.documentos || []
     ).find((doc) => doc.idDocumento === documentoId);
 
-    console.log("Intentando eliminar documento:");
+    console.log("Toggle de estado para documento:");
     console.log("apartadoId:", apartadoId);
     console.log("documentoId:", documentoId);
     console.log("Documento completo:", documento);
+    console.log("Estado actual:", documento?.activo);
 
     if (!documentoId || !documento) {
       console.error("Error: documento no encontrado o ID indefinido");
-      showSnackbar("No se puede eliminar: documento no encontrado", "error");
+      showSnackbar("No se puede modificar: documento no encontrado", "error");
       return;
     }
 
-    if (window.confirm("¿Está seguro de eliminar este documento?")) {
+    // Mensaje diferente según si va a activar o desactivar
+    const nuevaAccion = documento.activo === false ? "activar" : "desactivar";
+    const mensajeConfirmacion = `¿Está seguro de ${nuevaAccion} este documento?`;
+
+    if (window.confirm(mensajeConfirmacion)) {
       try {
-        await eliminarDocumento(documentoId);
+        // Ahora toggleEstadoDocumento devuelve el documento actualizado
+        const documentoActualizado = await toggleEstadoDocumento(documentoId);
 
         setApartados(
           apartados.map((apartado) => {
             if (apartado.idApartado === apartadoId) {
               return {
                 ...apartado,
-                documentos: (apartado.documentos || []).filter(
-                  (doc) => doc.idDocumento !== documentoId,
+                documentos: (apartado.documentos || []).map((doc) =>
+                  doc.idDocumento === documentoId ? documentoActualizado : doc
                 ),
               };
             }
@@ -379,11 +386,16 @@ const ConfigExpediente = () => {
           }),
         );
 
-        showSnackbar("Documento eliminado exitosamente");
+        // Mensaje diferente según la acción realizada
+        const mensajeExito = documento.activo === false
+          ? "Documento activado exitosamente"
+          : "Documento desactivado exitosamente";
+
+        showSnackbar(mensajeExito);
         handleUpdateWithDelay(); // Programar actualización después de 2 segundos
       } catch (error) {
-        console.error("Error eliminando documento:", error);
-        showSnackbar("Error al eliminar el documento", "error");
+        console.error("Error cambiando estado del documento:", error);
+        showSnackbar("Error al cambiar el estado del documento", "error");
       }
     }
   };
@@ -1018,8 +1030,8 @@ const ConfigExpediente = () => {
           >
             <Typography
               variant="h6"
-              sx={{ 
-                color: institutionalColors.primary, 
+              sx={{
+                color: institutionalColors.primary,
                 fontWeight: "bold",
                 display: "flex",
                 alignItems: "center",
@@ -1033,8 +1045,8 @@ const ConfigExpediente = () => {
 
           {/* Tabs para alternar entre Documentos y Programas */}
           <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', px: 2.5 }}>
-            <Tabs 
-              value={activeTab} 
+            <Tabs
+              value={activeTab}
               onChange={handleTabChange}
               sx={{
                 '& .MuiTab-root': {
@@ -1051,15 +1063,15 @@ const ConfigExpediente = () => {
                 },
               }}
             >
-              <Tab 
-                icon={<DescriptionIcon sx={{ fontSize: 20 }} />} 
-                iconPosition="start" 
-                label={`Documentos (${stats.totalDocuments})`} 
+              <Tab
+                icon={<DescriptionIcon sx={{ fontSize: 20 }} />}
+                iconPosition="start"
+                label={`Documentos (${stats.totalDocuments})`}
               />
-              <Tab 
-                icon={<CodeIcon sx={{ fontSize: 20 }} />} 
-                iconPosition="start" 
-                label={`Programas (${stats.totalProgramas})`} 
+              <Tab
+                icon={<CodeIcon sx={{ fontSize: 20 }} />}
+                iconPosition="start"
+                label={`Programas (${stats.totalProgramas})`}
               />
             </Tabs>
           </Box>
@@ -1116,7 +1128,7 @@ const ConfigExpediente = () => {
                     onClick={handleAddCategory}
                     sx={{
                       bgcolor: institutionalColors.primary,
-                      "&:hover": { 
+                      "&:hover": {
                         bgcolor: institutionalColors.secondary,
                         transform: "translateY(-2px)",
                       },
@@ -1170,7 +1182,7 @@ const ConfigExpediente = () => {
                           }}
                         >
                           <Badge
-                            badgeContent={activeTab === 0 
+                            badgeContent={activeTab === 0
                               ? (apartado.documentos?.length || 0)
                               : (apartado.programas?.length || 0)
                             }
@@ -1214,8 +1226,8 @@ const ConfigExpediente = () => {
                                   label="OBLIGATORIO"
                                   size="small"
                                   color="error"
-                                  sx={{ 
-                                    height: 22, 
+                                  sx={{
+                                    height: 22,
                                     fontSize: "0.7rem",
                                     fontWeight: "bold",
                                   }}
@@ -1224,18 +1236,18 @@ const ConfigExpediente = () => {
                               <Chip
                                 size="small"
                                 icon={activeTab === 0 ? <DescriptionIcon /> : <CodeIcon />}
-                                label={activeTab === 0 
+                                label={activeTab === 0
                                   ? `${apartado.documentos?.length || 0} documentos`
                                   : `${apartado.programas?.length || 0} programas`
                                 }
                                 sx={{
                                   height: 22,
                                   fontSize: "0.7rem",
-                                  bgcolor: alpha(activeTab === 0 
-                                    ? institutionalColors.success 
+                                  bgcolor: alpha(activeTab === 0
+                                    ? institutionalColors.success
                                     : institutionalColors.warning, 0.1),
-                                  color: activeTab === 0 
-                                    ? institutionalColors.success 
+                                  color: activeTab === 0
+                                    ? institutionalColors.success
                                     : institutionalColors.warning,
                                 }}
                               />
@@ -1330,136 +1342,70 @@ const ConfigExpediente = () => {
                                           </Avatar>
                                         </ListItemIcon>
 
-                                        <Box sx={{ flex: 1 }}>
-                                          {/* Título con badges */}
-                                          <Box
-                                            sx={{
-                                              display: "flex",
-                                              alignItems: "center",
-                                              flexWrap: "wrap",
-                                              gap: 1,
-                                              mb: 1,
-                                            }}
-                                          >
-                                            <Typography
-                                              variant="subtitle1"
-                                              sx={{
-                                                fontWeight: "bold",
-                                                color: institutionalColors.textPrimary,
-                                              }}
-                                            >
-                                              {documento.nombreArchivo}
-                                            </Typography>
-
-                                            {documento.periodoRevision > 0 && (
-                                              <Tooltip
-                                                title={getReviewDescription(documento)}
-                                                arrow
-                                              >
-                                                <Chip
-                                                  size="small"
-                                                  icon={getReviewIcon(documento.periodoRevision)}
-                                                  label={getReviewDescription(documento)}
-                                                  sx={{
-                                                    height: 24,
-                                                    bgcolor: alpha(institutionalColors.info, 0.1),
-                                                    color: institutionalColors.info,
-                                                    "& .MuiChip-icon": {
-                                                      color: institutionalColors.info,
-                                                    },
-                                                  }}
-                                                />
-                                              </Tooltip>
-                                            )}
-                                          </Box>
-
-                                          {/* Descripción */}
+                                        {/* Título con badges */}
+                                        <Box
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            flexWrap: "wrap",
+                                            gap: 1,
+                                            mb: 1,
+                                          }}
+                                        >
                                           <Typography
-                                            variant="body2"
+                                            variant="subtitle1"
                                             sx={{
-                                              color: institutionalColors.textSecondary,
-                                              mb: 1.5,
+                                              fontWeight: "bold",
+                                              color: institutionalColors.textPrimary,
                                             }}
                                           >
-                                            {documento.descripcion || "Sin descripción"}
+                                            {documento.nombreArchivo}
                                           </Typography>
 
-                                          {/* Chips informativos mejorados */}
-                                          <Box
-                                            sx={{
-                                              display: "flex",
-                                              gap: 1,
-                                              flexWrap: "wrap",
-                                              mb: 2,
-                                            }}
-                                          >
-                                            {documento.formatoEsperado && (
+                                          {/* 👇 NUEVO - Badge de estado activo/inactivo */}
+                                          {documento.activo === false ? (
+                                            <Chip
+                                              size="small"
+                                              label="INACTIVO"
+                                              color="default"
+                                              sx={{
+                                                height: 24,
+                                                bgcolor: alpha(institutionalColors.error, 0.1),
+                                                color: institutionalColors.error,
+                                              }}
+                                            />
+                                          ) : (
+                                            <Chip
+                                              size="small"
+                                              label="ACTIVO"
+                                              sx={{
+                                                height: 24,
+                                                bgcolor: alpha(institutionalColors.success, 0.1),
+                                                color: institutionalColors.success,
+                                              }}
+                                            />
+                                          )}
+
+                                          {documento.periodoRevision > 0 && (
+                                            <Tooltip
+                                              title={getReviewDescription(documento)}
+                                              arrow
+                                            >
                                               <Chip
                                                 size="small"
-                                                icon={<AttachFileIcon />}
-                                                label={`Formato: ${documento.formatoEsperado}`}
+                                                icon={getReviewIcon(documento.periodoRevision)}
+                                                label={getReviewDescription(documento)}
                                                 sx={{
                                                   height: 24,
-                                                  bgcolor: alpha(institutionalColors.success, 0.1),
-                                                  color: institutionalColors.success,
+                                                  bgcolor: alpha(institutionalColors.info, 0.1),
+                                                  color: institutionalColors.info,
+                                                  "& .MuiChip-icon": {
+                                                    color: institutionalColors.info,
+                                                  },
                                                 }}
                                               />
-                                            )}
-
-                                            {documento.etiquetas && (
-                                              <Chip
-                                                size="small"
-                                                icon={<InfoIcon />}
-                                                label={documento.etiquetas}
-                                                sx={{
-                                                  height: 24,
-                                                  bgcolor: alpha(institutionalColors.warning, 0.1),
-                                                  color: institutionalColors.warning,
-                                                }}
-                                              />
-                                            )}
-                                          </Box>
-
-                                          {/* Información técnica mejorada */}
-                                          <Box
-                                            sx={{
-                                              display: "grid",
-                                              gridTemplateColumns: "repeat(3, 1fr)",
-                                              gap: 1,
-                                              mt: 1,
-                                              p: 1.5,
-                                              borderRadius: 2,
-                                              bgcolor: alpha(institutionalColors.primary, 0.03),
-                                              fontSize: "0.75rem",
-                                            }}
-                                          >
-                                            <Box>
-                                              <Typography variant="caption" color="textSecondary" display="block">
-                                                Fecha Carga
-                                              </Typography>
-                                              <Typography variant="body2" fontWeight="medium">
-                                                {documento.fechaCarga || "N/A"}
-                                              </Typography>
-                                            </Box>
-
-                                            <Box>
-                                              <Typography variant="caption" color="textSecondary" display="block">
-                                                Última Modificación
-                                              </Typography>
-                                              <Typography variant="body2" fontWeight="medium">
-                                                {documento.fechaModificacion || "N/A"}
-                                              </Typography>
-                                            </Box>
-
-                                            <Box>
-                                              <Typography variant="caption" color="textSecondary" display="block">
-                                                ID Documento
-                                              </Typography>
-                                              <Typography variant="body2" fontWeight="medium" sx={{ fontFamily: "monospace" }}>
-                                                #{documento.idDocumento}
-                                              </Typography>
-                                            </Box>
-                                          </Box>
+                                            </Tooltip>
+                                          )}
                                         </Box>
 
                                         <ListItemSecondaryAction>
@@ -1484,7 +1430,10 @@ const ConfigExpediente = () => {
                                               </IconButton>
                                             </Tooltip>
 
-                                            <Tooltip title="Eliminar documento" arrow>
+                                            <Tooltip
+                                              title={documento.activo === false ? "Activar documento" : "Desactivar documento"}
+                                              arrow
+                                            >
                                               <IconButton
                                                 size="small"
                                                 onClick={() =>
@@ -1494,13 +1443,24 @@ const ConfigExpediente = () => {
                                                   )
                                                 }
                                                 sx={{
-                                                  color: institutionalColors.error,
+                                                  color: documento.activo === false
+                                                    ? institutionalColors.success  // Verde para activar
+                                                    : institutionalColors.error,    // Rojo para desactivar
                                                   "&:hover": {
-                                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                                    bgcolor: alpha(
+                                                      documento.activo === false
+                                                        ? institutionalColors.success
+                                                        : institutionalColors.error,
+                                                      0.1
+                                                    ),
                                                   },
                                                 }}
                                               >
-                                                <DeleteIcon fontSize="small" />
+                                                {documento.activo === false ? (
+                                                  <CheckCircleIcon fontSize="small" /> // Icono de activar
+                                                ) : (
+                                                  <VisibilityOffIcon fontSize="small" />
+                                                )}
                                               </IconButton>
                                             </Tooltip>
                                           </Stack>

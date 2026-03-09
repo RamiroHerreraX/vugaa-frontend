@@ -43,17 +43,31 @@ export const getDocumentosPorInstancia = async (idInstancia) => {
 };
 
 // ========================================
-// 🔹 ELIMINAR DOCUMENTO (ELIMINACIÓN LÓGICA)
+// 🔹 TOGGLE ESTADO DOCUMENTO (ACTIVAR/DESACTIVAR)
 // ========================================
-export const eliminarDocumento = async (idDocumento) => {
-  await API.delete(`${ENDPOINT}/${idDocumento}`);
+export const toggleEstadoDocumento = async (id) => {
+  const response = await API.delete(`${ENDPOINT}/${id}`);
+  return response.data; // Ahora devuelve el documento con el estado actualizado
 };
 
+// Mantenemos el alias para compatibilidad
+export const eliminarDocumento = toggleEstadoDocumento;
+
+// ========================================
+// 🔹 CREAR DOCUMENTO PLANTILLA (SUPERADMIN)
+// ========================================
 export const crearDocumentoPlantilla = async (data) => {
-  const response = await API.post(`${ENDPOINT}/plantilla`,data);
+  const response = await API.post(`${ENDPOINT}/plantilla`, data);
   return response.data;
 };
 
+// ========================================
+// 🔹 CREAR DOCUMENTO PLANTILLA PARA ADMIN (NUEVO)
+// ========================================
+export const crearDocumentoPlantillaParaAdmin = async (data) => {
+  const response = await API.post(`${ENDPOINT}/plantilla-admin`, data);
+  return response.data;
+};
 
 // ========================================
 // 🔹 ACTUALIZAR SOLO REQUIERE_VALIDACION

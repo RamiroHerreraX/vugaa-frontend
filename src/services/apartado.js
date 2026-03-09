@@ -59,3 +59,10 @@ export const editarApartadoGlobal = async (id, data) => {
 };
 
 
+// ========================================
+// 🔥 NUEVO: LISTAR POR INSTANCIA + GLOBALES
+// ========================================
+export const getApartadosPorInstanciaConGlobales = async (idInstancia) => {
+  const response = await API.get(`${ENDPOINT}/instancia/${idInstancia}/combinados`);
+  return response.data;
+};
