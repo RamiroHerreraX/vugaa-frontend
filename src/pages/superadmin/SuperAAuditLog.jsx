@@ -164,6 +164,8 @@ const AuditLog = () => {
 
       setAuditLogs(sorted);
 
+      console.log(sorted)
+
       const uniqueInstancias = [
         ...new Map(
           sorted

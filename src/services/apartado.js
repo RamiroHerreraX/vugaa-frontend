@@ -66,3 +66,22 @@ export const getApartadosPorInstanciaConGlobales = async (idInstancia) => {
   const response = await API.get(`${ENDPOINT}/instancia/${idInstancia}/combinados`);
   return response.data;
 };
+
+
+// ========================================
+// 🆕 LISTAR SOLO GLOBALES
+// ========================================
+export const getApartadosGlobales = async () => {
+  const response = await API.get(`${ENDPOINT}/globales`);
+  return response.data;
+};
+
+// ========================================
+// 🆕 ACTIVAR / DESACTIVAR GLOBAL
+// ========================================
+export const cambiarEstadoApartadoGlobal = async (id, activo) => {
+  const response = await API.patch(
+    `${ENDPOINT}/global/${id}/estado?activo=${activo}`
+  );
+  return response.data;
+};

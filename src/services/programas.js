@@ -64,3 +64,13 @@ export const getProgramasPorApartado = async (idApartado) => {
 export const eliminarPrograma = async (idPrograma) => {
   await API.delete(`${ENDPOINT}/${idPrograma}`);
 };
+
+// ========================================
+// 🆕 ACTIVAR / DESACTIVAR PROGRAMA GLOBAL
+// ========================================
+export const cambiarEstadoProgramaGlobal = async (idPrograma, activo) => {
+  const response = await API.patch(
+    `${ENDPOINT}/global/${idPrograma}/estado?activo=${activo}`
+  );
+  return response.data;
+};

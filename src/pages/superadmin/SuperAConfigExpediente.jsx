@@ -20,43 +20,47 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Divider,
   Avatar,
   Badge,
   Zoom,
   Fade,
   Tab,
   Tabs,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
-  DragIndicator as DragIndicatorIcon,
   Save as SaveIcon,
   Folder as FolderIcon,
   Description as DescriptionIcon,
   ExpandMore as ExpandMoreIcon,
   Timer as TimerIcon,
-  People as PeopleIcon,
   AdminPanelSettings as AdminPanelSettingsIcon,
   Refresh as RefreshIcon,
   CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
   Schedule as ScheduleIcon,
   Category as CategoryIcon,
-  Visibility as VisibilityIcon,
-  CloudUpload as CloudUploadIcon,
-  AttachFile as AttachFileIcon,
-  Info as InfoIcon,
   Code as CodeIcon,
   Computer as ComputerIcon,
   VisibilityOff as VisibilityOffIcon,
+  Visibility as VisibilityIcon,
+  PowerSettingsNew as PowerIcon,
+  Restore as RestoreIcon,
+  Delete as DeleteIcon,
+  Warning as WarningIcon,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
 // Importar servicios de API
-import { getTodosApartados, desactivarApartado } from "../../services/apartado";
+import { 
+  getApartadosGlobales, 
+  cambiarEstadoApartadoGlobal 
+} from "../../services/apartado";
 
 import {
   getDocumentosPorApartado,
@@ -72,7 +76,10 @@ import EditDocumentDialog from "../../components/expediente/EditDocumentDialog";
 import CreateProgramaDialog from "../../components/programas/CreateProgramaDialog";
 import EditProgramaDialog from "../../components/programas/EditProgramaDialog";
 
-import { getProgramasPorApartado, eliminarPrograma } from "../../services/programas";
+import { 
+  getProgramasPorApartado, 
+  cambiarEstadoProgramaGlobal 
+} from "../../services/programas";
 
 // Importar iconos y colores desde el archivo de iconos
 import {
@@ -80,6 +87,85 @@ import {
   getDefaultIcon,
   getCategoryColor,
 } from "../../utils/iconosUtils";
+
+// Modal de confirmación personalizado
+const ConfirmDialog = ({ open, onClose, onConfirm, title, message, confirmText = "Confirmar", cancelText = "Cancelar", severity = "warning" }) => {
+  const getColorBySeverity = () => {
+    switch (severity) {
+      case 'error': return institutionalColors.error;
+      case 'success': return institutionalColors.success;
+      case 'info': return institutionalColors.info;
+      default: return institutionalColors.warning;
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-description"
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          minWidth: 400,
+        }
+      }}
+    >
+      <DialogTitle id="confirm-dialog-title" sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 1,
+        borderBottom: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
+        pb: 2
+      }}>
+        <WarningIcon sx={{ color: getColorBySeverity() }} />
+        <Typography variant="h6" component="span" sx={{ fontWeight: 'bold' }}>
+          {title}
+        </Typography>
+      </DialogTitle>
+      <DialogContent sx={{ py: 3 }}>
+        <DialogContentText id="confirm-dialog-description" sx={{ color: institutionalColors.textPrimary }}>
+          {message}
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, pt: 0 }}>
+        <Button 
+          onClick={onClose}
+          variant="outlined"
+          sx={{
+            borderColor: institutionalColors.border,
+            color: institutionalColors.textSecondary,
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: institutionalColors.primary,
+              bgcolor: alpha(institutionalColors.primary, 0.04),
+            }
+          }}
+        >
+          {cancelText}
+        </Button>
+        <Button
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
+          variant="contained"
+          autoFocus
+          sx={{
+            bgcolor: getColorBySeverity(),
+            textTransform: 'none',
+            '&:hover': {
+              bgcolor: alpha(getColorBySeverity(), 0.8),
+            }
+          }}
+        >
+          {confirmText}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
 
 const ConfigExpediente = () => {
   const [apartados, setApartados] = useState([]);
@@ -107,6 +193,16 @@ const ConfigExpediente = () => {
   const [openCreatePrograma, setOpenCreatePrograma] = useState(false);
   const [openEditPrograma, setOpenEditPrograma] = useState(false);
 
+  // Estado para el modal de confirmación
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    severity: "warning",
+    confirmText: "Confirmar",
+  });
+
   const [currentApartado, setCurrentApartado] = useState(null);
   const [currentDocumento, setCurrentDocumento] = useState(null);
   const [currentPrograma, setCurrentPrograma] = useState(null);
@@ -125,7 +221,7 @@ const ConfigExpediente = () => {
       const timer = setTimeout(() => {
         cargarApartados();
         setPendingUpdate(false);
-      }, 2000);
+      }, 0);
 
       return () => clearTimeout(timer);
     }
@@ -139,7 +235,7 @@ const ConfigExpediente = () => {
       console.log("🔵 Iniciando carga de apartados...");
 
       // 1️⃣ Obtener TODOS los apartados
-      const apartadosData = await getTodosApartados();
+      const apartadosData = await getApartadosGlobales();
       console.log("📂 Apartados obtenidos del backend:", apartadosData);
 
       const apartadosConDocumentosYProgramas = await Promise.all(
@@ -189,18 +285,18 @@ const ConfigExpediente = () => {
         apartadosConDocumentosYProgramas,
       );
 
-      // 2️⃣ Filtrar activos y ordenar
-      const apartadosActivos = apartadosConDocumentosYProgramas
-        .filter((ap) => ap.activo !== false)
+      // Mostrar TODOS los apartados (activos e inactivos)
+      const apartadosOrdenados = apartadosConDocumentosYProgramas
         .sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
-      console.log("🟢 Apartados activos y ordenados:", apartadosActivos);
+      console.log("🟢 Apartados ordenados:", apartadosOrdenados);
 
-      setApartados(apartadosActivos);
+      setApartados(apartadosOrdenados);
 
-      // Expandir primera categoría
-      if (apartadosActivos.length > 0) {
-        setExpandedCategory(apartadosActivos[0].idApartado);
+      // Expandir primera categoría si existe y está activa
+      const primeraActiva = apartadosOrdenados.find(ap => ap.activo !== false);
+      if (primeraActiva) {
+        setExpandedCategory(primeraActiva.idApartado);
       }
 
       console.log("✅ Carga completada correctamente");
@@ -226,9 +322,23 @@ const ConfigExpediente = () => {
     setPendingUpdate(true);
   };
 
+  // Función para mostrar el modal de confirmación
+  const showConfirmDialog = (title, message, onConfirm, severity = "warning", confirmText = "Confirmar") => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      onConfirm: () => onConfirm(),
+      severity,
+      confirmText,
+    });
+  };
+
   // Calcular estadísticas
   const stats = {
     totalCategories: apartados.length,
+    totalCategoriesActivas: apartados.filter(ap => ap.activo !== false).length,
+    totalCategoriesInactivas: apartados.filter(ap => ap.activo === false).length,
     totalDocuments: apartados.reduce(
       (total, ap) => total + (ap.documentos?.length || 0),
       0,
@@ -250,12 +360,43 @@ const ConfigExpediente = () => {
     setOpenEditCategory(true);
   };
 
+  // Cambiar estado de apartado (activar/desactivar)
+  const handleToggleCategoryStatus = async (apartado) => {
+    const nuevoEstado = !apartado.activo;
+    const accion = nuevoEstado ? "activar" : "desactivar";
+    
+    showConfirmDialog(
+      `${accion === "activar" ? "Activar" : "Desactivar"} Categoría`,
+      `¿Está seguro de ${accion} la categoría "${apartado.nombre}"?`,
+      async () => {
+        try {
+          await cambiarEstadoApartadoGlobal(apartado.idApartado, nuevoEstado);
+          
+          // Actualizar el estado local
+          setApartados(apartados.map(ap => 
+            ap.idApartado === apartado.idApartado 
+              ? { ...ap, activo: nuevoEstado }
+              : ap
+          ));
+          
+          showSnackbar(`Categoría ${accion}da exitosamente`);
+          handleUpdateWithDelay();
+        } catch (error) {
+          console.error(`Error al ${accion} categoría:`, error);
+          showSnackbar(`Error al ${accion} la categoría`, "error");
+        }
+      },
+      nuevoEstado ? "success" : "warning",
+      accion === "activar" ? "Activar" : "Desactivar"
+    );
+  };
+
   const handleCreateCategorySuccess = (nuevoApartado) => {
     setApartados([...apartados, nuevoApartado]);
     setOpenCreateCategory(false);
     showSnackbar("Categoría creada exitosamente");
     setExpandedCategory(nuevoApartado.idApartado);
-    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+    handleUpdateWithDelay();
   };
 
   const handleUpdateCategorySuccess = (apartadoActualizado) => {
@@ -269,25 +410,7 @@ const ConfigExpediente = () => {
     setOpenEditCategory(false);
     setCurrentApartado(null);
     showSnackbar("Categoría actualizada exitosamente");
-    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
-  };
-
-  const handleDeleteCategory = async (apartadoId) => {
-    if (
-      window.confirm(
-        "¿Está seguro de eliminar esta categoría y todos sus documentos y programas?",
-      )
-    ) {
-      try {
-        await desactivarApartado(apartadoId);
-        setApartados(apartados.filter((ap) => ap.idApartado !== apartadoId));
-        showSnackbar("Categoría eliminada exitosamente");
-        handleUpdateWithDelay(); // Programar actualización después de 2 segundos
-      } catch (error) {
-        console.error("Error eliminando categoría:", error);
-        showSnackbar("Error al eliminar la categoría", "error");
-      }
-    }
+    handleUpdateWithDelay();
   };
 
   // Handlers para documentos
@@ -319,7 +442,7 @@ const ConfigExpediente = () => {
     setOpenCreateDocument(false);
     setCurrentApartado(null);
     showSnackbar("Documento creado exitosamente");
-    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+    handleUpdateWithDelay();
   };
 
   const handleUpdateDocumentSuccess = (apartadoId, documentoActualizado) => {
@@ -342,62 +465,49 @@ const ConfigExpediente = () => {
     setCurrentApartado(null);
     setCurrentDocumento(null);
     showSnackbar("Documento actualizado exitosamente");
-    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+    handleUpdateWithDelay();
   };
 
-  const handleDeleteDocument = async (apartadoId, documentoId) => {
-    // Buscar el documento completo en el estado local
-    const documento = (
-      apartados.find((a) => a.idApartado === apartadoId)?.documentos || []
-    ).find((doc) => doc.idDocumento === documentoId);
+  const handleToggleDocumentStatus = async (apartadoId, documento) => {
+    const documentoId = documento.idDocumento;
+    const nuevoEstado = !documento.activo;
+    const accion = nuevoEstado ? "activar" : "desactivar";
 
-    console.log("Toggle de estado para documento:");
-    console.log("apartadoId:", apartadoId);
-    console.log("documentoId:", documentoId);
-    console.log("Documento completo:", documento);
-    console.log("Estado actual:", documento?.activo);
+    showConfirmDialog(
+      `${accion === "activar" ? "Activar" : "Desactivar"} Documento`,
+      `¿Está seguro de ${accion} el documento "${documento.nombreArchivo}"?`,
+      async () => {
+        try {
+          const documentoActualizado = await toggleEstadoDocumento(documentoId);
 
-    if (!documentoId || !documento) {
-      console.error("Error: documento no encontrado o ID indefinido");
-      showSnackbar("No se puede modificar: documento no encontrado", "error");
-      return;
-    }
+          setApartados(
+            apartados.map((apartado) => {
+              if (apartado.idApartado === apartadoId) {
+                return {
+                  ...apartado,
+                  documentos: (apartado.documentos || []).map((doc) =>
+                    doc.idDocumento === documentoId ? documentoActualizado : doc
+                  ),
+                };
+              }
+              return apartado;
+            }),
+          );
 
-    // Mensaje diferente según si va a activar o desactivar
-    const nuevaAccion = documento.activo === false ? "activar" : "desactivar";
-    const mensajeConfirmacion = `¿Está seguro de ${nuevaAccion} este documento?`;
+          const mensajeExito = documento.activo === false
+            ? "Documento activado exitosamente"
+            : "Documento desactivado exitosamente";
 
-    if (window.confirm(mensajeConfirmacion)) {
-      try {
-        // Ahora toggleEstadoDocumento devuelve el documento actualizado
-        const documentoActualizado = await toggleEstadoDocumento(documentoId);
-
-        setApartados(
-          apartados.map((apartado) => {
-            if (apartado.idApartado === apartadoId) {
-              return {
-                ...apartado,
-                documentos: (apartado.documentos || []).map((doc) =>
-                  doc.idDocumento === documentoId ? documentoActualizado : doc
-                ),
-              };
-            }
-            return apartado;
-          }),
-        );
-
-        // Mensaje diferente según la acción realizada
-        const mensajeExito = documento.activo === false
-          ? "Documento activado exitosamente"
-          : "Documento desactivado exitosamente";
-
-        showSnackbar(mensajeExito);
-        handleUpdateWithDelay(); // Programar actualización después de 2 segundos
-      } catch (error) {
-        console.error("Error cambiando estado del documento:", error);
-        showSnackbar("Error al cambiar el estado del documento", "error");
-      }
-    }
+          showSnackbar(mensajeExito);
+          handleUpdateWithDelay();
+        } catch (error) {
+          console.error("Error cambiando estado del documento:", error);
+          showSnackbar("Error al cambiar el estado del documento", "error");
+        }
+      },
+      nuevoEstado ? "success" : "warning",
+      accion === "activar" ? "Activar" : "Desactivar"
+    );
   };
 
   // Handlers para programas
@@ -412,6 +522,45 @@ const ConfigExpediente = () => {
     setCurrentApartado(apartado);
     setCurrentPrograma(programa);
     setOpenEditPrograma(true);
+  };
+
+  // Cambiar estado de programa (activar/desactivar)
+  const handleToggleProgramaStatus = async (apartadoId, programa) => {
+    const nuevoEstado = !programa.activo;
+    const accion = nuevoEstado ? "activar" : "desactivar";
+    
+    showConfirmDialog(
+      `${accion === "activar" ? "Activar" : "Desactivar"} Programa`,
+      `¿Está seguro de ${accion} el programa "${programa.nombre}"?`,
+      async () => {
+        try {
+          await cambiarEstadoProgramaGlobal(programa.id, nuevoEstado);
+          
+          // Actualizar el estado local
+          setApartados(
+            apartados.map((apartado) => {
+              if (apartado.idApartado === apartadoId) {
+                return {
+                  ...apartado,
+                  programas: (apartado.programas || []).map((prog) =>
+                    prog.id === programa.id ? { ...prog, activo: nuevoEstado } : prog
+                  ),
+                };
+              }
+              return apartado;
+            }),
+          );
+          
+          showSnackbar(`Programa ${accion}do exitosamente`);
+          handleUpdateWithDelay();
+        } catch (error) {
+          console.error(`Error al ${accion} programa:`, error);
+          showSnackbar(`Error al ${accion} el programa`, "error");
+        }
+      },
+      nuevoEstado ? "success" : "warning",
+      accion === "activar" ? "Activar" : "Desactivar"
+    );
   };
 
   const handleCreateProgramaSuccess = (apartadoId, nuevoPrograma) => {
@@ -429,7 +578,7 @@ const ConfigExpediente = () => {
     setOpenCreatePrograma(false);
     setCurrentApartado(null);
     showSnackbar("Programa creado exitosamente");
-    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
+    handleUpdateWithDelay();
   };
 
   const handleUpdateProgramaSuccess = (apartadoId, programaActualizado) => {
@@ -452,51 +601,7 @@ const ConfigExpediente = () => {
     setCurrentApartado(null);
     setCurrentPrograma(null);
     showSnackbar("Programa actualizado exitosamente");
-    handleUpdateWithDelay(); // Programar actualización después de 2 segundos
-  };
-
-  const handleDeletePrograma = async (apartadoId, programaId) => {
-    // Buscar el programa completo en el estado local
-    const programa = (
-      apartados.find((a) => a.idApartado === apartadoId)?.programas || []
-    ).find((prog) => prog.id === programaId);
-
-    console.log("Intentando eliminar programa:");
-    console.log("apartadoId:", apartadoId);
-    console.log("programaId:", programaId);
-    console.log("Programa completo:", programa);
-
-    if (!programaId || !programa) {
-      console.error("Error: programa no encontrado o ID indefinido");
-      showSnackbar("No se puede eliminar: programa no encontrado", "error");
-      return;
-    }
-
-    if (window.confirm("¿Está seguro de eliminar este programa?")) {
-      try {
-        await eliminarPrograma(programaId);
-
-        setApartados(
-          apartados.map((apartado) => {
-            if (apartado.idApartado === apartadoId) {
-              return {
-                ...apartado,
-                programas: (apartado.programas || []).filter(
-                  (prog) => prog.id !== programaId,
-                ),
-              };
-            }
-            return apartado;
-          }),
-        );
-
-        showSnackbar("Programa eliminado exitosamente");
-        handleUpdateWithDelay(); // Programar actualización después de 2 segundos
-      } catch (error) {
-        console.error("Error eliminando programa:", error);
-        showSnackbar("Error al eliminar el programa", "error");
-      }
-    }
+    handleUpdateWithDelay();
   };
 
   const handleTabChange = (event, newValue) => {
@@ -651,7 +756,7 @@ const ConfigExpediente = () => {
                 <Chip
                   size="small"
                   icon={<RefreshIcon />}
-                  label="Actualizando en 2 segundos..."
+                  label="Actualizando..."
                   sx={{
                     bgcolor: alpha(institutionalColors.warning, 0.1),
                     color: institutionalColors.warning,
@@ -783,7 +888,7 @@ const ConfigExpediente = () => {
                     WebkitBoxOrient: "vertical",
                   }}
                 >
-                  {stats.requiredCategories} obligatorias
+                  {stats.totalCategoriesActivas} activas · {stats.totalCategoriesInactivas} inactivas
                 </Typography>
               </Box>
             </CardContent>
@@ -1163,12 +1268,13 @@ const ConfigExpediente = () => {
                         "&:hover": {
                           boxShadow: 4,
                         },
+                        opacity: apartado.activo === false ? 0.7 : 1,
                       }}
                     >
                       <AccordionSummary
                         expandIcon={<ExpandMoreIcon />}
                         sx={{
-                          bgcolor: "#fff",
+                          bgcolor: apartado.activo === false ? alpha(institutionalColors.error, 0.05) : "#fff",
                           "&:hover": {
                             bgcolor: alpha(institutionalColors.primary, 0.02),
                           },
@@ -1216,11 +1322,26 @@ const ConfigExpediente = () => {
                                 variant="h6"
                                 sx={{
                                   fontWeight: "bold",
-                                  color: institutionalColors.textPrimary,
+                                  color: apartado.activo === false ? institutionalColors.textMuted : institutionalColors.textPrimary,
+                                  textDecoration: apartado.activo === false ? 'line-through' : 'none',
                                 }}
                               >
                                 {apartado.nombre}
                               </Typography>
+                              {apartado.activo === false && (
+                                <Chip
+                                  label="INACTIVO"
+                                  size="small"
+                                  color="default"
+                                  sx={{
+                                    height: 22,
+                                    fontSize: "0.7rem",
+                                    fontWeight: "bold",
+                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                    color: institutionalColors.error,
+                                  }}
+                                />
+                              )}
                               {apartado.obligatorio && (
                                 <Chip
                                   label="OBLIGATORIO"
@@ -1278,21 +1399,37 @@ const ConfigExpediente = () => {
                                 <EditIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Eliminar categoría" arrow>
+                            
+                            {/* Botón para activar/desactivar categoría con iconos mejorados */}
+                            <Tooltip 
+                              title={apartado.activo === false ? "Activar categoría" : "Desactivar categoría"} 
+                              arrow
+                            >
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteCategory(apartado.idApartado);
+                                  handleToggleCategoryStatus(apartado);
                                 }}
                                 sx={{
-                                  color: institutionalColors.error,
+                                  color: apartado.activo === false 
+                                    ? institutionalColors.success 
+                                    : institutionalColors.warning,
                                   "&:hover": {
-                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                    bgcolor: alpha(
+                                      apartado.activo === false 
+                                        ? institutionalColors.success 
+                                        : institutionalColors.warning, 
+                                      0.1
+                                    ),
                                   },
                                 }}
                               >
-                                <DeleteIcon fontSize="small" />
+                                {apartado.activo === false ? (
+                                  <RestoreIcon fontSize="small" /> // Icono de restaurar/activar
+                                ) : (
+                                  <PowerIcon fontSize="small" /> // Icono de apagar/desactivar
+                                )}
                               </IconButton>
                             </Tooltip>
                           </Stack>
@@ -1323,6 +1460,7 @@ const ConfigExpediente = () => {
                                           borderLeft: `4px solid ${institutionalColors.primary}`,
                                           alignItems: "flex-start",
                                           transition: "all 0.2s",
+                                          opacity: documento.activo === false ? 0.7 : 1,
                                           "&:hover": {
                                             transform: "translateX(4px)",
                                             boxShadow: 2,
@@ -1357,12 +1495,12 @@ const ConfigExpediente = () => {
                                             sx={{
                                               fontWeight: "bold",
                                               color: institutionalColors.textPrimary,
+                                              textDecoration: documento.activo === false ? 'line-through' : 'none',
                                             }}
                                           >
                                             {documento.nombreArchivo}
                                           </Typography>
 
-                                          {/* 👇 NUEVO - Badge de estado activo/inactivo */}
                                           {documento.activo === false ? (
                                             <Chip
                                               size="small"
@@ -1430,6 +1568,7 @@ const ConfigExpediente = () => {
                                               </IconButton>
                                             </Tooltip>
 
+                                            {/* Botón para activar/desactivar documento con iconos mejorados */}
                                             <Tooltip
                                               title={documento.activo === false ? "Activar documento" : "Desactivar documento"}
                                               arrow
@@ -1437,29 +1576,29 @@ const ConfigExpediente = () => {
                                               <IconButton
                                                 size="small"
                                                 onClick={() =>
-                                                  handleDeleteDocument(
+                                                  handleToggleDocumentStatus(
                                                     apartado.idApartado,
-                                                    documento.idDocumento,
+                                                    documento,
                                                   )
                                                 }
                                                 sx={{
                                                   color: documento.activo === false
-                                                    ? institutionalColors.success  // Verde para activar
-                                                    : institutionalColors.error,    // Rojo para desactivar
+                                                    ? institutionalColors.success
+                                                    : institutionalColors.warning,
                                                   "&:hover": {
                                                     bgcolor: alpha(
                                                       documento.activo === false
                                                         ? institutionalColors.success
-                                                        : institutionalColors.error,
+                                                        : institutionalColors.warning,
                                                       0.1
                                                     ),
                                                   },
                                                 }}
                                               >
                                                 {documento.activo === false ? (
-                                                  <CheckCircleIcon fontSize="small" /> // Icono de activar
+                                                  <RestoreIcon fontSize="small" /> // Icono de restaurar/activar
                                                 ) : (
-                                                  <VisibilityOffIcon fontSize="small" />
+                                                  <PowerIcon fontSize="small" /> // Icono de apagar/desactivar
                                                 )}
                                               </IconButton>
                                             </Tooltip>
@@ -1475,6 +1614,7 @@ const ConfigExpediente = () => {
                                 startIcon={<AddIcon />}
                                 size="medium"
                                 onClick={() => handleAddDocument(apartado.idApartado)}
+                                disabled={apartado.activo === false}
                                 sx={{
                                   mt: 2,
                                   color: institutionalColors.primary,
@@ -1510,6 +1650,7 @@ const ConfigExpediente = () => {
                                           borderLeft: `4px solid ${getTipoProgramaColor(programa.tipo)}`,
                                           alignItems: "flex-start",
                                           transition: "all 0.2s",
+                                          opacity: programa.activo === false ? 0.7 : 1,
                                           "&:hover": {
                                             transform: "translateX(4px)",
                                             boxShadow: 2,
@@ -1545,6 +1686,7 @@ const ConfigExpediente = () => {
                                               sx={{
                                                 fontWeight: "bold",
                                                 color: institutionalColors.textPrimary,
+                                                textDecoration: programa.activo === false ? 'line-through' : 'none',
                                               }}
                                             >
                                               {programa.nombre}
@@ -1567,9 +1709,13 @@ const ConfigExpediente = () => {
                                             {programa.activo === false && (
                                               <Chip
                                                 size="small"
-                                                label="Inactivo"
+                                                label="INACTIVO"
                                                 color="default"
-                                                sx={{ height: 24 }}
+                                                sx={{
+                                                  height: 24,
+                                                  bgcolor: alpha(institutionalColors.error, 0.1),
+                                                  color: institutionalColors.error,
+                                                }}
                                               />
                                             )}
                                           </Box>
@@ -1677,23 +1823,38 @@ const ConfigExpediente = () => {
                                               </IconButton>
                                             </Tooltip>
 
-                                            <Tooltip title="Eliminar programa" arrow>
+                                            {/* Botón para activar/desactivar programa con iconos mejorados */}
+                                            <Tooltip
+                                              title={programa.activo === false ? "Activar programa" : "Desactivar programa"}
+                                              arrow
+                                            >
                                               <IconButton
                                                 size="small"
                                                 onClick={() =>
-                                                  handleDeletePrograma(
+                                                  handleToggleProgramaStatus(
                                                     apartado.idApartado,
-                                                    programa.id,
+                                                    programa,
                                                   )
                                                 }
                                                 sx={{
-                                                  color: institutionalColors.error,
+                                                  color: programa.activo === false
+                                                    ? institutionalColors.success
+                                                    : institutionalColors.warning,
                                                   "&:hover": {
-                                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                                    bgcolor: alpha(
+                                                      programa.activo === false
+                                                        ? institutionalColors.success
+                                                        : institutionalColors.warning,
+                                                      0.1
+                                                    ),
                                                   },
                                                 }}
                                               >
-                                                <DeleteIcon fontSize="small" />
+                                                {programa.activo === false ? (
+                                                  <RestoreIcon fontSize="small" /> // Icono de restaurar/activar
+                                                ) : (
+                                                  <PowerIcon fontSize="small" /> // Icono de apagar/desactivar
+                                                )}
                                               </IconButton>
                                             </Tooltip>
                                           </Stack>
@@ -1708,6 +1869,7 @@ const ConfigExpediente = () => {
                                 startIcon={<AddIcon />}
                                 size="medium"
                                 onClick={() => handleAddPrograma(apartado.idApartado)}
+                                disabled={apartado.activo === false}
                                 sx={{
                                   mt: 2,
                                   color: institutionalColors.warning,
@@ -1731,6 +1893,18 @@ const ConfigExpediente = () => {
           </Box>
         </Paper>
       </Box>
+
+      {/* Modal de Confirmación Personalizado */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText="Cancelar"
+        severity={confirmDialog.severity}
+      />
 
       {/* Modales de Categorías */}
       <CreateCategoryDialog
