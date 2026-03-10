@@ -15,15 +15,18 @@ export const login = async (email, password, tenant) => {
 };
 
 export const logout = async () => {
-  try {
-    await API.post('/auth/logout');
-  } catch (error) {
-    console.error('Error en logout:', error);
-  } finally {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-  }
+  const tenant = localStorage.getItem('tenant');
+
+  await API.post('/auth/logout', {}, {
+    headers: {
+      'X-Tenant-ID': tenant
+    }
+  });
+
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  localStorage.removeItem('tenant');
 };
 
 export const getCurrentUser = () => {

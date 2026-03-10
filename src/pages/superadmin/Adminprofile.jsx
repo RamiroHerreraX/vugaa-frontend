@@ -40,9 +40,7 @@ import {
 
 import { useAuth } from "../../context/AuthContext";
 import usuarioService from "../../services/usuarioService";
-import {
-  crearPerfilAdministrador,
-} from "../../services/Perfiladministrador";
+import { crearPerfilAdministrador } from "../../services/Perfiladministrador";
 
 const palette = {
   primary: "#133B6B",
@@ -133,7 +131,7 @@ const AdminProfile = () => {
 
   const [formData, setFormData] = useState({
     numeroEmpleado: "",
-    tipoAdmin: "",
+    tipoAdmin: "SUPERADMIN",
     telefono: "",
     emailAlternativo: "",
     departamento: "",
@@ -155,12 +153,7 @@ const AdminProfile = () => {
     if (user) {
       setIdUsuario(user.id || user.idUsuario);
       setUserEmail(user.email || "");
-      
-      // Forzar tipoAdmin como SUPERADMIN
-      setFormData(prev => ({
-        ...prev,
-        tipoAdmin: "SUPERADMIN"
-      }));
+      setFormData((prev) => ({ ...prev, tipoAdmin: "SUPERADMIN" }));
     } else {
       setSnackbar({ open: true, message: "No se encontró sesión activa.", severity: "error" });
     }
@@ -199,8 +192,11 @@ const AdminProfile = () => {
     else if (passwordData.newPassword.length < 8) e.newPassword = "Mínimo 8 caracteres";
     if (!passwordData.confirmPassword) e.confirmPassword = "Confirmar contraseña requerido";
     else if (passwordData.newPassword !== passwordData.confirmPassword) e.confirmPassword = "Las contraseñas no coinciden";
-    if (passwordData.newPassword && passwordData.currentPassword &&
-      passwordData.newPassword === passwordData.currentPassword)
+    if (
+      passwordData.newPassword &&
+      passwordData.currentPassword &&
+      passwordData.newPassword === passwordData.currentPassword
+    )
       e.newPassword = "La nueva contraseña debe ser diferente a la actual";
     setPasswordErrors(e);
     return Object.keys(e).length === 0;
@@ -213,12 +209,18 @@ const AdminProfile = () => {
       if (required && (!formData[name] || formData[name].toString().trim() === "")) {
         newErrors[name] = "Este campo es requerido";
       }
-      if (formData[name] && name === "emailAlternativo" &&
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData[name])) {
+      if (
+        formData[name] &&
+        name === "emailAlternativo" &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData[name])
+      ) {
         newErrors[name] = "Email inválido";
       }
-      if (formData[name] && name === "telefono" &&
-        !/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(formData[name])) {
+      if (
+        formData[name] &&
+        name === "telefono" &&
+        !/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(formData[name])
+      ) {
         newErrors[name] = "Teléfono inválido";
       }
     });
@@ -231,10 +233,6 @@ const AdminProfile = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
-    
-    // Log para depuración
-    console.log("Campo cambiado:", name, value);
-    console.log("Estado actual de completedSections:", completedSections);
   };
 
   const handlePasswordChange = (e) => {
@@ -244,19 +242,13 @@ const AdminProfile = () => {
   };
 
   const handleNext = () => {
-    console.log("handleNext - activeTab:", activeTab);
-    if (activeTab === 0) { 
-      setActiveTab(1); 
-      return; 
+    if (activeTab === 0) {
+      setActiveTab(1);
+      return;
     }
     if (validateCurrentSection()) {
       const sectionKey = sections[activeTab].key;
-      console.log("Marcando sección como completada:", sectionKey);
-      setCompletedSections((prev) => {
-        const newState = { ...prev, [sectionKey]: true };
-        console.log("Nuevo estado de completedSections:", newState);
-        return newState;
-      });
+      setCompletedSections((prev) => ({ ...prev, [sectionKey]: true }));
       setActiveTab((t) => t + 1);
     }
   };
@@ -269,12 +261,7 @@ const AdminProfile = () => {
     setLoadingPassword(true);
     try {
       await usuarioService.cambiarPassword(idUsuario, passwordData.currentPassword, passwordData.newPassword);
-      console.log("Contraseña cambiada exitosamente, marcando sección seguridad como completada");
-      setCompletedSections((prev) => {
-        const newState = { ...prev, seguridad: true };
-        console.log("Nuevo estado de completedSections después de cambiar contraseña:", newState);
-        return newState;
-      });
+      setCompletedSections((prev) => ({ ...prev, seguridad: true }));
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setSnackbar({ open: true, message: "Contraseña actualizada exitosamente", severity: "success" });
       setTimeout(() => setActiveTab(1), 1500);
@@ -285,71 +272,60 @@ const AdminProfile = () => {
     }
   };
 
+  // ── FIX: handleCompleteProfile valida la sección actual y no depende de allDone ──
   const handleCompleteProfile = async () => {
     if (!idUsuario) return;
 
+    // 1. Validar la sección actual (sistema) antes de proceder
+    if (!validateCurrentSection()) return;
+
+    // 2. Verificar que se cambió la contraseña
     if (!completedSections.seguridad) {
       setSnackbar({ open: true, message: "Debes cambiar tu contraseña primero", severity: "warning" });
       setActiveTab(0);
       return;
     }
 
-    // Validar todas las secciones requeridas
+    // 3. Validar todas las secciones con campos requeridos
     let allValid = true;
     const newCompleted = { ...completedSections };
-    
-    console.log("Validando todas las secciones. Estado actual:", completedSections);
-    console.log("Datos del formulario:", formData);
-    
+
     sections.forEach((section) => {
       if (section.key === "seguridad") return;
-      
-      // Verificar si todos los campos requeridos están llenos
       const requiredFields = section.fields.filter((f) => f.required);
-      console.log(`Sección ${section.key} - Campos requeridos:`, requiredFields.map(f => f.name));
-      
       const valid = requiredFields.every((f) => {
         const value = formData[f.name];
-        const isValid = value && value.toString().trim() !== "";
-        console.log(`  Campo ${f.name}: valor="${value}", válido=${isValid}`);
-        return isValid;
+        return value && value.toString().trim() !== "";
       });
-      
-      console.log(`Sección ${section.key} válida: ${valid}`);
       newCompleted[section.key] = valid;
       if (!valid) allValid = false;
     });
-    
-    console.log("Nuevo estado de completedSections después de validar:", newCompleted);
+
+    // Marcar la sección actual como completada también
+    newCompleted[sections[activeTab].key] = true;
     setCompletedSections(newCompleted);
 
     if (!allValid) {
-      console.log("No todas las secciones son válidas. allValid =", allValid);
       setSnackbar({ open: true, message: "Hay campos obligatorios incompletos.", severity: "warning" });
       return;
     }
 
-    console.log("Todas las secciones son válidas, procediendo a guardar...");
     setLoadingSave(true);
     try {
       const payload = {
         idUsuario,
         numeroEmpleado: formData.numeroEmpleado,
-        tipoAdmin: "SUPERADMIN", // Forzar SUPERADMIN
+        tipoAdmin: "SUPERADMIN",
         telefono: formData.telefono,
         emailAlternativo: formData.emailAlternativo,
         departamento: formData.departamento,
       };
 
-      console.log("Enviando payload:", payload);
       await crearPerfilAdministrador(payload);
-
       updateUser({ perfilCompleto: true });
-
       setSnackbar({ open: true, message: "¡Perfil completado exitosamente! Redirigiendo...", severity: "success" });
       setTimeout(() => navigate("/dashboard"), 2000);
     } catch (err) {
-      console.error("Error al guardar el perfil:", err);
       setSnackbar({ open: true, message: err.message || "Error al guardar el perfil", severity: "error" });
     } finally {
       setLoadingSave(false);
@@ -360,7 +336,6 @@ const AdminProfile = () => {
   const renderField = (field) => {
     const { name, label, type, required, placeholder, options } = field;
 
-    // Si es el campo tipoAdmin, deshabilitarlo y forzar SUPERADMIN
     if (name === "tipoAdmin") {
       return (
         <Box sx={{ mb: 2.5 }}>
@@ -373,9 +348,7 @@ const AdminProfile = () => {
             size="small"
             value="Super Administrador"
             disabled
-            InputProps={{
-              readOnly: true,
-            }}
+            InputProps={{ readOnly: true }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 borderRadius: 2,
@@ -546,16 +519,6 @@ const AdminProfile = () => {
   // ── Cálculos de progreso ──────────────────────────────────────────────────
   const completedCount = Object.values(completedSections).filter(Boolean).length;
   const progress = (completedCount / sections.length) * 100;
-  const allDone = completedCount === sections.length;
-
-  // Log para depuración del estado
-  console.log("=== ESTADO ACTUAL ===");
-  console.log("completedSections:", completedSections);
-  console.log("completedCount:", completedCount);
-  console.log("allDone:", allDone);
-  console.log("activeTab:", activeTab);
-  console.log("formData:", formData);
-  console.log("===================");
 
   return (
     <Box sx={{ minHeight: "100vh", background: "#F4F7FB" }}>
@@ -570,7 +533,7 @@ const AdminProfile = () => {
                   Completa tu Perfil de Administrador
                 </Typography>
                 <Typography variant="caption" sx={{ color: palette.textMuted }}>
-                  {allDone ? "Todo listo para finalizar" : "Configuración pendiente"}
+                  {completedCount === sections.length ? "Todo listo para finalizar" : "Configuración pendiente"}
                 </Typography>
               </Box>
             </Stack>
@@ -604,15 +567,13 @@ const AdminProfile = () => {
 
       {/* Contenido */}
       <Box sx={{ maxWidth: 1300, mx: "auto", p: { xs: 2, sm: 3, md: 4 } }}>
-        {!allDone && (
-          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }} icon={<WarningIcon />}>
-            <AlertTitle>Completa todos los pasos</AlertTitle>
-            {activeTab === 0
-              ? "Primero debes cambiar tu contraseña por seguridad."
-              : `Paso ${activeTab + 1} de ${sections.length}: ${sections[activeTab].label}`}
-            {" "}Los campos marcados con <strong>*</strong> son obligatorios.
-          </Alert>
-        )}
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }} icon={<WarningIcon />}>
+          <AlertTitle>Completa todos los pasos</AlertTitle>
+          {activeTab === 0
+            ? "Primero debes cambiar tu contraseña por seguridad."
+            : `Paso ${activeTab + 1} de ${sections.length}: ${sections[activeTab].label}`}
+          {" "}Los campos marcados con <strong>*</strong> son obligatorios.
+        </Alert>
 
         <Paper sx={{ borderRadius: 3, overflow: "hidden", border: `1px solid ${palette.border}` }}>
           <Box sx={{ p: 4 }}>
@@ -638,14 +599,20 @@ const AdminProfile = () => {
               </>
             )}
 
-            {/* Navegación - Mostrar siempre */}
+            {/* Navegación */}
             <Stack direction="row" justifyContent="space-between" sx={{ mt: 4 }}>
               <Button
                 startIcon={<PrevIcon />}
                 onClick={handlePrev}
                 disabled={activeTab === 0}
                 variant="outlined"
-                sx={{ borderColor: palette.border, color: palette.text, textTransform: "none", px: 3, "&:hover": { borderColor: palette.primary, bgcolor: palette.primaryBg } }}
+                sx={{
+                  borderColor: palette.border,
+                  color: palette.text,
+                  textTransform: "none",
+                  px: 3,
+                  "&:hover": { borderColor: palette.primary, bgcolor: palette.primaryBg },
+                }}
               >
                 Anterior
               </Button>
@@ -660,12 +627,13 @@ const AdminProfile = () => {
                   Siguiente
                 </Button>
               ) : (
+                // ✅ FIX: disabled solo depende de loadingSave, no de allDone
                 <Button
                   endIcon={loadingSave ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : <DoneAllIcon />}
                   onClick={handleCompleteProfile}
                   variant="contained"
                   color="success"
-                  disabled={loadingSave || !allDone}
+                  disabled={loadingSave}
                   sx={{ textTransform: "none", px: 4, py: 1 }}
                 >
                   {loadingSave ? "Guardando..." : "Completar Perfil"}
@@ -682,7 +650,11 @@ const AdminProfile = () => {
         onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} sx={{ width: "100%" }}>
+        <Alert
+          onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
