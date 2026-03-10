@@ -5,6 +5,9 @@ import { getTodosApartados } from '../../../services/apartado';
 import { subirDocumento, getDocumentosSubidosPorApartado, eliminarDocumentoSubido, descargarArchivo , obtenerArchivoBlob} from '../../../services/documentoSubido';
 import { getDocumentosPorApartado } from '../../../services/documentoExpediente';
 import { getMiExpediente } from '../../../services/expediente';
+import { getProgramasPorApartado } from '../../../services/programas';
+import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
+import { crearCertificacionCompleta } from '../../../services/certificaciones';
 
 import {
   Box,
@@ -464,6 +467,90 @@ const Expediente = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Estados nuevos:
+const [certModalOpen, setCertModalOpen] = useState(false);
+const [progSeleccionado, setProgSeleccionado] = useState(null);
+const [saving, setSaving] = useState(false);
+const [uploading, setUploading] = useState(false);
+const [uploadProgress, setUploadProgress] = useState(0);
+const [nuevaCertificacion, setNuevaCertificacion] = useState({
+  subseccion: '', tipoDocumento: '', institucion: '',
+  fecha: new Date().toISOString().split('T')[0],
+  horas: '', archivo: null, nombreArchivo: ''
+});
+
+// Handlers nuevos:
+const handleNuevaCertificacionChange = (campo) => (event) => {
+  setNuevaCertificacion(prev => ({ ...prev, [campo]: event.target.value }));
+};
+
+const handleCertFileChange = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    setSnackbar({ open: true, message: 'El archivo no puede ser mayor a 10MB', severity: 'error' });
+    return;
+  }
+  const tiposPermitidos = ['application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg', 'image/png'];
+  if (!tiposPermitidos.includes(file.type)) {
+    setSnackbar({ open: true, message: 'Formato no permitido. Use PDF, DOC, DOCX, JPG o PNG', severity: 'error' });
+    return;
+  }
+  setNuevaCertificacion(prev => ({ ...prev, archivo: file, nombreArchivo: file.name }));
+  // Simular progreso
+  setUploading(true);
+  setUploadProgress(0);
+  const interval = setInterval(() => {
+    setUploadProgress(prev => {
+      if (prev >= 100) { clearInterval(interval); setUploading(false); return 100; }
+      return prev + 10;
+    });
+  }, 300);
+};
+
+const handleGuardarCertDesdePrograma = async () => {
+  if (!nuevaCertificacion.tipoDocumento || !nuevaCertificacion.institucion ||
+      !nuevaCertificacion.horas || !nuevaCertificacion.archivo) {
+    setSnackbar({ open: true, message: 'Complete todos los campos requeridos', severity: 'warning' });
+    return;
+  }
+  setSaving(true);
+  try {
+    await crearCertificacionCompleta(
+      {
+        nombre:        nuevaCertificacion.tipoDocumento,
+        institucion:   nuevaCertificacion.institucion,
+        horas:         parseInt(nuevaCertificacion.horas),
+        fecha:         nuevaCertificacion.fecha,
+        nombreArchivo: nuevaCertificacion.nombreArchivo,
+        descripcion:   '',
+      },
+      user?.instanciaId,
+      expediente?.id,
+      progSeleccionado?.id,
+      nuevaCertificacion.archivo
+    );
+    setSnackbar({ open: true, message: 'Certificación agregada correctamente', severity: 'success' });
+    setCertModalOpen(false);
+    setProgSeleccionado(null);
+    setNuevaCertificacion({
+      subseccion: '', tipoDocumento: '', institucion: '',
+      fecha: new Date().toISOString().split('T')[0],
+      horas: '', archivo: null, nombreArchivo: ''
+    });
+  } catch (error) {
+    setSnackbar({
+      open: true,
+      message: error.response?.data?.message || 'Error al guardar la certificación',
+      severity: 'error'
+    });
+  } finally {
+    setSaving(false);
+  }
+};
+
   // ── Estados principales ──────────────────────────────────
   const [expediente, setExpediente] = useState(null);
   const [archivosSubidos, setArchivosSubidos] = useState({});
@@ -565,6 +652,12 @@ const Expediente = () => {
 
         const apartadosTransformados = await Promise.all(
           globales.map(async (apartado) => {
+            let programas = [];
+            try {
+              programas = await getProgramasPorApartado(apartado.idApartado);
+            } catch (error) {
+              console.error(`Error cargando programas del apartado ${apartado.idApartado}:`, error);
+            }
             let documentos = [];
             try {
               documentos = await getDocumentosPorApartado(apartado.idApartado);
@@ -582,6 +675,7 @@ const Expediente = () => {
               obligatorio: apartado.obligatorio || false,
               esGlobal: !apartado.idInstancia,
               documentos: documentos || [],
+              programas: programas || [], 
             };
           })
         );
@@ -1126,6 +1220,102 @@ const handleDescargarDocumento = async (documento) => {
           {!archivosSubidos[apartado.idApartado]?.length && apartado.documentos?.length === 0 && (
             <Alert severity="info" sx={{ mb: 2 }}>No hay documentos configurados en este apartado</Alert>
           )}
+
+          {/* ── Programas del apartado ── */}
+{/* ── Programas del apartado ── */}
+{apartado.programas?.length > 0 && (
+  <Box sx={{ mb: 2 }}>
+    <Typography variant="caption" sx={{ 
+      color: colors.text.secondary, fontWeight: '600', 
+      textTransform: 'uppercase', letterSpacing: 0.5, 
+      display: 'block', mb: 1 
+    }}>
+      Programas requeridos
+    </Typography>
+    <List sx={{ p: 0 }}>
+      {apartado.programas.map((prog) => (
+        <ListItem
+          key={prog.id}
+          sx={{
+            p: 2, 
+            mb: 1, 
+            borderRadius: 2,
+            backgroundColor: '#fff',
+            border: `1px solid ${colors.accents.purple}20`,
+            borderLeft: `4px solid ${colors.accents.purple}`,
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 36 }}>
+            <Box sx={{ 
+              width: 28, 
+              height: 28, 
+              borderRadius: '50%',
+              backgroundColor: `${colors.accents.purple}15`,
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              color: colors.accents.purple
+            }}>
+              <SchoolIcon sx={{ fontSize: '0.9rem' }} />
+            </Box>
+          </ListItemIcon>
+          
+          <ListItemText
+            primary={
+              <Typography variant="body2" sx={{ fontWeight: '700', color: colors.text.primary }}>
+                {prog.nombre}
+              </Typography>
+            }
+            secondary={
+              prog.descripcion && (
+                <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+                  {prog.descripcion}
+                  {prog.horasRequeridas ? ` • ${prog.horasRequeridas} hrs requeridas` : ''}
+                </Typography>
+              )
+            }
+          />
+          
+          {prog.horasRequeridas && (
+            <Chip 
+              label={`${prog.horasRequeridas} hrs`} 
+              size="small" 
+              sx={{ 
+                height: '20px', 
+                fontSize: '0.65rem', 
+                backgroundColor: `${colors.accents.purple}15`, 
+                color: colors.accents.purple,
+                mr: 1
+              }} 
+            />
+          )}
+          
+          {/* Botón Subir - AHORA DENTRO DEL ListItem */}
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem' }} />}
+            onClick={() => { 
+              setProgSeleccionado(prog); 
+              setCertModalOpen(true); 
+            }}
+            sx={{
+              textTransform: 'none', 
+              fontSize: '0.75rem',
+              bgcolor: colors.accents.purple,
+              '&:hover': { bgcolor: '#5a4bd1' },
+              height: '28px', 
+              px: 1.5, 
+              flexShrink: 0
+            }}
+          >
+            Subir
+          </Button>
+        </ListItem>
+      ))}
+    </List>
+  </Box>
+)}
 
           {/* ── Botón subir ── */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1, borderTop: `1px solid ${colors.primary.main}10` }}>
@@ -1833,6 +2023,28 @@ const handleDescargarDocumento = async (documento) => {
           <Button onClick={handleConfirmarEliminacion} variant="contained" color="error" startIcon={<DeleteIcon />} sx={{ textTransform: 'none' }}>Eliminar</Button>
         </DialogActions>
       </Dialog>
+    <AddCertificationModal
+  open={certModalOpen}
+  onClose={() => {
+    if (saving) return;  // ← cambiado de savingCert a saving
+    setCertModalOpen(false);
+    setProgSeleccionado(null);
+    setNuevaCertificacion({
+      subseccion: '', tipoDocumento: '', institucion: '',
+      fecha: new Date().toISOString().split('T')[0],
+      horas: '', archivo: null, nombreArchivo: ''
+    });
+  }}
+  onSave={handleGuardarCertDesdePrograma}
+  nuevaCertificacion={nuevaCertificacion}
+  onFieldChange={handleNuevaCertificacionChange}
+  onFileChange={handleCertFileChange}
+  onRemoveFile={() => setNuevaCertificacion(prev => ({ ...prev, archivo: null, nombreArchivo: '' }))}
+  uploading={uploading}  // ← cambiado de uploadingCert a uploading
+  uploadProgress={uploadProgress}  // ← cambiado de uploadProgressCert a uploadProgress
+  saving={saving}  // ← cambiado de savingCert a saving
+  subseccionFija={progSeleccionado?.nombre}
+/>
 
       {/* Snackbar */}
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
