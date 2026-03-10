@@ -50,37 +50,60 @@ import {
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
-// IMPORTAR EL HOOK DE AUTENTICACIÓN
 import { useAuth } from "../../context/AuthContext";
 
-// Importar servicios de API - ACTUALIZADO
-import { getApartadosPorInstanciaConGlobales, desactivarApartado } from "../../services/apartado";
+import {
+  getApartadosPorInstanciaConGlobales,
+  desactivarApartado,
+} from "../../services/apartado";
 
 import {
   getDocumentosPorApartado,
   toggleEstadoDocumento,
 } from "../../services/documentoExpediente";
 
-// Importar los modales
 import CreateCategoryDialogAdmin from "../../components/expedienteAdmin/CreateCategoryDialogAdmin";
 import EditCategoryDialogAdmin from "../../components/expedienteAdmin/EditCategoryDialogAdmin";
 import CreateDocumentDialogAdmin from "../../components/expedienteAdmin/CreateDocumentDialogAdmin";
 import EditDocumentDialogAdmin from "../../components/expedienteAdmin/EditDocumentDialogAdmin";
 
-import CreateProgramaDialog from "../../components/programas/CreateProgramaDialog";
-import EditProgramaDialog from "../../components/programas/EditProgramaDialog";
+import CreateProgramaDialogAdmin from "../../components/programasAdmin/CreateProgramaDialogAdmin";
+import EditProgramaDialogAdmin from "../../components/programasAdmin/EditProgramaDialogAdmin";
 
 import { getProgramasPorApartado, eliminarPrograma } from "../../services/programas";
 
-// Importar iconos y colores desde el archivo de iconos
 import {
   institutionalColors,
   getDefaultIcon,
   getCategoryColor,
 } from "../../utils/iconosUtils";
 
+// ─── Utilidad: normalizar un programa recibido del backend ───────────────────
+// El backend puede devolver el ID como "id", "idPrograma" o "programaId".
+// Siempre dejamos ambos campos poblados para no depender del contexto.
+const normalizePrograma = (programa) => {
+  const id =
+    programa?.id ||
+    programa?.idPrograma ||
+    programa?.programaId ||
+    null;
+
+  return {
+    ...programa,
+    id,
+    idPrograma: id,
+    nombre: programa?.nombre || "",
+    descripcion: programa?.descripcion || "",
+    horasRequeridas: programa?.horasRequeridas || 0,
+    tipo: programa?.tipo || "VIDEO",
+    activo: programa?.activo !== undefined ? programa.activo : true,
+    configuracionJson: programa?.configuracionJson || "",
+    idInstancia: programa?.idInstancia || null,
+    idApartado: programa?.idApartado || null,
+  };
+};
+
 const ConfigExpediente = () => {
-  // OBTENER EL USUARIO DEL CONTEXTO DE AUTENTICACIÓN
   const { user } = useAuth();
 
   const [apartadosGlobales, setApartadosGlobales] = useState([]);
@@ -93,19 +116,14 @@ const ConfigExpediente = () => {
     severity: "success",
   });
 
-  // Estado para controlar la pestaña activa (documentos o programas)
   const [activeTab, setActiveTab] = useState(0);
+  const [activeView, setActiveView] = useState(0);
 
-  // Estado para controlar la vista (global o instancia)
-  const [activeView, setActiveView] = useState(0); // 0: Instancia, 1: Globales
-
-  // Estados para los diálogos de categorías y documentos
   const [openCreateCategory, setOpenCreateCategory] = useState(false);
   const [openEditCategory, setOpenEditCategory] = useState(false);
   const [openCreateDocument, setOpenCreateDocument] = useState(false);
   const [openEditDocument, setOpenEditDocument] = useState(false);
 
-  // Estados para los diálogos de programas
   const [openCreatePrograma, setOpenCreatePrograma] = useState(false);
   const [openEditPrograma, setOpenEditPrograma] = useState(false);
 
@@ -116,44 +134,26 @@ const ConfigExpediente = () => {
 
   const [expandedCategory, setExpandedCategory] = useState(null);
 
-  // ✅ CORREGIDO: usar ap.idInstancia (nombre del campo en el DTO del back)
-  const canDeleteCategory = (apartado) => {
-    if (!user) return false;
-    if (apartado.esGlobal) return false;
-    return user.instanciaId === apartado.idInstancia;
-  };
+  // ─── Permisos ─────────────────────────────────────────────────────────────
+  const canDeleteCategory = (apartado) =>
+    !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  const canEditCategory = (apartado) => {
-    if (!user) return false;
-    if (apartado.esGlobal) return false;
-    return user.instanciaId === apartado.idInstancia;
-  };
+  const canEditCategory = (apartado) =>
+    !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  const canModifyDocument = (apartado) => {
-    if (!user) return false;
-    if (apartado.esGlobal) return false;
-    return user.instanciaId === apartado.idInstancia;
-  };
+  const canModifyDocument = (apartado) =>
+    !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  const canAddDocument = (apartado) => {
-    if (!user) return false;
-    if (apartado.esGlobal) return false;
-    return user.instanciaId === apartado.idInstancia;
-  };
+  const canAddDocument = (apartado) =>
+    !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  const canModifyPrograma = (apartado) => {
-    if (!user) return false;
-    if (apartado.esGlobal) return false;
-    return user.instanciaId === apartado.idInstancia;
-  };
+  const canModifyPrograma = (apartado) =>
+    !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  const canAddPrograma = (apartado) => {
-    if (!user) return false;
-    if (apartado.esGlobal) return false;
-    return user.instanciaId === apartado.idInstancia;
-  };
+  const canAddPrograma = (apartado) =>
+    !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  // Cargar datos iniciales
+  // ─── Carga de datos ───────────────────────────────────────────────────────
   useEffect(() => {
     cargarApartados();
   }, []);
@@ -163,51 +163,63 @@ const ConfigExpediente = () => {
       setLoading(true);
       setError(null);
 
-      if (!user || !user.instanciaId) {
-        console.error("❌ No se encontró instanciaId del usuario");
+      if (!user?.instanciaId) {
         setError("No se pudo determinar la instancia del usuario");
         setLoading(false);
         return;
       }
 
-      const apartadosData = await getApartadosPorInstanciaConGlobales(user.instanciaId);
-
-      const apartadosConDocumentosYProgramas = await Promise.all(
-        apartadosData.map(async (apartado) => {
-          try {
-            const documentos = await getDocumentosPorApartado(apartado.idApartado);
-            const programas = await getProgramasPorApartado(apartado.idApartado);
-            return { ...apartado, documentos: documentos || [], programas: programas || [] };
-          } catch (error) {
-            console.error(`❌ Error cargando datos para apartado ${apartado.idApartado}:`, error);
-            return { ...apartado, documentos: [], programas: [] };
-          }
-        }),
+      const apartadosData = await getApartadosPorInstanciaConGlobales(
+        user.instanciaId
       );
 
-      const apartadosActivos = apartadosConDocumentosYProgramas.filter((ap) => ap.activo !== false);
+      const apartadosConDatos = await Promise.all(
+        apartadosData.map(async (apartado) => {
+          try {
+            const [documentos, programas] = await Promise.all([
+              getDocumentosPorApartado(apartado.idApartado),
+              getProgramasPorApartado(apartado.idApartado),
+            ]);
+            return {
+              ...apartado,
+              documentos: documentos || [],
+              // ✅ Normalizar todos los programas al cargar para coherencia
+              programas: (programas || []).map(normalizePrograma),
+            };
+          } catch (err) {
+            console.error(
+              `Error cargando datos para apartado ${apartado.idApartado}:`,
+              err
+            );
+            return { ...apartado, documentos: [], programas: [] };
+          }
+        })
+      );
 
-      // ✅ CORREGIDO: usar ap.idInstancia (nombre del campo en el DTO del back)
-      const globales = apartadosActivos
-        .filter(ap => ap.idInstancia === null || ap.idInstancia === undefined)
-        .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-        .map(ap => ({ ...ap, esGlobal: true }));
+      const activos = apartadosConDatos.filter((ap) => ap.activo !== false);
 
-      const deInstancia = apartadosActivos
-        .filter(ap => ap.idInstancia !== null && ap.idInstancia !== undefined && ap.idInstancia === user.instanciaId)
+      const globales = activos
+        .filter((ap) => ap.idInstancia == null)
         .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-        .map(ap => ({ ...ap, esGlobal: false }));
+        .map((ap) => ({ ...ap, esGlobal: true }));
+
+      const deInstancia = activos
+        .filter(
+          (ap) =>
+            ap.idInstancia != null && ap.idInstancia === user.instanciaId
+        )
+        .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+        .map((ap) => ({ ...ap, esGlobal: false }));
 
       setApartadosGlobales(globales);
       setApartadosInstancia(deInstancia);
 
-      const apartadosParaExpandir = activeView === 0 ? deInstancia : globales;
-      if (apartadosParaExpandir.length > 0) {
-        setExpandedCategory(apartadosParaExpandir[0].idApartado);
+      const primeros = activeView === 0 ? deInstancia : globales;
+      if (primeros.length > 0) {
+        setExpandedCategory(primeros[0].idApartado);
       }
-
-    } catch (error) {
-      console.error("🔥 Error general cargando apartados:", error);
+    } catch (err) {
+      console.error("Error general cargando apartados:", err);
       setError("Error al cargar las categorías. Por favor, intente de nuevo.");
       showSnackbar("Error al cargar datos", "error");
     } finally {
@@ -215,39 +227,35 @@ const ConfigExpediente = () => {
     }
   };
 
-  const showSnackbar = (message, severity = "success") => {
+  const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
-  };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
+  const handleCloseSnackbar = () =>
+    setSnackbar((prev) => ({ ...prev, open: false }));
 
-  const getCurrentApartados = () => {
-    return activeView === 0 ? apartadosInstancia : apartadosGlobales;
-  };
+  const getCurrentApartados = () =>
+    activeView === 0 ? apartadosInstancia : apartadosGlobales;
 
   const getCurrentStats = () => {
-    const currentApartados = activeView === 0 ? apartadosInstancia : apartadosGlobales;
+    const list = activeView === 0 ? apartadosInstancia : apartadosGlobales;
     return {
-      totalCategories: currentApartados.length,
-      totalDocuments: currentApartados.reduce(
-        (total, ap) => total + (ap.documentos?.length || 0),
-        0,
+      totalCategories: list.length,
+      totalDocuments: list.reduce(
+        (t, ap) => t + (ap.documentos?.length || 0),
+        0
       ),
-      totalProgramas: currentApartados.reduce(
-        (total, ap) => total + (ap.programas?.length || 0),
-        0,
+      totalProgramas: list.reduce(
+        (t, ap) => t + (ap.programas?.length || 0),
+        0
       ),
-      requiredCategories: currentApartados.filter((ap) => ap.obligatorio).length,
+      requiredCategories: list.filter((ap) => ap.obligatorio).length,
     };
   };
 
   const stats = getCurrentStats();
 
-  const handleAddCategory = () => {
-    setOpenCreateCategory(true);
-  };
+  // ─── Categorías ───────────────────────────────────────────────────────────
+  const handleAddCategory = () => setOpenCreateCategory(true);
 
   const handleEditCategory = (apartado) => {
     setCurrentApartado(apartado);
@@ -255,15 +263,9 @@ const ConfigExpediente = () => {
   };
 
   const handleCreateCategorySuccess = (nuevoApartado) => {
-    const nuevoApartadoCompleto = {
-      ...nuevoApartado,
-      documentos: [],
-      programas: [],
-      esGlobal: false
-    };
-
+    const completo = { ...nuevoApartado, documentos: [], programas: [], esGlobal: false };
     setApartadosInstancia((prev) =>
-      [...prev, nuevoApartadoCompleto].sort((a, b) => (a.orden || 0) - (b.orden || 0))
+      [...prev, completo].sort((a, b) => (a.orden || 0) - (b.orden || 0))
     );
     setOpenCreateCategory(false);
     showSnackbar("Categoría creada exitosamente");
@@ -271,21 +273,22 @@ const ConfigExpediente = () => {
   };
 
   const handleUpdateCategorySuccess = (apartadoActualizado) => {
-    const updateApartados = (apartados) =>
-      apartados.map((ap) => {
-        if (ap.idApartado === apartadoActualizado.idApartado) {
-          return {
-            ...apartadoActualizado,
-            documentos: ap.documentos || [],
-            programas: ap.programas || [],
-            esGlobal: ap.esGlobal
-          };
-        }
-        return ap;
-      }).sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    const update = (list) =>
+      list
+        .map((ap) =>
+          ap.idApartado === apartadoActualizado.idApartado
+            ? {
+                ...apartadoActualizado,
+                documentos: ap.documentos || [],
+                programas: ap.programas || [],
+                esGlobal: ap.esGlobal,
+              }
+            : ap
+        )
+        .sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
-    setApartadosInstancia((prev) => updateApartados(prev));
-    setApartadosGlobales((prev) => updateApartados(prev));
+    setApartadosInstancia((prev) => update(prev));
+    setApartadosGlobales((prev) => update(prev));
     setOpenEditCategory(false);
     setCurrentApartado(null);
     showSnackbar("Categoría actualizada exitosamente");
@@ -293,24 +296,32 @@ const ConfigExpediente = () => {
 
   const handleDeleteCategory = async (apartadoId) => {
     if (
-      window.confirm(
-        "¿Está seguro de eliminar esta categoría y todos sus documentos y programas?",
+      !window.confirm(
+        "¿Está seguro de eliminar esta categoría y todos sus documentos y programas?"
       )
-    ) {
-      try {
-        await desactivarApartado(apartadoId);
-        setApartadosInstancia((prev) => prev.filter((ap) => ap.idApartado !== apartadoId));
-        setApartadosGlobales((prev) => prev.filter((ap) => ap.idApartado !== apartadoId));
-        showSnackbar("Categoría eliminada exitosamente");
-      } catch (error) {
-        console.error("Error eliminando categoría:", error);
-        showSnackbar("Error al eliminar la categoría", "error");
-      }
+    )
+      return;
+
+    try {
+      await desactivarApartado(apartadoId);
+      setApartadosInstancia((prev) =>
+        prev.filter((ap) => ap.idApartado !== apartadoId)
+      );
+      setApartadosGlobales((prev) =>
+        prev.filter((ap) => ap.idApartado !== apartadoId)
+      );
+      showSnackbar("Categoría eliminada exitosamente");
+    } catch (err) {
+      console.error("Error eliminando categoría:", err);
+      showSnackbar("Error al eliminar la categoría", "error");
     }
   };
 
+  // ─── Documentos ───────────────────────────────────────────────────────────
   const handleAddDocument = (apartadoId) => {
-    const apartado = getCurrentApartados().find((ap) => ap.idApartado === apartadoId);
+    const apartado = getCurrentApartados().find(
+      (ap) => ap.idApartado === apartadoId
+    );
     setCurrentApartado(apartado);
     setSelectedApartadoId(apartadoId);
     setOpenCreateDocument(true);
@@ -323,113 +334,110 @@ const ConfigExpediente = () => {
   };
 
   const handleCreateDocumentSuccess = (apartadoId, nuevoDocumento) => {
-    const updateDocumentos = (apartados) =>
-      apartados.map((apartado) => {
-        if (apartado.idApartado === apartadoId) {
-          return {
-            ...apartado,
-            documentos: [...(apartado.documentos || []), nuevoDocumento].sort((a, b) => (a.orden || 0) - (b.orden || 0)),
-          };
-        }
-        return apartado;
-      });
+    const update = (list) =>
+      list.map((ap) =>
+        ap.idApartado === apartadoId
+          ? {
+              ...ap,
+              documentos: [...(ap.documentos || []), nuevoDocumento].sort(
+                (a, b) => (a.orden || 0) - (b.orden || 0)
+              ),
+            }
+          : ap
+      );
 
-    setApartadosInstancia((prev) => updateDocumentos(prev));
-    setApartadosGlobales((prev) => updateDocumentos(prev));
+    setApartadosInstancia((prev) => update(prev));
+    setApartadosGlobales((prev) => update(prev));
     setOpenCreateDocument(false);
     setCurrentApartado(null);
     showSnackbar("Documento creado exitosamente");
   };
 
   const handleUpdateDocumentSuccess = (apartadoId, documentoActualizado) => {
-    const updateDocumentos = (apartados) =>
-      apartados.map((apartado) => {
-        if (apartado.idApartado === apartadoId) {
-          return {
-            ...apartado,
-            documentos: (apartado.documentos || []).map((doc) =>
-              doc.idDocumento === documentoActualizado.idDocumento
-                ? { ...doc, ...documentoActualizado }
-                : doc,
-            ).sort((a, b) => (a.orden || 0) - (b.orden || 0)),
-          };
-        }
-        return apartado;
-      });
+    const update = (list) =>
+      list.map((ap) =>
+        ap.idApartado === apartadoId
+          ? {
+              ...ap,
+              documentos: (ap.documentos || [])
+                .map((doc) =>
+                  doc.idDocumento === documentoActualizado.idDocumento
+                    ? { ...doc, ...documentoActualizado }
+                    : doc
+                )
+                .sort((a, b) => (a.orden || 0) - (b.orden || 0)),
+            }
+          : ap
+      );
 
-    setApartadosInstancia((prev) => updateDocumentos(prev));
-    setApartadosGlobales((prev) => updateDocumentos(prev));
+    setApartadosInstancia((prev) => update(prev));
+    setApartadosGlobales((prev) => update(prev));
     setOpenEditDocument(false);
     setCurrentApartado(null);
     setCurrentDocumento(null);
     showSnackbar("Documento actualizado exitosamente");
   };
 
-  // ✅ CORREGIDO: Toggle de estado sin necesidad de recargar la página
   const handleDeleteDocument = async (apartadoId, documentoId) => {
-    // Buscamos el documento en AMBAS listas para no depender de activeView
-    const buscarDocumento = (apartados) =>
-      (apartados.find((a) => a.idApartado === apartadoId)?.documentos || []).find(
+    const buscar = (list) =>
+      (list.find((a) => a.idApartado === apartadoId)?.documentos || []).find(
         (doc) => doc.idDocumento === documentoId
       );
 
     const documento =
-      buscarDocumento(apartadosInstancia) || buscarDocumento(apartadosGlobales);
+      buscar(apartadosInstancia) || buscar(apartadosGlobales);
 
     if (!documentoId || !documento) {
-      console.error("Error: documento no encontrado o ID indefinido");
       showSnackbar("No se puede modificar: documento no encontrado", "error");
       return;
     }
 
-    // ✅ Capturamos el estado ANTES del await para evitar closures stale
     const estaActivo = documento.activo !== false;
-    const nuevaAccion = estaActivo ? "desactivar" : "activar";
+    const accion = estaActivo ? "desactivar" : "activar";
 
-    if (window.confirm(`¿Está seguro de ${nuevaAccion} este documento?`)) {
-      try {
-        const documentoActualizado = await toggleEstadoDocumento(documentoId);
+    if (!window.confirm(`¿Está seguro de ${accion} este documento?`)) return;
 
-        // ✅ Normalizamos el valor de activo a booleano siempre
-        // Si el backend no devuelve el campo, usamos la inversión del estado anterior como fallback
-        const nuevoActivo =
-          documentoActualizado?.activo !== undefined
-            ? Boolean(documentoActualizado.activo)
-            : !estaActivo;
+    try {
+      const documentoActualizado = await toggleEstadoDocumento(documentoId);
 
-        const updateDocumentos = (apartados) =>
-          apartados.map((apartado) => {
-            if (apartado.idApartado === apartadoId) {
-              return {
-                ...apartado,
-                documentos: (apartado.documentos || []).map((doc) =>
+      const nuevoActivo =
+        documentoActualizado?.activo !== undefined
+          ? Boolean(documentoActualizado.activo)
+          : !estaActivo;
+
+      const update = (list) =>
+        list.map((ap) =>
+          ap.idApartado === apartadoId
+            ? {
+                ...ap,
+                documentos: (ap.documentos || []).map((doc) =>
                   doc.idDocumento === documentoId
                     ? { ...doc, ...documentoActualizado, activo: nuevoActivo }
                     : doc
                 ),
-              };
-            }
-            return apartado;
-          });
+              }
+            : ap
+        );
 
-        // ✅ Usamos callbacks funcionales para siempre operar sobre el estado más reciente
-        setApartadosInstancia((prev) => updateDocumentos(prev));
-        setApartadosGlobales((prev) => updateDocumentos(prev));
+      setApartadosInstancia((prev) => update(prev));
+      setApartadosGlobales((prev) => update(prev));
 
-        const mensajeExito = estaActivo
+      showSnackbar(
+        estaActivo
           ? "Documento desactivado exitosamente"
-          : "Documento activado exitosamente";
-
-        showSnackbar(mensajeExito);
-      } catch (error) {
-        console.error("Error cambiando estado del documento:", error);
-        showSnackbar("Error al cambiar el estado del documento", "error");
-      }
+          : "Documento activado exitosamente"
+      );
+    } catch (err) {
+      console.error("Error cambiando estado del documento:", err);
+      showSnackbar("Error al cambiar el estado del documento", "error");
     }
   };
 
+  // ─── Programas ────────────────────────────────────────────────────────────
   const handleAddPrograma = (apartadoId) => {
-    const apartado = getCurrentApartados().find((ap) => ap.idApartado === apartadoId);
+    const apartado = getCurrentApartados().find(
+      (ap) => ap.idApartado === apartadoId
+    );
     setCurrentApartado(apartado);
     setSelectedApartadoId(apartadoId);
     setOpenCreatePrograma(true);
@@ -441,43 +449,75 @@ const ConfigExpediente = () => {
     setOpenEditPrograma(true);
   };
 
+  // ✅ CORRECCIÓN: ahora recibe (apartadoId, nuevoPrograma) directamente
+  // desde el modal, sin depender del estado selectedApartadoId que puede
+  // haberse limpiado antes de que onExited dispare.
   const handleCreateProgramaSuccess = (apartadoId, nuevoPrograma) => {
-    const updateProgramas = (apartados) =>
-      apartados.map((apartado) => {
-        if (apartado.idApartado === apartadoId) {
-          return {
-            ...apartado,
-            programas: [...(apartado.programas || []), nuevoPrograma].sort((a, b) => (a.id || 0) - (b.id || 0)),
-          };
-        }
-        return apartado;
-      });
+    if (!apartadoId) {
+      console.error("handleCreateProgramaSuccess: apartadoId es null");
+      showSnackbar("Error al registrar el programa en la lista", "error");
+      return;
+    }
 
-    setApartadosInstancia((prev) => updateProgramas(prev));
-    setApartadosGlobales((prev) => updateProgramas(prev));
+    const programaNormalizado = normalizePrograma(nuevoPrograma);
+
+    const update = (list) =>
+      list.map((ap) =>
+        ap.idApartado === apartadoId
+          ? {
+              ...ap,
+              programas: [
+                ...(Array.isArray(ap.programas) ? ap.programas : []),
+                programaNormalizado,
+              ].sort((a, b) => (a.id || 0) - (b.id || 0)),
+            }
+          : ap
+      );
+
+    setApartadosInstancia((prev) => update(prev));
+    setApartadosGlobales((prev) => update(prev));
+
+    // Limpiar estado del modal DESPUÉS de actualizar la lista
     setOpenCreatePrograma(false);
     setCurrentApartado(null);
+    setSelectedApartadoId(null);
     showSnackbar("Programa creado exitosamente");
   };
 
-  const handleUpdateProgramaSuccess = (apartadoId, programaActualizado) => {
-    const updateProgramas = (apartados) =>
-      apartados.map((apartado) => {
-        if (apartado.idApartado === apartadoId) {
-          return {
-            ...apartado,
-            programas: (apartado.programas || []).map((prog) =>
-              prog.id === programaActualizado.id
-                ? { ...prog, ...programaActualizado }
-                : prog,
-            ).sort((a, b) => (a.id || 0) - (b.id || 0)),
-          };
-        }
-        return apartado;
-      });
+  // ✅ CORRECCIÓN: onSuccess en EditProgramaDialogAdmin llama con (programa),
+  // y aquí leemos el apartadoId desde currentApartado que todavía está vivo
+  // porque el modal llama onSuccess ANTES de cerrar.
+  const handleUpdateProgramaSuccess = (programaActualizado) => {
+    const apartadoId = currentApartado?.idApartado;
 
-    setApartadosInstancia((prev) => updateProgramas(prev));
-    setApartadosGlobales((prev) => updateProgramas(prev));
+    if (!apartadoId) {
+      console.error("handleUpdateProgramaSuccess: apartadoId es null");
+      showSnackbar("Error al actualizar el programa en la lista", "error");
+      return;
+    }
+
+    const programaNormalizado = normalizePrograma(programaActualizado);
+
+    const update = (list) =>
+      list.map((ap) =>
+        ap.idApartado === apartadoId
+          ? {
+              ...ap,
+              programas: (Array.isArray(ap.programas) ? ap.programas : [])
+                .map((prog) =>
+                  prog.id === programaNormalizado.id ||
+                  prog.idPrograma === programaNormalizado.id
+                    ? { ...prog, ...programaNormalizado }
+                    : prog
+                )
+                .sort((a, b) => (a.id || 0) - (b.id || 0)),
+            }
+          : ap
+      );
+
+    setApartadosInstancia((prev) => update(prev));
+    setApartadosGlobales((prev) => update(prev));
+
     setOpenEditPrograma(false);
     setCurrentApartado(null);
     setCurrentPrograma(null);
@@ -485,96 +525,83 @@ const ConfigExpediente = () => {
   };
 
   const handleDeletePrograma = async (apartadoId, programaId) => {
-    const currentApartados = getCurrentApartados();
     const programa = (
-      currentApartados.find((a) => a.idApartado === apartadoId)?.programas || []
+      getCurrentApartados().find((a) => a.idApartado === apartadoId)
+        ?.programas || []
     ).find((prog) => prog.id === programaId);
 
     if (!programaId || !programa) {
-      console.error("Error: programa no encontrado o ID indefinido");
       showSnackbar("No se puede eliminar: programa no encontrado", "error");
       return;
     }
 
-    if (window.confirm("¿Está seguro de eliminar este programa?")) {
-      try {
-        await eliminarPrograma(programaId);
+    if (!window.confirm("¿Está seguro de eliminar este programa?")) return;
 
-        const updateProgramas = (apartados) =>
-          apartados.map((apartado) => {
-            if (apartado.idApartado === apartadoId) {
-              return {
-                ...apartado,
-                programas: (apartado.programas || []).filter(
-                  (prog) => prog.id !== programaId,
+    try {
+      await eliminarPrograma(programaId);
+
+      const update = (list) =>
+        list.map((ap) =>
+          ap.idApartado === apartadoId
+            ? {
+                ...ap,
+                programas: (ap.programas || []).filter(
+                  (prog) => prog.id !== programaId
                 ),
-              };
-            }
-            return apartado;
-          });
+              }
+            : ap
+        );
 
-        setApartadosInstancia((prev) => updateProgramas(prev));
-        setApartadosGlobales((prev) => updateProgramas(prev));
-
-        showSnackbar("Programa eliminado exitosamente");
-      } catch (error) {
-        console.error("Error eliminando programa:", error);
-        showSnackbar("Error al eliminar el programa", "error");
-      }
+      setApartadosInstancia((prev) => update(prev));
+      setApartadosGlobales((prev) => update(prev));
+      showSnackbar("Programa eliminado exitosamente");
+    } catch (err) {
+      console.error("Error eliminando programa:", err);
+      showSnackbar("Error al eliminar el programa", "error");
     }
   };
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
+  // ─── Helpers de UI ────────────────────────────────────────────────────────
+  const handleTabChange = (_, v) => setActiveTab(v);
 
-  const handleViewChange = (event, newValue) => {
-    setActiveView(newValue);
+  const handleViewChange = (_, v) => {
+    setActiveView(v);
     setExpandedCategory(null);
-
-    const newApartados = newValue === 0 ? apartadosInstancia : apartadosGlobales;
-    if (newApartados.length > 0) {
-      setExpandedCategory(newApartados[0].idApartado);
-    }
+    const next = v === 0 ? apartadosInstancia : apartadosGlobales;
+    if (next.length > 0) setExpandedCategory(next[0].idApartado);
   };
 
-  const handleCategoryExpand = (apartadoId) => {
-    setExpandedCategory(expandedCategory === apartadoId ? null : apartadoId);
-  };
+  const handleCategoryExpand = (id) =>
+    setExpandedCategory((prev) => (prev === id ? null : id));
 
-  const handleRefresh = () => {
-    cargarApartados();
-  };
+  const handleRefresh = () => cargarApartados();
 
   const getReviewDescription = (documento) => {
-    if (
-      !documento.periodoRevision ||
-      parseInt(documento.periodoRevision) === 0
-    )
-      return "No requiere revisión periódica";
     const days = parseInt(documento.periodoRevision);
+    if (!days || days === 0) return "No requiere revisión periódica";
     if (days === 30) return "Revisión mensual";
     if (days === 60) return "Revisión bimestral";
     if (days === 90) return "Revisión trimestral";
     if (days === 180) return "Revisión semestral";
     if (days === 365) return "Revisión anual";
     if (days === 730) return "Revisión bianual";
-    return `Revisión cada ${documento.periodoRevision} días`;
+    return `Revisión cada ${days} días`;
   };
 
-  const getReviewIcon = (days) => {
-    if (days <= 30) return <ScheduleIcon fontSize="small" />;
-    if (days <= 90) return <TimerIcon fontSize="small" />;
-    return <ScheduleIcon fontSize="small" />;
-  };
+  const getReviewIcon = (days) =>
+    days <= 30 ? (
+      <ScheduleIcon fontSize="small" />
+    ) : (
+      <TimerIcon fontSize="small" />
+    );
 
   const getTipoProgramaColor = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case 'backend':
+      case "backend":
         return institutionalColors.success;
-      case 'frontend':
+      case "frontend":
         return institutionalColors.info;
-      case 'fullstack':
+      case "fullstack":
         return institutionalColors.warning;
       default:
         return institutionalColors.primary;
@@ -583,17 +610,14 @@ const ConfigExpediente = () => {
 
   const getTipoProgramaIcon = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case 'backend':
-        return <CodeIcon fontSize="small" />;
-      case 'frontend':
+      case "frontend":
         return <ComputerIcon fontSize="small" />;
-      case 'fullstack':
-        return <CodeIcon fontSize="small" />;
       default:
         return <CodeIcon fontSize="small" />;
     }
   };
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <Box
@@ -647,11 +671,7 @@ const ConfigExpediente = () => {
           <Box>
             <Typography
               variant="h5"
-              sx={{
-                color: institutionalColors.primary,
-                fontWeight: "bold",
-                mb: 0.5,
-              }}
+              sx={{ color: institutionalColors.primary, fontWeight: "bold", mb: 0.5 }}
             >
               Configuración de Expedientes
             </Typography>
@@ -708,22 +728,20 @@ const ConfigExpediente = () => {
           </Alert>
         )}
 
-        {/* Tabs para alternar entre vista de Instancia y Globales */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        {/* Tabs vista instancia / globales */}
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
           <Tabs
             value={activeView}
             onChange={handleViewChange}
             sx={{
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 'bold',
-                fontSize: '0.9rem',
+              "& .MuiTab-root": {
+                textTransform: "none",
+                fontWeight: "bold",
+                fontSize: "0.9rem",
                 minHeight: 48,
               },
-              '& .Mui-selected': {
-                color: institutionalColors.primary,
-              },
-              '& .MuiTabs-indicator': {
+              "& .Mui-selected": { color: institutionalColors.primary },
+              "& .MuiTabs-indicator": {
                 backgroundColor: institutionalColors.primary,
               },
             }}
@@ -741,7 +759,7 @@ const ConfigExpediente = () => {
           </Tabs>
         </Box>
 
-        {/* 4 CARDS CON ESTADÍSTICAS */}
+        {/* Stats */}
         <Box
           sx={{
             display: "grid",
@@ -749,316 +767,114 @@ const ConfigExpediente = () => {
             gap: 2,
             mb: 3,
             width: "100%",
-            "@media (max-width: 1100px)": {
-              gridTemplateColumns: "repeat(2, 1fr)",
-            },
-            "@media (max-width: 600px)": {
-              gridTemplateColumns: "1fr",
-            },
+            "@media (max-width: 1100px)": { gridTemplateColumns: "repeat(2, 1fr)" },
+            "@media (max-width: 600px)": { gridTemplateColumns: "1fr" },
           }}
         >
-          <Card
-            sx={{
-              borderLeft: `4px solid ${institutionalColors.primary}`,
-              height: 120,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <CardContent
+          {[
+            {
+              color: institutionalColors.primary,
+              icon: <FolderIcon />,
+              label: `Categorías ${activeView === 0 ? "de Instancia" : "Globales"}`,
+              value: stats.totalCategories,
+              sub: `${stats.requiredCategories} obligatorias`,
+            },
+            {
+              color: institutionalColors.success,
+              icon: <DescriptionIcon />,
+              label: "Documentos Totales",
+              value: stats.totalDocuments,
+              sub: null,
+            },
+            {
+              color: institutionalColors.warning,
+              icon: <CodeIcon />,
+              label: "Programas Totales",
+              value: stats.totalProgramas,
+              sub: null,
+            },
+            {
+              color: institutionalColors.info,
+              icon: <SaveIcon />,
+              label: "Categorías Obligatorias",
+              value: stats.requiredCategories,
+              sub: `De ${stats.totalCategories} categorías totales`,
+            },
+          ].map(({ color, icon, label, value, sub }) => (
+            <Card
+              key={label}
               sx={{
-                p: 1.5,
-                flex: 1,
+                borderLeft: `4px solid ${color}`,
+                height: 120,
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "space-between",
-                height: "100%",
+                overflow: "hidden",
               }}
             >
-              <Box
+              <CardContent
                 sx={{
+                  p: 1.5,
+                  flex: 1,
                   display: "flex",
-                  alignItems: "flex-start",
+                  flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: 1,
-                  mb: 1,
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ color: institutionalColors.primary }}>
-                    <FolderIcon />
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: 1,
+                    mb: 1,
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ color }}>{icon}</Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: institutionalColors.textSecondary,
+                        fontWeight: 500,
+                        fontSize: "0.75rem",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {label}
+                    </Typography>
                   </Box>
                   <Typography
-                    variant="body2"
+                    variant="h5"
                     sx={{
-                      color: institutionalColors.textSecondary,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                      lineHeight: 1.2,
+                      color: institutionalColors.textPrimary,
+                      fontWeight: "bold",
+                      fontSize: "1.5rem",
+                      lineHeight: 1,
                     }}
                   >
-                    Categorías {activeView === 0 ? 'de Instancia' : 'Globales'}
+                    {value}
                   </Typography>
                 </Box>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    color: institutionalColors.textPrimary,
-                    fontWeight: "bold",
-                    fontSize: "1.5rem",
-                    lineHeight: 1,
-                    textAlign: "right",
-                  }}
-                >
-                  {stats.totalCategories}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-end",
-                  gap: 0.5,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: institutionalColors.textSecondary,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.2,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                  }}
-                >
-                  {stats.requiredCategories} obligatorias
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card
-            sx={{
-              borderLeft: `4px solid ${institutionalColors.success}`,
-              height: 120,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 1.5,
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                height: "100%",
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  mb: 1,
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ color: institutionalColors.success }}>
-                    <DescriptionIcon />
-                  </Box>
+                {sub && (
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     sx={{
                       color: institutionalColors.textSecondary,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                      lineHeight: 1.2,
+                      fontSize: "0.7rem",
                     }}
                   >
-                    Documentos Totales
+                    {sub}
                   </Typography>
-                </Box>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    color: institutionalColors.textPrimary,
-                    fontWeight: "bold",
-                    fontSize: "1.5rem",
-                    lineHeight: 1,
-                    textAlign: "right",
-                  }}
-                >
-                  {stats.totalDocuments}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card
-            sx={{
-              borderLeft: `4px solid ${institutionalColors.warning}`,
-              height: 120,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 1.5,
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                height: "100%",
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  mb: 1,
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ color: institutionalColors.warning }}>
-                    <CodeIcon />
-                  </Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: institutionalColors.textSecondary,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Programas Totales
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    color: institutionalColors.textPrimary,
-                    fontWeight: "bold",
-                    fontSize: "1.5rem",
-                    lineHeight: 1,
-                    textAlign: "right",
-                  }}
-                >
-                  {stats.totalProgramas}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card
-            sx={{
-              borderLeft: `4px solid ${institutionalColors.info}`,
-              height: 120,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 1.5,
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                height: "100%",
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  mb: 1,
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ color: institutionalColors.info }}>
-                    <SaveIcon />
-                  </Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: institutionalColors.textSecondary,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Categorías Obligatorias
-                  </Typography>
-                </Box>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    color: institutionalColors.textPrimary,
-                    fontWeight: "bold",
-                    fontSize: "1.5rem",
-                    lineHeight: 1,
-                    textAlign: "right",
-                  }}
-                >
-                  {stats.requiredCategories}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-end",
-                  gap: 0.5,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: institutionalColors.textSecondary,
-                    fontSize: "0.7rem",
-                    lineHeight: 1.2,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                  }}
-                >
-                  De {stats.totalCategories} categorías totales
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </Box>
       </Box>
 
       {/* Contenido principal */}
       <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minHeight: 0,
-          px: 3,
-          pb: 3,
-        }}
+        sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, px: 3, pb: 3 }}
       >
         <Paper
           elevation={3}
@@ -1092,26 +908,28 @@ const ConfigExpediente = () => {
               }}
             >
               <CategoryIcon />
-              {activeView === 0 ? 'Categorías de mi Instancia' : 'Categorías Globales'}
+              {activeView === 0
+                ? "Categorías de mi Instancia"
+                : "Categorías Globales"}
             </Typography>
           </Box>
 
-          {/* Tabs para alternar entre Documentos y Programas */}
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#fff', px: 2.5 }}>
+          {/* Tabs documentos / programas */}
+          <Box
+            sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "#fff", px: 2.5 }}
+          >
             <Tabs
               value={activeTab}
               onChange={handleTabChange}
               sx={{
-                '& .MuiTab-root': {
-                  textTransform: 'none',
-                  fontWeight: 'bold',
-                  fontSize: '0.9rem',
+                "& .MuiTab-root": {
+                  textTransform: "none",
+                  fontWeight: "bold",
+                  fontSize: "0.9rem",
                   minHeight: 48,
                 },
-                '& .Mui-selected': {
-                  color: institutionalColors.primary,
-                },
-                '& .MuiTabs-indicator': {
+                "& .Mui-selected": { color: institutionalColors.primary },
+                "& .MuiTabs-indicator": {
                   backgroundColor: institutionalColors.primary,
                 },
               }}
@@ -1139,7 +957,7 @@ const ConfigExpediente = () => {
             }}
           >
             {getCurrentApartados().length === 0 ? (
-              <Fade in={true}>
+              <Fade in>
                 <Box
                   sx={{
                     display: "flex",
@@ -1159,22 +977,34 @@ const ConfigExpediente = () => {
                       mb: 3,
                     }}
                   >
-                    {activeView === 0 ? <BusinessIcon sx={{ fontSize: 60 }} /> : <PublicIcon sx={{ fontSize: 60 }} />}
+                    {activeView === 0 ? (
+                      <BusinessIcon sx={{ fontSize: 60 }} />
+                    ) : (
+                      <PublicIcon sx={{ fontSize: 60 }} />
+                    )}
                   </Avatar>
                   <Typography
                     variant="h5"
-                    sx={{ color: institutionalColors.textPrimary, mb: 1, fontWeight: "bold" }}
+                    sx={{
+                      color: institutionalColors.textPrimary,
+                      mb: 1,
+                      fontWeight: "bold",
+                    }}
                   >
-                    No hay categorías {activeView === 0 ? 'de instancia' : 'globales'} configuradas
+                    No hay categorías{" "}
+                    {activeView === 0 ? "de instancia" : "globales"} configuradas
                   </Typography>
                   <Typography
                     variant="body1"
-                    sx={{ color: institutionalColors.textSecondary, mb: 3, textAlign: "center" }}
+                    sx={{
+                      color: institutionalColors.textSecondary,
+                      mb: 3,
+                      textAlign: "center",
+                    }}
                   >
                     {activeView === 0
-                      ? 'Comience creando una nueva categoría para organizar los documentos y programas de su instancia'
-                      : 'Las categorías globales son configuradas por el administrador del sistema'
-                    }
+                      ? "Comience creando una nueva categoría para organizar los documentos y programas de su instancia"
+                      : "Las categorías globales son configuradas por el administrador del sistema"}
                   </Typography>
                   {activeView === 0 && (
                     <Button
@@ -1203,7 +1033,7 @@ const ConfigExpediente = () => {
                 .map((apartado, index) => (
                   <Zoom
                     key={apartado.idApartado}
-                    in={true}
+                    in
                     style={{ transitionDelay: `${index * 50}ms` }}
                   >
                     <Accordion
@@ -1217,9 +1047,7 @@ const ConfigExpediente = () => {
                         boxShadow: 2,
                         "&:before": { display: "none" },
                         transition: "all 0.2s",
-                        "&:hover": {
-                          boxShadow: 4,
-                        },
+                        "&:hover": { boxShadow: 4 },
                       }}
                     >
                       <AccordionSummary
@@ -1232,16 +1060,13 @@ const ConfigExpediente = () => {
                         }}
                       >
                         <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            width: "100%",
-                          }}
+                          sx={{ display: "flex", alignItems: "center", width: "100%" }}
                         >
                           <Badge
-                            badgeContent={activeTab === 0
-                              ? (apartado.documentos?.length || 0)
-                              : (apartado.programas?.length || 0)
+                            badgeContent={
+                              activeTab === 0
+                                ? apartado.documentos?.length || 0
+                                : apartado.programas?.length || 0
                             }
                             color="primary"
                             sx={{ mr: 2 }}
@@ -1250,7 +1075,10 @@ const ConfigExpediente = () => {
                               sx={{
                                 width: 48,
                                 height: 48,
-                                bgcolor: alpha(getCategoryColor(apartado.nombre), 0.1),
+                                bgcolor: alpha(
+                                  getCategoryColor(apartado.nombre),
+                                  0.1
+                                ),
                                 color: getCategoryColor(apartado.nombre),
                               }}
                             >
@@ -1283,29 +1111,36 @@ const ConfigExpediente = () => {
                                   label="OBLIGATORIO"
                                   size="small"
                                   color="error"
-                                  sx={{
-                                    height: 22,
-                                    fontSize: "0.7rem",
-                                    fontWeight: "bold",
-                                  }}
+                                  sx={{ height: 22, fontSize: "0.7rem", fontWeight: "bold" }}
                                 />
                               )}
                               <Chip
                                 size="small"
-                                icon={activeTab === 0 ? <DescriptionIcon /> : <CodeIcon />}
-                                label={activeTab === 0
-                                  ? `${apartado.documentos?.length || 0} documentos`
-                                  : `${apartado.programas?.length || 0} programas`
+                                icon={
+                                  activeTab === 0 ? (
+                                    <DescriptionIcon />
+                                  ) : (
+                                    <CodeIcon />
+                                  )
+                                }
+                                label={
+                                  activeTab === 0
+                                    ? `${apartado.documentos?.length || 0} documentos`
+                                    : `${apartado.programas?.length || 0} programas`
                                 }
                                 sx={{
                                   height: 22,
                                   fontSize: "0.7rem",
-                                  bgcolor: alpha(activeTab === 0
-                                    ? institutionalColors.success
-                                    : institutionalColors.warning, 0.1),
-                                  color: activeTab === 0
-                                    ? institutionalColors.success
-                                    : institutionalColors.warning,
+                                  bgcolor: alpha(
+                                    activeTab === 0
+                                      ? institutionalColors.success
+                                      : institutionalColors.warning,
+                                    0.1
+                                  ),
+                                  color:
+                                    activeTab === 0
+                                      ? institutionalColors.success
+                                      : institutionalColors.warning,
                                 }}
                               />
                               {apartado.esGlobal && (
@@ -1330,7 +1165,6 @@ const ConfigExpediente = () => {
                             </Typography>
                           </Box>
 
-                          {/* ✅ FIX: component="span" evita <button> anidado dentro del <button> del AccordionSummary */}
                           <Stack direction="row" spacing={1}>
                             {!apartado.esGlobal && canEditCategory(apartado) && (
                               <Tooltip title="Editar categoría" arrow>
@@ -1352,7 +1186,6 @@ const ConfigExpediente = () => {
                                 </IconButton>
                               </Tooltip>
                             )}
-
                             {!apartado.esGlobal && canDeleteCategory(apartado) && (
                               <Tooltip title="Eliminar categoría" arrow>
                                 <IconButton
@@ -1380,7 +1213,7 @@ const ConfigExpediente = () => {
                       <AccordionDetails sx={{ bgcolor: "#fff", p: 3 }}>
                         <Box sx={{ pl: 7 }}>
                           {activeTab === 0 ? (
-                            // SECCIÓN DE DOCUMENTOS
+                            // ── Documentos ────────────────────────────────
                             <>
                               <List sx={{ p: 0 }}>
                                 {(apartado.documentos || [])
@@ -1388,7 +1221,7 @@ const ConfigExpediente = () => {
                                   .map((documento, docIndex) => (
                                     <Fade
                                       key={documento.idDocumento}
-                                      in={true}
+                                      in
                                       style={{ transitionDelay: `${docIndex * 30}ms` }}
                                     >
                                       <ListItem
@@ -1412,7 +1245,10 @@ const ConfigExpediente = () => {
                                             sx={{
                                               width: 32,
                                               height: 32,
-                                              bgcolor: alpha(institutionalColors.primary, 0.1),
+                                              bgcolor: alpha(
+                                                institutionalColors.primary,
+                                                0.1
+                                              ),
                                               color: institutionalColors.primary,
                                             }}
                                           >
@@ -1444,10 +1280,12 @@ const ConfigExpediente = () => {
                                               <Chip
                                                 size="small"
                                                 label="INACTIVO"
-                                                color="default"
                                                 sx={{
                                                   height: 24,
-                                                  bgcolor: alpha(institutionalColors.error, 0.1),
+                                                  bgcolor: alpha(
+                                                    institutionalColors.error,
+                                                    0.1
+                                                  ),
                                                   color: institutionalColors.error,
                                                 }}
                                               />
@@ -1457,7 +1295,10 @@ const ConfigExpediente = () => {
                                                 label="ACTIVO"
                                                 sx={{
                                                   height: 24,
-                                                  bgcolor: alpha(institutionalColors.success, 0.1),
+                                                  bgcolor: alpha(
+                                                    institutionalColors.success,
+                                                    0.1
+                                                  ),
                                                   color: institutionalColors.success,
                                                 }}
                                               />
@@ -1470,11 +1311,16 @@ const ConfigExpediente = () => {
                                               >
                                                 <Chip
                                                   size="small"
-                                                  icon={getReviewIcon(documento.periodoRevision)}
+                                                  icon={getReviewIcon(
+                                                    documento.periodoRevision
+                                                  )}
                                                   label={getReviewDescription(documento)}
                                                   sx={{
                                                     height: 24,
-                                                    bgcolor: alpha(institutionalColors.info, 0.1),
+                                                    bgcolor: alpha(
+                                                      institutionalColors.info,
+                                                      0.1
+                                                    ),
                                                     color: institutionalColors.info,
                                                     "& .MuiChip-icon": {
                                                       color: institutionalColors.info,
@@ -1488,60 +1334,70 @@ const ConfigExpediente = () => {
 
                                         <ListItemSecondaryAction>
                                           <Stack direction="row" spacing={1}>
-                                            {!apartado.esGlobal && canModifyDocument(apartado) && (
-                                              <Tooltip title="Editar documento" arrow>
-                                                <IconButton
-                                                  size="small"
-                                                  onClick={() =>
-                                                    handleEditDocument(apartado, documento)
-                                                  }
-                                                  sx={{
-                                                    color: institutionalColors.primary,
-                                                    "&:hover": {
-                                                      bgcolor: alpha(institutionalColors.primary, 0.1),
-                                                    },
-                                                  }}
-                                                >
-                                                  <EditIcon fontSize="small" />
-                                                </IconButton>
-                                              </Tooltip>
-                                            )}
+                                            {!apartado.esGlobal &&
+                                              canModifyDocument(apartado) && (
+                                                <Tooltip title="Editar documento" arrow>
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() =>
+                                                      handleEditDocument(apartado, documento)
+                                                    }
+                                                    sx={{
+                                                      color: institutionalColors.primary,
+                                                      "&:hover": {
+                                                        bgcolor: alpha(
+                                                          institutionalColors.primary,
+                                                          0.1
+                                                        ),
+                                                      },
+                                                    }}
+                                                  >
+                                                    <EditIcon fontSize="small" />
+                                                  </IconButton>
+                                                </Tooltip>
+                                              )}
 
-                                            {!apartado.esGlobal && canModifyDocument(apartado) && (
-                                              <Tooltip
-                                                title={documento.activo === false ? "Activar documento" : "Desactivar documento"}
-                                                arrow
-                                              >
-                                                <IconButton
-                                                  size="small"
-                                                  onClick={() =>
-                                                    handleDeleteDocument(
-                                                      apartado.idApartado,
-                                                      documento.idDocumento,
-                                                    )
+                                            {!apartado.esGlobal &&
+                                              canModifyDocument(apartado) && (
+                                                <Tooltip
+                                                  title={
+                                                    documento.activo === false
+                                                      ? "Activar documento"
+                                                      : "Desactivar documento"
                                                   }
-                                                  sx={{
-                                                    color: documento.activo === false
-                                                      ? institutionalColors.success
-                                                      : institutionalColors.error,
-                                                    "&:hover": {
-                                                      bgcolor: alpha(
+                                                  arrow
+                                                >
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() =>
+                                                      handleDeleteDocument(
+                                                        apartado.idApartado,
+                                                        documento.idDocumento
+                                                      )
+                                                    }
+                                                    sx={{
+                                                      color:
                                                         documento.activo === false
                                                           ? institutionalColors.success
                                                           : institutionalColors.error,
-                                                        0.1
-                                                      ),
-                                                    },
-                                                  }}
-                                                >
-                                                  {documento.activo === false ? (
-                                                    <CheckCircleIcon fontSize="small" />
-                                                  ) : (
-                                                    <VisibilityOffIcon fontSize="small" />
-                                                  )}
-                                                </IconButton>
-                                              </Tooltip>
-                                            )}
+                                                      "&:hover": {
+                                                        bgcolor: alpha(
+                                                          documento.activo === false
+                                                            ? institutionalColors.success
+                                                            : institutionalColors.error,
+                                                          0.1
+                                                        ),
+                                                      },
+                                                    }}
+                                                  >
+                                                    {documento.activo === false ? (
+                                                      <CheckCircleIcon fontSize="small" />
+                                                    ) : (
+                                                      <VisibilityOffIcon fontSize="small" />
+                                                    )}
+                                                  </IconButton>
+                                                </Tooltip>
+                                              )}
                                           </Stack>
                                         </ListItemSecondaryAction>
                                       </ListItem>
@@ -1570,15 +1426,15 @@ const ConfigExpediente = () => {
                               )}
                             </>
                           ) : (
-                            // SECCIÓN DE PROGRAMAS
+                            // ── Programas ─────────────────────────────────
                             <>
                               <List sx={{ p: 0 }}>
                                 {(apartado.programas || [])
                                   .sort((a, b) => (a.id || 0) - (b.id || 0))
                                   .map((programa, progIndex) => (
                                     <Fade
-                                      key={programa.id}
-                                      in={true}
+                                      key={programa.id ?? progIndex}
+                                      in
                                       style={{ transitionDelay: `${progIndex * 30}ms` }}
                                     >
                                       <ListItem
@@ -1602,7 +1458,10 @@ const ConfigExpediente = () => {
                                             sx={{
                                               width: 32,
                                               height: 32,
-                                              bgcolor: alpha(getTipoProgramaColor(programa.tipo), 0.1),
+                                              bgcolor: alpha(
+                                                getTipoProgramaColor(programa.tipo),
+                                                0.1
+                                              ),
                                               color: getTipoProgramaColor(programa.tipo),
                                             }}
                                           >
@@ -1633,10 +1492,13 @@ const ConfigExpediente = () => {
                                             <Chip
                                               size="small"
                                               icon={getTipoProgramaIcon(programa.tipo)}
-                                              label={programa.tipo || 'Sin tipo'}
+                                              label={programa.tipo || "Sin tipo"}
                                               sx={{
                                                 height: 24,
-                                                bgcolor: alpha(getTipoProgramaColor(programa.tipo), 0.1),
+                                                bgcolor: alpha(
+                                                  getTipoProgramaColor(programa.tipo),
+                                                  0.1
+                                                ),
                                                 color: getTipoProgramaColor(programa.tipo),
                                                 "& .MuiChip-icon": {
                                                   color: getTipoProgramaColor(programa.tipo),
@@ -1673,33 +1535,48 @@ const ConfigExpediente = () => {
                                               p: 1.5,
                                               borderRadius: 2,
                                               bgcolor: alpha(institutionalColors.primary, 0.03),
-                                              fontSize: "0.75rem",
                                             }}
                                           >
                                             <Box>
-                                              <Typography variant="caption" color="textSecondary" display="block">
+                                              <Typography
+                                                variant="caption"
+                                                color="textSecondary"
+                                                display="block"
+                                              >
                                                 Horas Requeridas
                                               </Typography>
                                               <Typography variant="body2" fontWeight="medium">
                                                 {programa.horasRequeridas || 0} horas
                                               </Typography>
                                             </Box>
-
                                             <Box>
-                                              <Typography variant="caption" color="textSecondary" display="block">
+                                              <Typography
+                                                variant="caption"
+                                                color="textSecondary"
+                                                display="block"
+                                              >
                                                 ID Programa
                                               </Typography>
-                                              <Typography variant="body2" fontWeight="medium" sx={{ fontFamily: "monospace" }}>
+                                              <Typography
+                                                variant="body2"
+                                                fontWeight="medium"
+                                                sx={{ fontFamily: "monospace" }}
+                                              >
                                                 #{programa.id}
                                               </Typography>
                                             </Box>
-
                                             <Box>
-                                              <Typography variant="caption" color="textSecondary" display="block">
+                                              <Typography
+                                                variant="caption"
+                                                color="textSecondary"
+                                                display="block"
+                                              >
                                                 Configuración
                                               </Typography>
                                               <Typography variant="body2" fontWeight="medium">
-                                                {programa.configuracionJson ? '✓ Configurado' : 'Sin configurar'}
+                                                {programa.configuracionJson
+                                                  ? "✓ Configurado"
+                                                  : "Sin configurar"}
                                               </Typography>
                                             </Box>
                                           </Box>
@@ -1714,16 +1591,21 @@ const ConfigExpediente = () => {
                                                 border: `1px solid ${alpha(institutionalColors.info, 0.2)}`,
                                               }}
                                             >
-                                              <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 0.5 }}>
+                                              <Typography
+                                                variant="caption"
+                                                color="textSecondary"
+                                                display="block"
+                                                sx={{ mb: 0.5 }}
+                                              >
                                                 Configuración:
                                               </Typography>
                                               <Typography
                                                 variant="caption"
                                                 sx={{
-                                                  fontFamily: 'monospace',
-                                                  fontSize: '0.7rem',
-                                                  whiteSpace: 'pre-wrap',
-                                                  wordBreak: 'break-all',
+                                                  fontFamily: "monospace",
+                                                  fontSize: "0.7rem",
+                                                  whiteSpace: "pre-wrap",
+                                                  wordBreak: "break-all",
                                                 }}
                                               >
                                                 {programa.configuracionJson}
@@ -1734,46 +1616,54 @@ const ConfigExpediente = () => {
 
                                         <ListItemSecondaryAction>
                                           <Stack direction="row" spacing={1}>
-                                            {!apartado.esGlobal && canModifyPrograma(apartado) && (
-                                              <Tooltip title="Editar programa" arrow>
-                                                <IconButton
-                                                  size="small"
-                                                  onClick={() =>
-                                                    handleEditPrograma(apartado, programa)
-                                                  }
-                                                  sx={{
-                                                    color: institutionalColors.primary,
-                                                    "&:hover": {
-                                                      bgcolor: alpha(institutionalColors.primary, 0.1),
-                                                    },
-                                                  }}
-                                                >
-                                                  <EditIcon fontSize="small" />
-                                                </IconButton>
-                                              </Tooltip>
-                                            )}
+                                            {!apartado.esGlobal &&
+                                              canModifyPrograma(apartado) && (
+                                                <Tooltip title="Editar programa" arrow>
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() =>
+                                                      handleEditPrograma(apartado, programa)
+                                                    }
+                                                    sx={{
+                                                      color: institutionalColors.primary,
+                                                      "&:hover": {
+                                                        bgcolor: alpha(
+                                                          institutionalColors.primary,
+                                                          0.1
+                                                        ),
+                                                      },
+                                                    }}
+                                                  >
+                                                    <EditIcon fontSize="small" />
+                                                  </IconButton>
+                                                </Tooltip>
+                                              )}
 
-                                            {!apartado.esGlobal && canModifyPrograma(apartado) && (
-                                              <Tooltip title="Eliminar programa" arrow>
-                                                <IconButton
-                                                  size="small"
-                                                  onClick={() =>
-                                                    handleDeletePrograma(
-                                                      apartado.idApartado,
-                                                      programa.id,
-                                                    )
-                                                  }
-                                                  sx={{
-                                                    color: institutionalColors.error,
-                                                    "&:hover": {
-                                                      bgcolor: alpha(institutionalColors.error, 0.1),
-                                                    },
-                                                  }}
-                                                >
-                                                  <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                              </Tooltip>
-                                            )}
+                                            {!apartado.esGlobal &&
+                                              canModifyPrograma(apartado) && (
+                                                <Tooltip title="Eliminar programa" arrow>
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() =>
+                                                      handleDeletePrograma(
+                                                        apartado.idApartado,
+                                                        programa.id
+                                                      )
+                                                    }
+                                                    sx={{
+                                                      color: institutionalColors.error,
+                                                      "&:hover": {
+                                                        bgcolor: alpha(
+                                                          institutionalColors.error,
+                                                          0.1
+                                                        ),
+                                                      },
+                                                    }}
+                                                  >
+                                                    <DeleteIcon fontSize="small" />
+                                                  </IconButton>
+                                                </Tooltip>
+                                              )}
                                           </Stack>
                                         </ListItemSecondaryAction>
                                       </ListItem>
@@ -1812,12 +1702,12 @@ const ConfigExpediente = () => {
         </Paper>
       </Box>
 
-      {/* Modales de Categorías */}
+      {/* ── Modales ── */}
       <CreateCategoryDialogAdmin
         open={openCreateCategory}
         onClose={() => setOpenCreateCategory(false)}
         onSuccess={handleCreateCategorySuccess}
-        isAdmin={true}
+        isAdmin
         instanciaId={user?.instanciaId}
       />
 
@@ -1829,10 +1719,9 @@ const ConfigExpediente = () => {
         }}
         onSuccess={handleUpdateCategorySuccess}
         category={currentApartado}
-        isAdmin={true}
+        isAdmin
       />
 
-      {/* Modales de Documentos */}
       <CreateDocumentDialogAdmin
         open={openCreateDocument}
         onClose={() => {
@@ -1857,32 +1746,31 @@ const ConfigExpediente = () => {
         apartado={currentApartado}
       />
 
-      {/* Modales de Programas */}
-      <CreateProgramaDialog
+      <CreateProgramaDialogAdmin
         open={openCreatePrograma}
         onClose={() => {
           setOpenCreatePrograma(false);
           setCurrentApartado(null);
+          setSelectedApartadoId(null);
         }}
-        onSuccess={handleCreateProgramaSuccess}
+        onSuccess={handleCreateProgramaSuccess}  // ← recibe (apartadoId, programa)
         apartadoId={selectedApartadoId}
-        apartado={currentApartado}
+        esGlobal={false}
       />
 
-      <EditProgramaDialog
+      <EditProgramaDialogAdmin
         open={openEditPrograma}
         onClose={() => {
           setOpenEditPrograma(false);
           setCurrentApartado(null);
           setCurrentPrograma(null);
         }}
-        onSuccess={handleUpdateProgramaSuccess}
+        onSuccess={handleUpdateProgramaSuccess}  // ← recibe (programa)
         apartadoId={currentApartado?.idApartado}
         programa={currentPrograma}
-        apartado={currentApartado}
+        esGlobal={currentApartado?.esGlobal || false}
       />
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -1893,12 +1781,7 @@ const ConfigExpediente = () => {
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{
-            width: "100%",
-            borderRadius: 2,
-            boxShadow: 3,
-            "& .MuiAlert-icon": { fontSize: 24 },
-          }}
+          sx={{ width: "100%", borderRadius: 2, boxShadow: 3 }}
           elevation={6}
           variant="filled"
         >

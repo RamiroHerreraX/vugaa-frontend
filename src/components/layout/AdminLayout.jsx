@@ -34,12 +34,12 @@ import {
   Logout as LogoutIcon,
   Menu as MenuIcon,
   Notifications as NotificationsIcon,
-  Description as DescriptionIcon,
-  School as SchoolIcon,
   ArrowDropDown as ArrowDropDownIcon,
   AccountCircle as AccountCircleIcon,
   Help as HelpIcon,
   LocationOn as LocationIcon,
+  Assignment as AssignmentIcon,
+  History as HistoryIcon, 
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 import { roleThemes, layoutConstants, palette } from "../../theme";
@@ -77,17 +77,11 @@ const AdminLayout = () => {
       description: "Configuración de expedientes",
     },
     { 
-      text: "Certificaciones", 
-      icon: <SchoolIcon />, 
-      path: "/admin/certificaciones",
-      description: "Gestión de certificaciones",
+      text: "Declaraciones", 
+      icon: <AssignmentIcon />,
+      path: "/admin/config_declaraciones",
+      description: "Gestión de declaraciones",
     },
-    // { 
-    //   text: "Documentos", 
-    //   icon: <DescriptionIcon />, 
-    //   path: "/admin/documentos",
-    //   description: "Documentos del sistema",
-    // },
     { 
       text: "Reportes", 
       icon: <ReportsIcon />, 
@@ -99,6 +93,12 @@ const AdminLayout = () => {
       icon: <ConfigIcon />, 
       path: "/admin/config",
       description: "Configuración del sistema",
+    },
+    { 
+      text: "Auditoria", 
+      icon: <HistoryIcon />,
+      path: "/admin/auditoria",
+      description: "Registro de actividades del sistema",
     },
   ];
 

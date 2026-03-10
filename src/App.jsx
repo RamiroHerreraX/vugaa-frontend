@@ -38,14 +38,16 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import SystemConfig from "./pages/admin/SystemConfig";
 import AdminProfile from "./pages/admin/AdminProfile";
 import ConfigExpediente from "./pages/admin/ConfigExpediente";
+import ConfigDeclaraciones from "./pages/admin/ConfigDeclaraciones";
 import GeneralAlerts from "./pages/admin/GeneralAlerts";
 import Reports from "./pages/admin/Reports";
 import UserManagement from "./pages/admin/UserManagement";
 import UserReview from "./pages/admin/UserReview";
+import AdminAuditLog from "./pages/admin/AdminAuditLog";
 
 // Páginas de Comité
 import CommitteeDashboard from "./pages/committee/CommitteeDashboard";
-import PendingReviews from "./pages/committee/PendingReviews";
+
 
 // Páginas de Usuario agente
 import UserDashboard from "./pages/agente/dashboard/Dashboard";
@@ -157,6 +159,8 @@ function App() {
               <Route path="/admin/users/:id/review" element={<UserReview />} />
               <Route path="/admin/config" element={<SystemConfig />} />
               <Route path="/admin/profile" element={<AdminProfile />} />
+              <Route path="/admin/config_declaraciones" element={<ConfigDeclaraciones />} />
+              <Route path="/admin/auditoria" element={<AdminAuditLog />} />
             
             </Route>
            
@@ -170,7 +174,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="pending" element={<PendingReviews />} />
+              
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<CommitteeDashboard />} />
             </Route>

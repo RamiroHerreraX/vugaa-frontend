@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import API from '../services/api';
 
@@ -11,25 +10,46 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [tokenExpiration, setTokenExpiration] = useState(null);
 
-  // Verificar token periódicamente
+  // 🔴 NUEVO: Función separada para logout local
+  const performLocalLogout = useCallback((redirect = true) => {
+    // Limpiar localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('tokenExpiration');
+    
+    // Limpiar estado
+    setUser(null);
+    setTokenExpiration(null);
+    
+    // Limpiar headers de axios
+    delete API.defaults.headers.common['Authorization'];
+    
+    // Redirigir si es necesario
+    if (redirect) {
+      window.location.href = '/login';
+    }
+  }, []);
+
+  // Verificar token periódicamente (CORREGIDO)
   useEffect(() => {
     const checkToken = async () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
       try {
-        const response = await API.get('/auth/verificar-token');
-        if (!response.data.valid) {
-          logout();
-        }
+        await API.get('/auth/verificar-token');
       } catch (error) {
-        logout();
+        // Solo hacer logout si no es 401 (porque 401 significa token expirado)
+        if (error.response?.status !== 401) {
+          performLocalLogout(false);
+        }
       }
     };
 
     const interval = setInterval(checkToken, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [performLocalLogout]);
 
   const loadUser = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -38,32 +58,33 @@ export const AuthProvider = ({ children }) => {
     
     if (token && userStr && expiration) {
       if (Date.now() > parseInt(expiration)) {
-        logout();
+        performLocalLogout(false);
       } else {
         try {
           const userData = JSON.parse(userStr);
           setUser(userData);
           setTokenExpiration(parseInt(expiration));
+          
+          // Configurar token en axios
+          API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         } catch (error) {
           console.error('Error parsing user data', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('tokenExpiration');
+          performLocalLogout(false);
         }
       }
     }
     setLoading(false);
-  }, []);
-
-  const updateUser = (campos) => {
-  const updatedUser = { ...user, ...campos };
-  setUser(updatedUser);
-  localStorage.setItem('user', JSON.stringify(updatedUser));
-};
+  }, [performLocalLogout]);
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  const updateUser = (campos) => {
+    const updatedUser = { ...user, ...campos };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
 
   const login = async (email, password, tenant) => {
     try {
@@ -77,7 +98,6 @@ export const AuthProvider = ({ children }) => {
       );
       
       if (response.data.token) {
-
         const roleMap = {
           'SUPERADMIN': 'supera',
           'ADMIN': 'admin',
@@ -95,10 +115,7 @@ export const AuthProvider = ({ children }) => {
           rol: roleMap[response.data.rol] || response.data.rol.toLowerCase(),
           instanciaId: response.data.instanciaId,
           instanciaNombre: response.data.instanciaNombre,
-
-          // NUEVO CAMPO
           perfilCompleto: response.data.perfilCompleto ?? false
-          
         };
 
         const expiration = Date.now() + (response.data.expiresIn || 86400000);
@@ -108,37 +125,47 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('tokenExpiration', expiration.toString());
         
+        // Configurar token en axios
+        API.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
         setUser(userData);
         setTokenExpiration(expiration);
         
-        return { 
-          success: true, 
-          user: userData 
-        };
+        return { success: true, user: userData };
       } else {
-        return { 
-          success: false, 
-          error: response.data.mensaje || 'Error al iniciar sesión' 
-        };
+        return { success: false, error: response.data.mensaje || 'Error al iniciar sesión' };
       }
     } catch (error) {
       const errorMsg = error.response?.data?.mensaje || 'Error de conexión';
-      return { 
-        success: false, 
-        error: errorMsg 
-      };
+      return { success: false, error: errorMsg };
     }
   };
 
-  const logout = () => {
-    API.post('/auth/logout').catch(console.error);
+  // 🔴 NUEVO: Logout mejorado que siempre limpia localmente
+  const logout = async (options = {}) => {
+    const { redirect = true } = options;
     
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('tokenExpiration');
-    setUser(null);
-    setTokenExpiration(null);
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        // Intentar logout en backend, pero sin esperar y con manejo de errores
+        await API.post('/auth/logout', {}, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 3000 // Timeout de 3 segundos
+        }).catch(error => {
+          // Ignorar errores específicos (incluyendo 401)
+          console.log('Error en logout del backend (ignorado):', error.message);
+        });
+      }
+    } catch (error) {
+      console.error('Error inesperado en logout:', error);
+    } finally {
+      // SIEMPRE limpiar el estado local
+      performLocalLogout(redirect);
+    }
   };
 
   const recuperarPassword = async (email) => {
@@ -193,10 +220,15 @@ export const AuthProvider = ({ children }) => {
         const expiration = Date.now() + (response.data.expiresIn || 86400000);
         localStorage.setItem('tokenExpiration', expiration.toString());
         setTokenExpiration(expiration);
+        
+        // Actualizar token en axios
+        API.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
         return true;
       }
     } catch (error) {
-      logout();
+      console.error('Error refreshing token:', error);
+      performLocalLogout(true);
     }
     return false;
   };
@@ -212,11 +244,8 @@ export const AuthProvider = ({ children }) => {
       loading,
       isAuthenticated: !!user,
       tokenExpiration,
-
-      // 🔵 LOGICA DE PERFIL
       perfilIncompleto: user ? !user.perfilCompleto : false,
       updateUser
-      
     }}>
       {children}
     </AuthContext.Provider>
