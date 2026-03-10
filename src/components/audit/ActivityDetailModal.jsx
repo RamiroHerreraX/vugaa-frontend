@@ -16,27 +16,39 @@ import {
   Warning as WarningIcon,
   Error as ErrorIcon,
   DevicesOther as DevicesIcon,
+  Badge as BadgeIcon,
 } from "@mui/icons-material";
 
 const institutionalColors = {
-  primary: '#133B6B',
-  secondary: '#1a4c7a',
-  background: '#f8fafc',
-  lightBlue: 'rgba(19, 59, 107, 0.08)',
-  textPrimary: '#2c3e50',
+  primary:       '#133B6B',
+  secondary:     '#1a4c7a',
+  background:    '#f8fafc',
+  lightBlue:     'rgba(19, 59, 107, 0.08)',
+  textPrimary:   '#2c3e50',
   textSecondary: '#7f8c8d',
-  success: '#27ae60',
-  warning: '#f39c12',
-  error: '#e74c3c',
-  info: '#3498db',
+  success:       '#27ae60',
+  warning:       '#f39c12',
+  error:         '#e74c3c',
+  info:          '#3498db',
 };
 
-// Mapea accion del DTO a severity visual
+const getRolColor = (rol = "") => {
+  const r = rol.toUpperCase();
+  if (r.includes("SUPER"))     return "#8e44ad";
+  if (r.includes("ADMIN"))     return institutionalColors.success;
+  if (r.includes("COMITE"))    return institutionalColors.primary;
+  if (r.includes("AGENTE"))    return "#526F78";
+  if (r.includes("PROFESION")) return "#2ecc71";
+  if (r.includes("EMPRESA"))   return "#ed6c02";
+  if (r.includes("ASOCIA"))    return "#16a085";
+  return institutionalColors.textSecondary;
+};
+
 const severityFromAccion = (accion = '') => {
   const a = accion.toUpperCase();
   if (a.includes('ELIMINAD') || a.includes('ERROR') || a.includes('RECHAZ')) return 'error';
-  if (a.includes('DESACTIVAD') || a.includes('VENCIM') || a.includes('ALERTA'))  return 'warning';
-  if (a.includes('CREAD') || a.includes('APROBAD') || a.includes('COMPLETAD'))   return 'success';
+  if (a.includes('DESACTIVAD') || a.includes('VENCIM') || a.includes('ALERTA')) return 'warning';
+  if (a.includes('CREAD') || a.includes('APROBAD') || a.includes('COMPLETAD'))  return 'success';
   return 'info';
 };
 
@@ -55,16 +67,18 @@ const getSeverityIcon = (severity) => {
   return                             <InfoIcon         sx={{ color }} />;
 };
 
-const Item = ({ icon, label, value }) => (
+const Item = ({ icon, label, value, children }) => (
   <Stack direction="row" spacing={1} alignItems="flex-start">
     <Box sx={{ color: institutionalColors.primary, minWidth: 24, mt: 0.3 }}>{icon}</Box>
     <Box>
       <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
         {label}
       </Typography>
-      <Typography fontWeight={500} sx={{ color: institutionalColors.textPrimary, wordBreak: 'break-all' }}>
-        {value || '—'}
-      </Typography>
+      {children || (
+        <Typography fontWeight={500} sx={{ color: institutionalColors.textPrimary, wordBreak: 'break-all' }}>
+          {value || '—'}
+        </Typography>
+      )}
     </Box>
   </Stack>
 );
@@ -72,14 +86,9 @@ const Item = ({ icon, label, value }) => (
 export default function ActivityDetailModal({ open, onClose, activity }) {
   if (!activity) return null;
 
-  // ── mapeo DTO → campos visuales ──────────────────────────────────────────
-  // activity es un AuditoriaDTO:
-  // idAuditoria, idUsuario, nombreUsuario, idInstancia, nombreInstancia,
-  // accion, entidadTipo, idEntidad, valorAnterior, valorNuevo,
-  // ipOrigen, userAgent, fecha
-
   const severity      = severityFromAccion(activity.accion);
   const severityColor = getSeverityColor(severity);
+  const rolColor      = activity.nombreRol ? getRolColor(activity.nombreRol) : institutionalColors.textSecondary;
 
   const fechaFormateada = activity.fecha
     ? new Date(activity.fecha).toLocaleString('es-MX', {
@@ -92,7 +101,6 @@ export default function ActivityDetailModal({ open, onClose, activity }) {
     ? activity.nombreUsuario.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
     : '?';
 
-  // valorAnterior / valorNuevo pueden ser objetos JSON
   const renderJson = (val) => {
     if (!val) return '—';
     if (typeof val === 'object') return JSON.stringify(val, null, 2);
@@ -222,7 +230,7 @@ export default function ActivityDetailModal({ open, onClose, activity }) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Avatar sx={{
               width: 48, height: 48, fontWeight: 700, fontSize: 16,
-              bgcolor: institutionalColors.primary,
+              bgcolor: activity.nombreRol ? rolColor : institutionalColors.primary,
               border: `2px solid ${institutionalColors.lightBlue}`,
             }}>
               {iniciales}
@@ -233,7 +241,25 @@ export default function ActivityDetailModal({ open, onClose, activity }) {
                 {activity.nombreUsuario || '—'}
               </Typography>
 
-              <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, mt: 0.3 }}>
+              {/* Rol como chip con color */}
+              {activity.nombreRol && (
+                <Chip
+                  icon={<BadgeIcon sx={{ fontSize: 14, color: `${rolColor} !important` }} />}
+                  label={activity.nombreRol}
+                  size="small"
+                  sx={{
+                    mt: 0.5,
+                    height: 20,
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    bgcolor: rolColor + '18',
+                    color: rolColor,
+                    border: `1px solid ${rolColor}40`,
+                  }}
+                />
+              )}
+
+              <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, mt: 0.5 }}>
                 ID Usuario: {activity.idUsuario}
               </Typography>
 

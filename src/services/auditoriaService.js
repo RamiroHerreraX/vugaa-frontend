@@ -3,7 +3,6 @@ import API from "./api";
 
 class AuditoriaService {
 
-  // Todas las auditorías
   async findAll() {
     try {
       const response = await API.get("/auditoria");
@@ -13,7 +12,6 @@ class AuditoriaService {
     }
   }
 
-  // Por ID
   async findById(id) {
     try {
       const response = await API.get(`/auditoria/${id}`);
@@ -23,7 +21,6 @@ class AuditoriaService {
     }
   }
 
-  // Por usuario
   async findByUsuario(idUsuario) {
     try {
       const response = await API.get(`/auditoria/usuario/${idUsuario}`);
@@ -33,7 +30,6 @@ class AuditoriaService {
     }
   }
 
-  // Por instancia
   async findByInstancia(idInstancia) {
     try {
       const response = await API.get(`/auditoria/instancia/${idInstancia}`);
@@ -43,7 +39,6 @@ class AuditoriaService {
     }
   }
 
-  // Por entidad (tipo + id)
   async findByEntidad(entidadTipo, idEntidad) {
     try {
       const response = await API.get(`/auditoria/entidad/${entidadTipo}/${idEntidad}`);
@@ -53,7 +48,6 @@ class AuditoriaService {
     }
   }
 
-  // Por rango de fechas
   async findByRangoFechas(desde, hasta) {
     try {
       const response = await API.get("/auditoria/fechas", {
@@ -65,7 +59,6 @@ class AuditoriaService {
     }
   }
 
-  // Filtro combinado — todos los parámetros son opcionales
   async filtrar({ idUsuario, idInstancia, entidadTipo, accion, desde, hasta } = {}) {
     try {
       const params = {};
@@ -83,7 +76,6 @@ class AuditoriaService {
     }
   }
 
-  // Conteo por instancia
   async countByInstancia(idInstancia) {
     try {
       const response = await API.get(`/auditoria/count/instancia/${idInstancia}`);
@@ -93,7 +85,6 @@ class AuditoriaService {
     }
   }
 
-  // Conteo por usuario
   async countByUsuario(idUsuario) {
     try {
       const response = await API.get(`/auditoria/count/usuario/${idUsuario}`);
@@ -103,7 +94,19 @@ class AuditoriaService {
     }
   }
 
-  // ── Manejador de errores ────────────────────────────────────────────────────
+  // Mis logs combinados: propios + permisos de asociados + donde aparezco mencionado
+  async misLogs(idUsuario, { desde, hasta } = {}) {
+    try {
+      const params = { idUsuario };
+      if (desde) params.desde = desde instanceof Date ? desde.toISOString() : desde;
+      if (hasta) params.hasta = hasta instanceof Date ? hasta.toISOString() : hasta;
+
+      const response = await API.get("/auditoria/mis-logs", { params });
+      return response.data;
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
 
   _handleError(error) {
     if (error.response) {

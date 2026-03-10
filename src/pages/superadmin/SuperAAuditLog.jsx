@@ -24,49 +24,34 @@ const institutionalColors = {
   error: "#e74c3c", info: "#3498db",
 };
 
-// ── Tipos de acción: detectados dinámicamente desde el backend ────────────────
-// Se extrae el PREFIJO de la acción (ej: "USUARIO_CREADO" → "USUARIO")
-// y se construye el filtro automáticamente. Solo necesitas agregar aquí
-// las que quieras con etiqueta legible; las demás aparecen como "Otro"
 const KNOWN_ACTION_PREFIXES = {
-  LOGIN:               "Accesos al sistema",
-  USUARIO:             "Usuarios",
-  ASOCIACION:          "Asociaciones",
-  DOCUMENTO:           "Documentos",
-  INSTANCIA:           "Instancias",
-  ROL:                 "Roles",
-  REGION:              "Regiones",
-  APARTADO:            "Apartados",
-  PROGRAMA:            "Programas",
-  PERFIL:              "Perfiles",
-  EXPEDIENTE:          "Expedientes",
-  CERTIFICACION:       "Certificaciones",
-  NOTIFICACION:        "Notificaciones",
-  AUDITORIA:           "Auditoría",
-  SISTEMA:             "Sistema",
-  SEGURIDAD:           "Seguridad",
+  LOGIN:         "Accesos al sistema",
+  USUARIO:       "Usuarios",
+  ASOCIACION:    "Asociaciones",
+  DOCUMENTO:     "Documentos",
+  INSTANCIA:     "Instancias",
+  ROL:           "Roles",
+  REGION:        "Regiones",
+  APARTADO:      "Apartados",
+  PROGRAMA:      "Programas",
+  PERFIL:        "Perfiles",
+  EXPEDIENTE:    "Expedientes",
+  CERTIFICACION: "Certificaciones",
+  NOTIFICACION:  "Notificaciones",
+  AUDITORIA:     "Auditoría",
+  SISTEMA:       "Sistema",
+  SEGURIDAD:     "Seguridad",
 };
-
-const USER_TYPES = [
-  { value: "all",           label: "Todos los usuarios"  },
-  { value: "SUPERADMIN",    label: "Super Admin"          },
-  { value: "ADMIN",         label: "Administradores"      },
-  { value: "COMITE",        label: "Comité"               },
-  { value: "AGENTE",        label: "Agentes"              },
-  { value: "PROFESIONISTA", label: "Profesionistas"       },
-  { value: "EMPRESARIO",    label: "Empresarios"          },
-  { value: "ASOCIACION",    label: "Asociaciones"         },
-];
 
 const getRolColor = (rol = "") => {
   const r = rol.toUpperCase();
-  if (r.includes("SUPER"))        return "#8e44ad";
-  if (r.includes("ADMIN"))        return institutionalColors.success;
-  if (r.includes("COMITE"))       return institutionalColors.primary;
-  if (r.includes("AGENTE"))       return "#526F78";
-  if (r.includes("PROFESION"))    return "#2ecc71";
-  if (r.includes("EMPRESA"))      return "#ed6c02";
-  if (r.includes("ASOCIA"))       return "#16a085";
+  if (r.includes("SUPER"))     return "#8e44ad";
+  if (r.includes("ADMIN"))     return institutionalColors.success;
+  if (r.includes("COMITE"))    return institutionalColors.primary;
+  if (r.includes("AGENTE"))    return "#526F78";
+  if (r.includes("PROFESION")) return "#2ecc71";
+  if (r.includes("EMPRESA"))   return "#ed6c02";
+  if (r.includes("ASOCIA"))    return "#16a085";
   return institutionalColors.textSecondary;
 };
 
@@ -81,15 +66,14 @@ const severityFromAccion = (accion = "") => {
   if (!accion) return "info";
   const a = accion.toUpperCase();
   if (a.includes("ELIMINAD") || a.includes("ERROR") || a.includes("RECHAZ") ||
-      a.includes("BLOQUEADO") || a.includes("FALLIDO"))              return "error";
+      a.includes("BLOQUEADO") || a.includes("FALLIDO"))             return "error";
   if (a.includes("ACTUALIZ") || a.includes("CAMBIO") || a.includes("DESACTIV") ||
-      a.includes("CONFIG"))                                           return "warning";
+      a.includes("CONFIG"))                                          return "warning";
   if (a.includes("CREAD") || a.includes("APROBAD") || a.includes("COMPLETAD") ||
-      a.includes("ACTIVAD") || a.includes("EXITOSO"))                return "success";
+      a.includes("ACTIVAD") || a.includes("EXITOSO"))               return "success";
   return "info";
 };
 
-// Extrae el prefijo de una acción: "USUARIO_CREADO" → "USUARIO"
 const getPrefijo = (accion = "") => accion.split("_")[0].toUpperCase();
 
 const AuditLog = () => {
@@ -99,16 +83,17 @@ const AuditLog = () => {
   const [loading,         setLoading]         = useState(false);
   const [searchTerm,      setSearchTerm]      = useState("");
   const [filterType,      setFilterType]      = useState("all");
-  const [filterUser,      setFilterUser]      = useState("all");
+  const [filterRol,       setFilterRol]       = useState("all");   // ← dinámico
   const [filterInstancia, setFilterInstancia] = useState("all");
   const [instancias,      setInstancias]      = useState([]);
   const [actionTypes,     setActionTypes]     = useState([{ value: "all", label: "Todas las acciones" }]);
+  const [roleTypes,       setRoleTypes]       = useState([{ value: "all", label: "Todos los roles" }]); // ← dinámico
   const [page,            setPage]            = useState(1);
   const rowsPerPage = 10;
 
-  const [selectedLog,  setSelectedLog]  = useState(null);
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [snackbar,     setSnackbar]     = useState({ open: false, message: "", severity: "success" });
+  const [selectedLog,      setSelectedLog]      = useState(null);
+  const [modalOpen,        setModalOpen]        = useState(false);
+  const [snackbar,         setSnackbar]         = useState({ open: false, message: "", severity: "success" });
   const [downloadAnchorEl, setDownloadAnchorEl] = useState(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportFormat,     setExportFormat]     = useState("csv");
@@ -123,7 +108,7 @@ const AuditLog = () => {
       const sorted = [...data].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
       setAuditLogs(sorted);
 
-      // ── Instancias únicas para filtro ──────────────────────────────────────
+      // Instancias únicas
       const uniqueInstancias = [
         ...new Map(
           sorted.filter(l => l.idInstancia)
@@ -135,16 +120,28 @@ const AuditLog = () => {
       ];
       setInstancias(uniqueInstancias);
 
-      // ── Action types dinámicos desde los datos reales ──────────────────────
+      // Action types dinámicos
       const prefijosEncontrados = [...new Set(sorted.map(l => getPrefijo(l.accion)).filter(Boolean))];
-      const dynamicTypes = [
+      setActionTypes([
         { value: "all", label: "Todas las acciones" },
         ...prefijosEncontrados.map(p => ({
           value: p,
           label: KNOWN_ACTION_PREFIXES[p] || p.charAt(0) + p.slice(1).toLowerCase(),
         })).sort((a, b) => a.label.localeCompare(b.label)),
-      ];
-      setActionTypes(dynamicTypes);
+      ]);
+
+      // ── Roles dinámicos desde nombreRol del DTO ───────────────────────────
+      const rolesEncontrados = [
+        ...new Set(
+          sorted
+            .map(l => l.nombreRol)
+            .filter(Boolean)
+        ),
+      ].sort();
+      setRoleTypes([
+        { value: "all", label: "Todos los roles" },
+        ...rolesEncontrados.map(r => ({ value: r, label: r })),
+      ]);
 
       showSnackbar("Datos cargados correctamente", "success");
     } catch (error) {
@@ -162,25 +159,26 @@ const AuditLog = () => {
     const term = searchTerm.toLowerCase();
 
     const matchesSearch =
-      (log.nombreUsuario  || "").toLowerCase().includes(term) ||
-      (log.accion         || "").toLowerCase().includes(term) ||
-      (log.entidadTipo    || "").toLowerCase().includes(term) ||
-      (log.nombreInstancia|| "").toLowerCase().includes(term) ||
+      (log.nombreUsuario   || "").toLowerCase().includes(term) ||
+      (log.accion          || "").toLowerCase().includes(term) ||
+      (log.entidadTipo     || "").toLowerCase().includes(term) ||
+      (log.nombreInstancia || "").toLowerCase().includes(term) ||
+      (log.nombreRol       || "").toLowerCase().includes(term) ||
       (log.valorNuevo?.descripcion || "").toLowerCase().includes(term) ||
       String(log.idEntidad || "").includes(term);
 
     const matchesType =
       filterType === "all" || getPrefijo(log.accion) === filterType;
 
-    const matchesUser =
-      filterUser === "all" ||
-      (log.valorNuevo?.rol || "").toUpperCase().includes(filterUser.toUpperCase());
+    // Filtra por nombreRol directo del DTO
+    const matchesRol =
+      filterRol === "all" || (log.nombreRol || "") === filterRol;
 
     const matchesInstancia =
       filterInstancia === "all" ||
       String(log.idInstancia) === String(filterInstancia);
 
-    return matchesSearch && matchesType && matchesUser && matchesInstancia;
+    return matchesSearch && matchesType && matchesRol && matchesInstancia;
   });
 
   const paginatedLogs = filteredLogs.slice(
@@ -193,8 +191,8 @@ const AuditLog = () => {
       ID:          log.idAuditoria,
       Fecha:       log.fecha,
       Usuario:     log.nombreUsuario  || log.idUsuario,
-      Rol:         log.valorNuevo?.rol || "—",
-      Instancia:   log.nombreInstancia|| log.idInstancia,
+      Rol:         log.nombreRol      || "—",
+      Instancia:   log.nombreInstancia || log.idInstancia,
       Acción:      log.accion,
       EntidadTipo: log.entidadTipo,
       IDEntidad:   log.idEntidad,
@@ -233,7 +231,7 @@ const AuditLog = () => {
   };
 
   const clearFilters = () => {
-    setSearchTerm(""); setFilterType("all"); setFilterUser("all");
+    setSearchTerm(""); setFilterType("all"); setFilterRol("all");
     setFilterInstancia("all"); setPage(1);
     showSnackbar("Filtros limpiados", "info");
   };
@@ -283,7 +281,6 @@ const AuditLog = () => {
         <Paper elevation={0} sx={{ p: 2, bgcolor: "white", border: "1px solid #e5e7eb" }}>
           <Grid container spacing={2} alignItems="center">
 
-            {/* Búsqueda */}
             <Grid item xs={12} md={3}>
               <TextField fullWidth size="small" placeholder="Buscar..." value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
@@ -295,7 +292,6 @@ const AuditLog = () => {
               />
             </Grid>
 
-            {/* Tipo de acción — dinámico */}
             <Grid item xs={12} md={2.5}>
               <FormControl fullWidth size="small">
                 <InputLabel>Tipo de Acción</InputLabel>
@@ -306,18 +302,17 @@ const AuditLog = () => {
               </FormControl>
             </Grid>
 
-            {/* Tipo de usuario / rol */}
+            {/* Rol dinámico desde el backend */}
             <Grid item xs={12} md={2.5}>
               <FormControl fullWidth size="small">
-                <InputLabel>Rol de Usuario</InputLabel>
-                <Select value={filterUser} label="Rol de Usuario"
-                  onChange={(e) => { setFilterUser(e.target.value); setPage(1); }}>
-                  {USER_TYPES.map(u => <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>)}
+                <InputLabel>Rol</InputLabel>
+                <Select value={filterRol} label="Rol"
+                  onChange={(e) => { setFilterRol(e.target.value); setPage(1); }}>
+                  {roleTypes.map(r => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
 
-            {/* Instancia */}
             <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Instancia</InputLabel>
@@ -334,7 +329,6 @@ const AuditLog = () => {
               </FormControl>
             </Grid>
 
-            {/* Limpiar */}
             <Grid item xs={12} md={1}>
               <Button fullWidth variant="outlined" size="small" onClick={clearFilters}
                 sx={{ height: 40, borderColor: institutionalColors.primary, color: institutionalColors.primary,
@@ -383,14 +377,14 @@ const AuditLog = () => {
               ) : paginatedLogs.map((log) => {
                 const severity = severityFromAccion(log.accion);
                 const color    = getSeverityColor(severity);
-                const rol      = log.valorNuevo?.rol || null;
+                // Usar nombreRol del DTO directamente
+                const rol      = log.nombreRol || null;
                 const rolColor = rol ? getRolColor(rol) : institutionalColors.textSecondary;
 
                 return (
                   <TableRow key={log.idAuditoria} hover
                     sx={{ "&:hover": { bgcolor: institutionalColors.lightBlue }, borderLeft: `3px solid ${color}` }}>
 
-                    {/* Fecha */}
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: "bold", color: institutionalColors.textPrimary }}>
                         {log.fecha ? new Date(log.fecha).toLocaleDateString("es-MX") : "—"}
@@ -403,8 +397,9 @@ const AuditLog = () => {
                     {/* Usuario + Rol */}
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Avatar sx={{ width: 32, height: 32, bgcolor: rol ? rolColor : institutionalColors.primary,
-                                      fontSize: "0.8rem", fontWeight: "bold" }}>
+                        <Avatar sx={{ width: 32, height: 32,
+                          bgcolor: rol ? rolColor : institutionalColors.primary,
+                          fontSize: "0.8rem", fontWeight: "bold" }}>
                           {(log.nombreUsuario || "?").charAt(0).toUpperCase()}
                         </Avatar>
                         <Box>
@@ -421,7 +416,6 @@ const AuditLog = () => {
                       </Box>
                     </TableCell>
 
-                    {/* Acción */}
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500, color: institutionalColors.textPrimary }}>
                         {log.accion}
@@ -430,7 +424,6 @@ const AuditLog = () => {
                         sx={{ bgcolor: `${color}15`, color, fontSize: "0.65rem", height: 18, mt: 0.5 }} />
                     </TableCell>
 
-                    {/* Instancia */}
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <BusinessIcon fontSize="small" sx={{ color: institutionalColors.primary }} />
@@ -440,7 +433,6 @@ const AuditLog = () => {
                       </Box>
                     </TableCell>
 
-                    {/* Entidad */}
                     <TableCell>
                       <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
                         {log.entidadTipo || "—"}
@@ -452,14 +444,12 @@ const AuditLog = () => {
                       )}
                     </TableCell>
 
-                    {/* IP */}
                     <TableCell>
                       <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
                         {log.ipOrigen || "—"}
                       </Typography>
                     </TableCell>
 
-                    {/* Ver detalle */}
                     <TableCell>
                       <Tooltip title="Ver detalles">
                         <IconButton size="small" sx={{ color: institutionalColors.primary }}
@@ -475,7 +465,6 @@ const AuditLog = () => {
           </Table>
         </TableContainer>
 
-        {/* Paginación */}
         <Box sx={{ p: 2, borderTop: "1px solid #e5e7eb", display: "flex",
                    justifyContent: "space-between", alignItems: "center", bgcolor: "white" }}>
           <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
@@ -488,12 +477,10 @@ const AuditLog = () => {
         </Box>
       </Paper>
 
-      {/* Modal detalle */}
       <ActivityDetailModal open={modalOpen}
         onClose={() => { setModalOpen(false); setSelectedLog(null); }}
         activity={selectedLog} />
 
-      {/* Diálogo export */}
       <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)}>
         <DialogTitle>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -529,7 +516,6 @@ const AuditLog = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
       <Snackbar open={snackbar.open} autoHideDuration={3000}
         onClose={() => setSnackbar(p => ({ ...p, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>

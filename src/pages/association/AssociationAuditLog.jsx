@@ -1,1416 +1,585 @@
-// src/pages/audit/AuditLog.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  Stack,
-  IconButton,
-  Tooltip,
-  MenuItem,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  Card,
-  CardContent,
-  Avatar,
-  LinearProgress,
-  Pagination,
-  Alert,
-  Snackbar,
+  Box, Paper, Typography, TextField, Button, Grid, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Chip, Stack, IconButton,
+  Tooltip, InputAdornment, FormControl, InputLabel, Select, Avatar,
+  Pagination, Alert, Snackbar, Menu, ListItemIcon, ListItemText, Dialog,
+  DialogTitle, DialogContent, DialogActions, Radio, RadioGroup,
+  FormControlLabel, FormLabel, CircularProgress, MenuItem, ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import {
-  Search as SearchIcon,
-  Download as DownloadIcon,
-  Visibility as VisibilityIcon,
-  Login as LoginIcon,
-  Logout as LogoutIcon,
-  Refresh as RefreshIcon,
-  Assignment as AssignmentIcon,
-  GroupAdd as GroupAddIcon,
-  Visibility as ProfileIcon,
-  FileUpload as FileUploadIcon,
-  PersonAdd as PersonAddIcon,
-  Lock as LockIcon,
+  Search as SearchIcon, Download as DownloadIcon,
+  Visibility as VisibilityIcon, Refresh as RefreshIcon,
+  Business as BusinessIcon, FileDownload as FileDownloadIcon,
+  TableChart as TableChartIcon, TextSnippet as TextSnippetIcon,
+  Person as PersonIcon, AdminPanelSettings as AdminIcon,
 } from "@mui/icons-material";
 import ActivityDetailModal from "../../components/audit/ActivityDetailModal";
-import * as XLSX from "xlsx";
+import auditoriaService from "../../services/auditoriaService";
+import { useAuth } from "../../context/AuthContext";
 
-// Colores institucionales
 const institutionalColors = {
-  primary: "#133B6B", // Azul oscuro principal
-  secondary: "#1a4c7a", // Azul medio
-  accent: "#e9e9e9", // Color para acentos (gris claro)
-  background: "#f8fafc", // Fondo claro
-  lightBlue: "rgba(19, 59, 107, 0.08)", // Azul transparente para hover
-  darkBlue: "#0D2A4D", // Azul más oscuro
-  textPrimary: "#2c3e50", // Texto principal
-  textSecondary: "#7f8c8d", // Texto secundario
-  success: "#27ae60", // Verde para éxito
-  warning: "#f39c12", // Naranja para advertencias
-  error: "#e74c3c", // Rojo para errores
-  info: "#3498db", // Azul para información
+  primary: "#133B6B", secondary: "#1a4c7a", background: "#f8f9fa",
+  lightBlue: "rgba(19, 59, 107, 0.08)", textPrimary: "#2c3e50",
+  textSecondary: "#7f8c8d", success: "#27ae60", warning: "#f39c12",
+  error: "#e74c3c", info: "#3498db",
+};
+
+const KNOWN_ACTION_PREFIXES = {
+  LOGIN:         "Accesos al sistema",
+  USUARIO:       "Usuarios",
+  ASOCIACION:    "Asociaciones",
+  DOCUMENTO:     "Documentos",
+  INSTANCIA:     "Instancias",
+  ROL:           "Roles",
+  REGION:        "Regiones",
+  APARTADO:      "Apartados",
+  PROGRAMA:      "Programas",
+  PERFIL:        "Perfiles",
+  EXPEDIENTE:    "Expedientes",
+  CERTIFICACION: "Certificaciones",
+  NOTIFICACION:  "Notificaciones",
+  AUDITORIA:     "Auditoría",
+  SISTEMA:       "Sistema",
+  SEGURIDAD:     "Seguridad",
+};
+
+const getRolColor = (rol = "") => {
+  const r = rol.toUpperCase();
+  if (r.includes("SUPER"))     return "#8e44ad";
+  if (r.includes("ADMIN"))     return institutionalColors.success;
+  if (r.includes("COMITE"))    return institutionalColors.primary;
+  if (r.includes("AGENTE"))    return "#526F78";
+  if (r.includes("PROFESION")) return "#2ecc71";
+  if (r.includes("EMPRESA"))   return "#ed6c02";
+  if (r.includes("ASOCIA"))    return "#16a085";
+  return institutionalColors.textSecondary;
+};
+
+const getSeverityColor = (severity) => ({
+  success: institutionalColors.success,
+  info:    institutionalColors.info,
+  warning: institutionalColors.warning,
+  error:   institutionalColors.error,
+}[severity] || institutionalColors.textSecondary);
+
+const severityFromAccion = (accion = "") => {
+  if (!accion) return "info";
+  const a = accion.toUpperCase();
+  if (a.includes("ELIMINAD") || a.includes("ERROR") || a.includes("RECHAZ") ||
+      a.includes("BLOQUEADO") || a.includes("FALLIDO"))             return "error";
+  if (a.includes("ACTUALIZ") || a.includes("CAMBIO") || a.includes("DESACTIV") ||
+      a.includes("CONFIG"))                                          return "warning";
+  if (a.includes("CREAD") || a.includes("APROBAD") || a.includes("COMPLETAD") ||
+      a.includes("ACTIVAD") || a.includes("EXITOSO"))               return "success";
+  return "info";
+};
+
+const getPrefijo = (accion = "") => accion.split("_")[0].toUpperCase();
+
+const isAdmin = (user) => {
+  const rol = (user?.rol || user?.role || "").toUpperCase();
+  return rol.includes("SUPERADMIN") || rol.includes("ADMIN");
 };
 
 const AuditLog = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterUser, setFilterUser] = useState("all");
-  const [page, setPage] = useState(1);
-  const [selectedActivity, setSelectedActivity] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const { user } = useAuth();
+  const esAdmin = isAdmin(user);
+
+  const [vistaMode,    setVistaMode]    = useState(esAdmin ? "all" : "mine");
+  const [auditLogs,    setAuditLogs]    = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [searchTerm,   setSearchTerm]   = useState("");
+  const [filterType,   setFilterType]   = useState("all");
+  const [filterUser,   setFilterUser]   = useState("all");
+  const [actionTypes,  setActionTypes]  = useState([{ value: "all", label: "Todas las acciones" }]);
+  // Usuarios dinámicos extraídos de los logs
+  const [userOptions,  setUserOptions]  = useState([{ value: "all", label: "Todos los usuarios" }]);
+  const [page,         setPage]         = useState(1);
   const rowsPerPage = 10;
 
-  // Datos de auditoría modificados con mensajes personales
-  const auditLogs = [
-    {
-      id: 1,
-      timestamp: "15/01/2026 10:45:10",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "CERTIFICATION_ASSIGN",
-      actionName: "Certificación subida",
-      entity: "Certificación",
-      entityId: "CERT-2026-00145",
-      details: "Subí una certificación al usuario Luis Rodríguez",
-      ip: "192.168.1.150",
-      severity: "success",
-      icon: <AssignmentIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 2,
-      timestamp: "15/01/2026 10:30:15",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "LOGIN_SUCCESS",
-      actionName: "Inicio de sesión",
-      entity: "Sistema",
-      entityId: "N/A",
-      details: "Inicié sesión en el sistema correctamente",
-      ip: "192.168.1.100",
-      severity: "info",
-      icon: <LoginIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 3,
-      timestamp: "15/01/2026 10:20:05",
-      user: {
-        name: "Luis Rodríguez",
-        role: "agente",
-        avatar: "LR",
-        email: "luis.rodriguez@institucion.edu",
-      },
-      action: "PERMISSION_GRANT",
-      actionName: "Permiso otorgado",
-      entity: "Permisos",
-      entityId: "PERM-003",
-      details:
-        "Luis Rodríguez me dio permiso para subir documentos en su nombre",
-      ip: "192.168.1.160",
-      severity: "success",
-      icon: <LockIcon />,
-      instanceName: "Instancia Principal",
-    },
+  const [selectedLog,      setSelectedLog]      = useState(null);
+  const [modalOpen,        setModalOpen]        = useState(false);
+  const [snackbar,         setSnackbar]         = useState({ open: false, message: "", severity: "success" });
+  const [downloadAnchorEl, setDownloadAnchorEl] = useState(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFormat,     setExportFormat]     = useState("csv");
+  const [exportScope,      setExportScope]      = useState("filtered");
 
-    {
-      id: 4,
-      timestamp: "15/01/2026 08:20:18",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "PROFILE_VIEW",
-      actionName: "Perfil consultado",
-      entity: "Usuario",
-      entityId: "USR-005",
-      details: "Vi el perfil del usuario Carlos Martínez",
-      ip: "192.168.1.100",
-      severity: "info",
-      icon: <ProfileIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 5,
-      timestamp: "14/01/2026 16:45:33",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "USER_ADD_ASSOCIATION",
-      actionName: "Usuario agregado",
-      entity: "Asociación",
-      entityId: "ASSOC-023",
-      details: "Agregué a María González a mi asociación",
-      ip: "192.168.1.100",
-      severity: "success",
-      icon: <GroupAddIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 6,
-      timestamp: "14/01/2026 14:10:55",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "DOCUMENT_UPLOAD_SELF",
-      actionName: "Documento subido",
-      entity: "Mi Expediente",
-      entityId: "DOC-2026-78901",
-      details: "Subí un documento a mi expediente personal",
-      ip: "192.168.1.130",
-      severity: "info",
-      icon: <FileUploadIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 7,
-      timestamp: "14/01/2026 11:30:42",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "USER_CREATE",
-      actionName: "Usuario creado",
-      entity: "Usuario",
-      entityId: "USR-012",
-      details: "Creé un nuevo usuario para Pedro Sánchez",
-      ip: "192.168.1.100",
-      severity: "success",
-      icon: <PersonAddIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 8,
-      timestamp: "13/01/2026 18:15:28",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "LOGOUT",
-      actionName: "Sesión finalizada",
-      entity: "Sistema",
-      entityId: "N/A",
-      details: "Cerré sesión del sistema",
-      ip: "192.168.1.100",
-      severity: "info",
-      icon: <LogoutIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 9,
-      timestamp: "13/01/2026 15:40:19",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "LOGIN_SUCCESS",
-      actionName: "Inicio de sesión",
-      entity: "Sistema",
-      entityId: "N/A",
-      details: "Inicié sesión nuevamente en el sistema",
-      ip: "192.168.1.140",
-      severity: "info",
-      icon: <LoginIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 10,
-      timestamp: "13/01/2026 12:05:37",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "CERTIFICATION_ASSIGN",
-      actionName: "Certificado asignado",
-      entity: "Certificación",
-      entityId: "CERT-2026-00122",
-      details: "Le asigné un certificado a Ana López",
-      ip: "192.168.1.150",
-      severity: "info",
-      icon: <AssignmentIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 11,
-      timestamp: "13/01/2026 10:15:22",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "PROFILE_VIEW",
-      actionName: "Perfil consultado",
-      entity: "Usuario",
-      entityId: "USR-003",
-      details: "Revisé el perfil de Luis Rodríguez",
-      ip: "192.168.1.100",
-      severity: "info",
-      icon: <ProfileIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 12,
-      timestamp: "12/01/2026 17:25:44",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "USER_ADD_ASSOCIATION",
-      actionName: "Usuario agregado",
-      entity: "Asociación",
-      entityId: "ASSOC-024",
-      details: "Agregué a Juan Pérez a mi asociación",
-      ip: "192.168.1.100",
-      severity: "success",
-      icon: <GroupAddIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 13,
-      timestamp: "12/01/2026 14:30:10",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "DOCUMENT_UPLOAD_SELF",
-      actionName: "Documento subido",
-      entity: "Mi Expediente",
-      entityId: "DOC-2026-78902",
-      details: "Subí mi certificado profesional a mi expediente",
-      ip: "192.168.1.130",
-      severity: "info",
-      icon: <FileUploadIcon />,
-      instanceName: "Instancia Principal",
-    },
-    {
-      id: 14,
-      timestamp: "12/01/2026 11:45:33",
-      user: {
-        name: "Fernanda López",
-        role: "comite",
-        avatar: "FL",
-        email: "fernanda.lopez@institucion.edu",
-      },
-      action: "PERMISSION_GRANT",
-      actionName: "Permisos otorgados",
-      entity: "Permisos",
-      entityId: "PERM-002",
-      details: "Fernanda me autorizó para gestionar certificados",
-      ip: "192.168.1.120",
-      severity: "success",
-      icon: <LockIcon />,
-      instanceName: "Instancia de Comité",
-    },
-    {
-      id: 15,
-      timestamp: "12/01/2026 09:20:15",
-      user: {
-        name: "Yo",
-        role: "admin",
-        avatar: "YO",
-        email: "yo@institucion.edu",
-      },
-      action: "LOGIN_SUCCESS",
-      actionName: "Inicio de sesión",
-      entity: "Sistema",
-      entityId: "N/A",
-      details: "Accedí al sistema desde mi computadora",
-      ip: "192.168.1.100",
-      severity: "info",
-      icon: <LoginIcon />,
-      instanceName: "Instancia Principal",
-    },
-  ];
+  const showSnackbar = (message, severity = "success") =>
+    setSnackbar({ open: true, message, severity });
 
-  const actionTypes = [
-    { value: "all", label: "Todas mis acciones" },
-    { value: "LOGIN", label: "Mis accesos al sistema" },
-    { value: "CERTIFICATION", label: "Certificados asignados" },
-    { value: "PERMISSION", label: "Permisos recibidos" },
-    { value: "PROFILE", label: "Perfiles consultados" },
-    { value: "USER", label: "Usuarios gestionados" },
-    { value: "DOCUMENT", label: "Documentos subidos" },
-  ];
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      let data = [];
 
-  const users = [
-    { value: "all", label: "Todos los usuarios" },
-    { value: "yo", label: "Mis acciones" },
-    { value: "comite", label: "Comité" },
-    { value: "agente", label: "Agentes" },
-    { value: "profesionista", label: "Profesionistas" },
-    { value: "empresario", label: "Empresarios" },
-  ];
+      if (vistaMode === "mine") {
+        const idUsuario = user?.id || user?.idUsuario;
+        if (!idUsuario) throw new Error("No se pudo obtener el ID del usuario");
+        data = await auditoriaService.misLogs(idUsuario);
+      } else {
+        data = await auditoriaService.findAll();
+      }
 
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case "success":
-        return institutionalColors.success;
-      case "info":
-        return institutionalColors.info;
-      case "warning":
-        return institutionalColors.warning;
-      case "error":
-        return institutionalColors.error;
-      default:
-        return institutionalColors.textSecondary;
+      const sorted = [...data].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      setAuditLogs(sorted);
+
+      // ── Action types dinámicos ────────────────────────────────────────────
+      const prefijos = [...new Set(sorted.map(l => getPrefijo(l.accion)).filter(Boolean))];
+      setActionTypes([
+        { value: "all", label: "Todas las acciones" },
+        ...prefijos.map(p => ({
+          value: p,
+          label: KNOWN_ACTION_PREFIXES[p] || p.charAt(0) + p.slice(1).toLowerCase(),
+        })).sort((a, b) => a.label.localeCompare(b.label)),
+      ]);
+
+      // ── Usuarios dinámicos extraídos de los logs ──────────────────────────
+      const uniqueUsers = [
+        ...new Map(
+          sorted
+            .filter(l => l.idUsuario && l.nombreUsuario)
+            .map(l => [l.idUsuario, {
+              value: String(l.idUsuario),
+              label: l.nombreUsuario,
+            }])
+        ).values(),
+      ].sort((a, b) => a.label.localeCompare(b.label));
+
+      setUserOptions([
+        { value: "all", label: "Todos los usuarios" },
+        ...uniqueUsers,
+      ]);
+
+      setPage(1);
+      showSnackbar("Datos cargados correctamente", "success");
+    } catch (error) {
+      showSnackbar(error.message || "Error al cargar auditorías", "error");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [vistaMode, user]);
 
-  const getRoleColor = (role) => {
-    switch (role) {
-      case "admin":
-        return institutionalColors.success;
-      case "comite":
-        return institutionalColors.primary;
-      case "agente":
-        return "#526F78";
-      case "profesionista":
-        return "#2ecc71";
-      case "empresario":
-        return "#ed6c02";
-      case "yo":
-        return institutionalColors.success;
-      default:
-        return institutionalColors.textSecondary;
-    }
-  };
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
+  // ── Filtrado ───────────────────────────────────────────────────────────────
   const filteredLogs = auditLogs.filter((log) => {
+    const term = searchTerm.toLowerCase();
+
     const matchesSearch =
-      log.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.actionName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.entityId.toLowerCase().includes(searchTerm.toLowerCase());
+      (log.nombreUsuario        || "").toLowerCase().includes(term) ||
+      (log.accion               || "").toLowerCase().includes(term) ||
+      (log.entidadTipo          || "").toLowerCase().includes(term) ||
+      (log.nombreInstancia      || "").toLowerCase().includes(term) ||
+      (log.valorNuevo?.descripcion || "").toLowerCase().includes(term) ||
+      String(log.idEntidad || "").includes(term);
 
     const matchesType =
-      filterType === "all" ? true : log.action.includes(filterType);
+      filterType === "all" || getPrefijo(log.accion) === filterType;
 
+    // Filtro por usuario dinámico (por idUsuario)
     const matchesUser =
-      filterUser === "all"
-        ? true
-        : filterUser === "yo"
-          ? log.user.name === "Yo"
-          : log.user.role === filterUser;
+      filterUser === "all" || String(log.idUsuario) === filterUser;
 
     return matchesSearch && matchesType && matchesUser;
   });
 
   const paginatedLogs = filteredLogs.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage,
+    (page - 1) * rowsPerPage, page * rowsPerPage
   );
 
-  // Estadísticas
-  const stats = {
-    total: auditLogs.length,
-    today: auditLogs.filter((log) => log.timestamp.includes("15/01/2026"))
-      .length,
-    misAcciones: auditLogs.filter((log) => log.user.name === "Yo").length,
-    permisosRecibidos: auditLogs.filter(
-      (log) => log.action === "PERMISSION_GRANT",
-    ).length,
-    certificadosAsignados: auditLogs.filter(
-      (log) => log.action === "CERTIFICATION_ASSIGN",
-    ).length,
-    documentosSubidos: auditLogs.filter(
-      (log) => log.action === "DOCUMENT_UPLOAD_SELF",
-    ).length,
-  };
+  // ── Export ─────────────────────────────────────────────────────────────────
+  const exportLogs = (data, format) => {
+    const exportData = data.map((log) => ({
+      ID:          log.idAuditoria,
+      Fecha:       log.fecha,
+      Usuario:     log.nombreUsuario  || log.idUsuario,
+      Instancia:   log.nombreInstancia || log.idInstancia,
+      Acción:      log.accion,
+      EntidadTipo: log.entidadTipo,
+      IDEntidad:   log.idEntidad,
+      Descripcion: log.valorNuevo?.descripcion || "—",
+      IP:          log.ipOrigen,
+      UserAgent:   log.userAgent,
+    }));
 
-  // Función para abrir modal de detalles
-  const handleViewDetails = (activity) => {
-    setSelectedActivity(activity);
-    setModalOpen(true);
-  };
+    let content = ""; let mimeType = "";
+    let fileName = `audit-logs-${new Date().toISOString().split("T")[0]}`;
 
-  // Función para cerrar modal
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setSelectedActivity(null);
-  };
-
-  // Función para exportar a Excel
-  const exportToExcel = () => {
-    try {
-      // Preparar los datos para Excel
-      const excelData = filteredLogs.map((log) => ({
-        Fecha: log.timestamp.split(" ")[0],
-        Hora: log.timestamp.split(" ")[1],
-        Usuario: log.user.name,
-        Rol: log.user.name === "Yo" ? "Yo" : log.user.role,
-        Email: log.user.email,
-        Acción: log.actionName,
-        Tipo: log.action,
-        Entidad: log.entity,
-        "ID Entidad": log.entityId,
-        Detalles: log.details,
-        Severidad: log.severity,
-        IP: log.ip,
-        Instancia: log.instanceName,
-      }));
-
-      // Crear hoja de trabajo
-      const ws = XLSX.utils.json_to_sheet(excelData);
-
-      // Ajustar ancho de columnas
-      const colWidths = [
-        { wch: 12 }, // Fecha
-        { wch: 10 }, // Hora
-        { wch: 20 }, // Usuario
-        { wch: 15 }, // Rol
-        { wch: 30 }, // Email
-        { wch: 25 }, // Acción
-        { wch: 20 }, // Tipo
-        { wch: 20 }, // Entidad
-        { wch: 15 }, // ID Entidad
-        { wch: 40 }, // Detalles
-        { wch: 10 }, // Severidad
-        { wch: 15 }, // IP
-        { wch: 20 }, // Instancia
-      ];
-      ws["!cols"] = colWidths;
-
-      // Crear libro de trabajo
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Actividades");
-
-      // Generar archivo Excel
-      const fecha = new Date().toISOString().split("T")[0];
-      XLSX.writeFile(wb, `actividades_${fecha}.xlsx`);
-
-      setSnackbar({
-        open: true,
-        message: "Excel exportado correctamente",
-        severity: "success",
-      });
-    } catch (error) {
-      console.error("Error al exportar Excel:", error);
-      setSnackbar({
-        open: true,
-        message: "Error al exportar Excel",
-        severity: "error",
-      });
+    if (format === "csv") {
+      const headers = Object.keys(exportData[0]).join(",");
+      const rows    = exportData.map(r => Object.values(r).map(v => `"${v ?? ""}"`).join(",")).join("\n");
+      content = `${headers}\n${rows}`; mimeType = "text/csv"; fileName += ".csv";
+    } else if (format === "json") {
+      content = JSON.stringify(exportData, null, 2); mimeType = "application/json"; fileName += ".json";
+    } else {
+      content = exportData.map(r => Object.entries(r).map(([k,v]) => `${k}: ${v ?? ""}`).join("\n"))
+                          .join("\n\n" + "=".repeat(50) + "\n\n");
+      mimeType = "text/plain"; fileName += ".txt";
     }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = fileName;
+    document.body.appendChild(link); link.click();
+    document.body.removeChild(link); URL.revokeObjectURL(url);
   };
 
-  const handleRefresh = () => {
-    setSnackbar({
-      open: true,
-      message: "Datos actualizados correctamente",
-      severity: "success",
-    });
+  const handleExportConfirm = () => {
+    exportLogs(exportScope === "filtered" ? filteredLogs : auditLogs, exportFormat);
+    setExportDialogOpen(false);
+    showSnackbar(`Exportado en formato ${exportFormat.toUpperCase()}`, "success");
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+  const clearFilters = () => {
+    setSearchTerm(""); setFilterType("all"); setFilterUser("all"); setPage(1);
+    showSnackbar("Filtros limpiados", "info");
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <Box
-      sx={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: institutionalColors.background,
-      }}
-    >
+    <Box sx={{ bgcolor: institutionalColors.background, minHeight: "100%", display: "flex", flexDirection: "column" }}>
+
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            mb: 2,
-          }}
-        >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
           <Box>
-            <Typography
-              variant="h5"
-              sx={{
-                color: institutionalColors.primary,
-                fontWeight: "bold",
-                mb: 0.5,
-              }}
-            >
-              Mis Actividades y Acciones
+            <Typography variant="h5" sx={{ color: institutionalColors.primary, fontWeight: "bold", mb: 0.5 }}>
+              Auditoría y Trazabilidad
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ color: institutionalColors.textSecondary }}
-            >
-              Registro personal de todas las acciones que he realizado y
-              recibido
+            <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
+              {vistaMode === "mine"
+                ? "Tus propias acciones, permisos recibidos y registros donde apareces"
+                : "Registro completo de todas las acciones realizadas en el sistema"}
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              startIcon={<DownloadIcon />}
-              size="small"
-              onClick={exportToExcel}
-              sx={{
-                borderColor: institutionalColors.primary,
-                color: institutionalColors.primary,
-                "&:hover": {
-                  borderColor: institutionalColors.secondary,
-                  bgcolor: institutionalColors.lightBlue,
-                },
-              }}
-            >
-              Exportar a Excel
+          <Stack direction="row" spacing={1} alignItems="center">
+            {esAdmin && (
+              <ToggleButtonGroup
+                value={vistaMode} exclusive
+                onChange={(_, val) => { if (val) setVistaMode(val); }}
+                size="small"
+                sx={{
+                  "& .MuiToggleButton-root": {
+                    textTransform: "none", fontSize: "0.75rem", px: 1.5,
+                    borderColor: institutionalColors.primary + "50",
+                    color: institutionalColors.textSecondary,
+                  },
+                  "& .MuiToggleButton-root.Mui-selected": {
+                    bgcolor: institutionalColors.primary, color: "white",
+                    "&:hover": { bgcolor: institutionalColors.secondary },
+                  },
+                }}
+              >
+                <ToggleButton value="all">
+                  <AdminIcon sx={{ fontSize: 14, mr: 0.5 }} /> Todos
+                </ToggleButton>
+                <ToggleButton value="mine">
+                  <PersonIcon sx={{ fontSize: 14, mr: 0.5 }} /> Mis logs
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
+
+            <Button variant="outlined" startIcon={<DownloadIcon />} size="small"
+              onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
+              sx={{ borderColor: institutionalColors.primary, color: institutionalColors.primary,
+                    "&:hover": { borderColor: institutionalColors.secondary, bgcolor: institutionalColors.lightBlue } }}>
+              Exportar
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
-              size="small"
-              onClick={handleRefresh}
-              sx={{
-                bgcolor: institutionalColors.primary,
-                "&:hover": {
-                  bgcolor: institutionalColors.secondary,
-                },
-              }}
-            >
-              Actualizar
+            <Menu anchorEl={downloadAnchorEl} open={Boolean(downloadAnchorEl)} onClose={() => setDownloadAnchorEl(null)}>
+              {[["csv","CSV (Excel)",<TableChartIcon />],["json","JSON",<FileDownloadIcon />],["txt","TXT",<TextSnippetIcon />]]
+                .map(([fmt, label, icon]) => (
+                  <MenuItem key={fmt} onClick={() => { setExportFormat(fmt); setExportDialogOpen(true); setDownloadAnchorEl(null); }}>
+                    <ListItemIcon sx={{ color: institutionalColors.primary }}>{icon}</ListItemIcon>
+                    <ListItemText primary={label} />
+                  </MenuItem>
+                ))}
+            </Menu>
+
+            <Button variant="contained" size="small" onClick={fetchLogs} disabled={loading}
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+              sx={{ bgcolor: institutionalColors.primary, "&:hover": { bgcolor: institutionalColors.secondary } }}>
+              {loading ? "Cargando..." : "Actualizar"}
             </Button>
           </Stack>
         </Box>
-        <Grid
-          container
-          spacing={2}
-          sx={{
-            mb: 3,
-            width: "100%",
-            flexWrap: "nowrap",
-          }}
-        >
-          <Grid item sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                borderLeft: `4px solid ${institutionalColors.success}`,
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ p: 2, textAlign: "center" }}>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    color: institutionalColors.success,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {stats.misAcciones}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: institutionalColors.textSecondary }}
-                >
-                  Mis Acciones
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
 
-          <Grid item sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                borderLeft: `4px solid ${institutionalColors.info}`,
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ p: 2, textAlign: "center" }}>
-                <Typography
-                  variant="h4"
-                  sx={{ color: institutionalColors.info, fontWeight: "bold" }}
-                >
-                  {stats.today}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: institutionalColors.textSecondary }}
-                >
-                  Hoy
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
+        {/* Badge modo actual */}
+        <Box sx={{ mb: 1.5 }}>
+          <Chip
+            icon={vistaMode === "mine" ? <PersonIcon /> : <AdminIcon />}
+            label={vistaMode === "mine"
+              ? `Mis logs — ${auditLogs.length} registros relacionados contigo`
+              : `Vista global — ${auditLogs.length} registros totales`}
+            size="small"
+            sx={{
+              bgcolor: vistaMode === "mine" ? institutionalColors.lightBlue : "#f0fdf4",
+              color:   vistaMode === "mine" ? institutionalColors.primary    : institutionalColors.success,
+              border: `1px solid ${vistaMode === "mine" ? institutionalColors.primary + "40" : institutionalColors.success + "40"}`,
+              fontWeight: 500,
+            }}
+          />
+        </Box>
 
-          <Grid item sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                borderLeft: `4px solid ${institutionalColors.primary}`,
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ p: 2, textAlign: "center" }}>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    color: institutionalColors.primary,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {stats.certificadosAsignados}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: institutionalColors.textSecondary }}
-                >
-                  Certificados Asignados
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                borderLeft: `4px solid ${institutionalColors.warning}`,
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ p: 2, textAlign: "center" }}>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    color: institutionalColors.warning,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {stats.permisosRecibidos}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: institutionalColors.textSecondary }}
-                >
-                  Permisos Recibidos
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                borderLeft: `4px solid ${institutionalColors.success}`,
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ p: 2, textAlign: "center" }}>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    color: institutionalColors.success,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {stats.documentosSubidos}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: institutionalColors.textSecondary }}
-                >
-                  Documentos Subidos
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                borderLeft: `4px solid ${institutionalColors.primary}`,
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ p: 2, textAlign: "center" }}>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    color: institutionalColors.primary,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {stats.total}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: institutionalColors.textSecondary }}
-                >
-                  Total de Eventos
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-        {/* Filtros */}
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            bgcolor: "white",
-            border: `1px solid ${institutionalColors.lightBlue}`,
-          }}
-        >
+        {/* Filtros — sin instancia, usuario dinámico */}
+        <Paper elevation={0} sx={{ p: 2, bgcolor: "white", border: "1px solid #e5e7eb" }}>
           <Grid container spacing={2} alignItems="center">
+
+            {/* Búsqueda */}
             <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Buscar en mis actividades..."
+              <TextField fullWidth size="small" placeholder="Buscar por usuario, acción, entidad..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon
-                        fontSize="small"
-                        sx={{ color: institutionalColors.textSecondary }}
-                      />
-                    </InputAdornment>
-                  ),
-                }}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                InputProps={{ startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: institutionalColors.textSecondary }} />
+                  </InputAdornment>
+                )}}
               />
             </Grid>
 
+            {/* Tipo de acción dinámico */}
             <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel
-                  sx={{
-                    "&.Mui-focused": { color: institutionalColors.primary },
-                  }}
-                >
-                  Tipo de Acción
-                </InputLabel>
-                <Select
-                  value={filterType}
-                  label="Tipo de Acción"
-                  onChange={(e) => setFilterType(e.target.value)}
-                  sx={{
-                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                      borderColor: institutionalColors.primary,
-                    },
-                  }}
-                >
-                  {actionTypes.map((type) => (
-                    <MenuItem key={type.value} value={type.value}>
-                      {type.label}
-                    </MenuItem>
-                  ))}
+                <InputLabel>Tipo de Acción</InputLabel>
+                <Select value={filterType} label="Tipo de Acción"
+                  onChange={(e) => { setFilterType(e.target.value); setPage(1); }}>
+                  {actionTypes.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
 
+            {/* Usuario dinámico desde los datos */}
             <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel
-                  sx={{
-                    "&.Mui-focused": { color: institutionalColors.primary },
-                  }}
-                >
-                  Filtrar por Usuario
-                </InputLabel>
-                <Select
-                  value={filterUser}
-                  label="Filtrar por Usuario"
-                  onChange={(e) => setFilterUser(e.target.value)}
-                  sx={{
-                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                      borderColor: institutionalColors.primary,
-                    },
-                  }}
-                >
-                  {users.map((user) => (
-                    <MenuItem key={user.value} value={user.value}>
-                      {user.label}
-                    </MenuItem>
-                  ))}
+                <InputLabel>Usuario</InputLabel>
+                <Select value={filterUser} label="Usuario"
+                  onChange={(e) => { setFilterUser(e.target.value); setPage(1); }}>
+                  {userOptions.map(u => <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
 
+            {/* Limpiar */}
             <Grid item xs={12} md={2}>
-              <Stack direction="row" spacing={1}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilterType("all");
-                    setFilterUser("all");
-                    setPage(1);
-                  }}
-                  sx={{
-                    borderColor: institutionalColors.primary,
-                    color: institutionalColors.primary,
-                    "&:hover": {
-                      borderColor: institutionalColors.secondary,
-                      bgcolor: institutionalColors.lightBlue,
-                    },
-                  }}
-                >
-                  Limpiar Filtros
-                </Button>
-              </Stack>
+              <Button fullWidth variant="outlined" size="small" onClick={clearFilters}
+                sx={{ height: 40, borderColor: institutionalColors.primary, color: institutionalColors.primary,
+                      "&:hover": { bgcolor: institutionalColors.lightBlue } }}>
+                Limpiar filtros
+              </Button>
             </Grid>
           </Grid>
         </Paper>
       </Box>
 
-      {/* Contenido principal */}
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <Paper
-          elevation={1}
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            border: `1px solid ${institutionalColors.lightBlue}`,
-          }}
-        >
-          <Box
-            sx={{
-              p: 2,
-              borderBottom: `1px solid ${institutionalColors.lightBlue}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              bgcolor: "white",
-            }}
-          >
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: "bold",
-                color: institutionalColors.textPrimary,
-              }}
-            >
-              Registro de Mis Actividades - {filteredLogs.length} eventos
-              encontrados
-            </Typography>
+      {/* Tabla */}
+      <Paper elevation={1} sx={{ flex: 1, display: "flex", flexDirection: "column",
+                                  border: "1px solid #e5e7eb", overflow: "hidden" }}>
+        <Box sx={{ p: 2, borderBottom: "1px solid #e5e7eb", display: "flex",
+                   justifyContent: "space-between", alignItems: "center", bgcolor: "white" }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: institutionalColors.textPrimary }}>
+            {filteredLogs.length} eventos encontrados
+          </Typography>
+          <Chip label={`${paginatedLogs.length} mostrados`} size="small" variant="outlined"
+            sx={{ borderColor: institutionalColors.textSecondary, color: institutionalColors.textSecondary }} />
+        </Box>
 
-            <Stack direction="row" spacing={1}>
-              <Chip
-                label={`${stats.misAcciones} acciones mías`}
-                size="small"
-                sx={{
-                  bgcolor: institutionalColors.lightBlue,
-                  color: institutionalColors.primary,
-                  borderColor: institutionalColors.primary,
-                }}
-                variant="outlined"
-              />
-              <Chip
-                label={`${paginatedLogs.length} mostrados`}
-                size="small"
-                variant="outlined"
-                sx={{
-                  borderColor: institutionalColors.textSecondary,
-                  color: institutionalColors.textSecondary,
-                }}
-              />
-            </Stack>
-          </Box>
-
-          {/* Tabla de auditoría */}
-          <TableContainer sx={{ flex: 1 }}>
-            <Table stickyHeader>
-              <TableHead>
+        <TableContainer sx={{ flex: 1 }}>
+          <Table stickyHeader>
+            <TableHead>
+              <TableRow>
+                {["Fecha", "Usuario", "Acción", "Instancia", "Entidad / ID", "IP", ""].map(h => (
+                  <TableCell key={h} sx={{ fontWeight: "bold", color: institutionalColors.primary }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      width: "15%",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Fecha y Hora
+                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                    <CircularProgress sx={{ color: institutionalColors.primary }} />
                   </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      width: "20%",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Usuario
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      width: "20%",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Acción
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      width: "15%",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Entidad
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      width: "25%",
-                      color: institutionalColors.primary,
-                    }}
-                  >
-                    Detalles
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      width: "5%",
-                      color: institutionalColors.primary,
-                    }}
-                  ></TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedLogs.map((log) => (
-                  <TableRow
-                    key={log.id}
-                    hover
+              ) : paginatedLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 6, color: institutionalColors.textSecondary }}>
+                    No se encontraron registros
+                  </TableCell>
+                </TableRow>
+              ) : paginatedLogs.map((log) => {
+                const severity = severityFromAccion(log.accion);
+                const color    = getSeverityColor(severity);
+                const rol      = log.valorNuevo?.rol || null;
+                const rolColor = rol ? getRolColor(rol) : institutionalColors.textSecondary;
+
+                const idUsuarioActual = user?.id || user?.idUsuario;
+                const esMiAccion = log.idUsuario === idUsuarioActual;
+                const esSobreMi  = !esMiAccion && (
+                  log.idEntidad === idUsuarioActual ||
+                  (log.valorNuevo?.descripcion || "").includes(String(idUsuarioActual))
+                );
+
+                return (
+                  <TableRow key={log.idAuditoria} hover
                     sx={{
                       "&:hover": { bgcolor: institutionalColors.lightBlue },
-                      borderLeft: `3px solid ${getSeverityColor(log.severity)}`,
-                    }}
-                  >
+                      borderLeft: `3px solid ${esSobreMi ? institutionalColors.warning : color}`,
+                      bgcolor: esSobreMi ? "#fffbeb" : "inherit",
+                    }}>
+
+                    {/* Fecha */}
                     <TableCell>
-                      <Box>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: "bold",
-                            color: institutionalColors.textPrimary,
-                          }}
-                        >
-                          {log.timestamp.split(" ")[0]}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: institutionalColors.textSecondary }}
-                        >
-                          {log.timestamp.split(" ")[1]}
-                        </Typography>
-                      </Box>
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: institutionalColors.textPrimary }}>
+                        {log.fecha ? new Date(log.fecha).toLocaleDateString("es-MX") : "—"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
+                        {log.fecha ? new Date(log.fecha).toLocaleTimeString("es-MX") : ""}
+                      </Typography>
                     </TableCell>
 
+                    {/* Usuario */}
                     <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
-                      >
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: getRoleColor(log.user.role),
-                            fontSize: "0.85rem",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {log.user.avatar}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Avatar sx={{ width: 32, height: 32,
+                          bgcolor: rol ? rolColor : institutionalColors.primary,
+                          fontSize: "0.8rem", fontWeight: "bold" }}>
+                          {(log.nombreUsuario || "?").charAt(0).toUpperCase()}
                         </Avatar>
                         <Box>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: "medium",
-                              color: institutionalColors.textPrimary,
-                            }}
-                          >
-                            {log.user.name}
+                          <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
+                            {log.nombreUsuario || `ID: ${log.idUsuario}`}
                           </Typography>
-                          <Chip
-                            label={
-                              log.user.name === "Yo" ? "Yo" : log.user.role
-                            }
-                            size="small"
-                            sx={{
-                              bgcolor: `${getRoleColor(log.user.role)}15`,
-                              color: getRoleColor(log.user.role),
-                              fontSize: "0.65rem",
-                              height: 18,
-                            }}
-                          />
+                          {rol && (
+                            <Chip label={rol} size="small"
+                              sx={{ height: 18, fontSize: "0.6rem", mt: 0.3,
+                                    bgcolor: rolColor + "20", color: rolColor,
+                                    border: `1px solid ${rolColor}40` }} />
+                          )}
+                          {esSobreMi && (
+                            <Chip label="sobre ti" size="small"
+                              sx={{ height: 18, fontSize: "0.6rem", mt: 0.3, ml: rol ? 0.5 : 0,
+                                    bgcolor: "#fef9c3", color: institutionalColors.warning,
+                                    border: `1px solid ${institutionalColors.warning}50` }} />
+                          )}
                         </Box>
                       </Box>
                     </TableCell>
 
+                    {/* Acción */}
                     <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Box sx={{ color: getSeverityColor(log.severity) }}>
-                          {log.icon}
-                        </Box>
-                        <Box>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: "medium",
-                              color: institutionalColors.textPrimary,
-                            }}
-                          >
-                            {log.actionName}
-                          </Typography>
-                          <Chip
-                            label={log.severity}
-                            size="small"
-                            sx={{
-                              bgcolor: `${getSeverityColor(log.severity)}15`,
-                              color: getSeverityColor(log.severity),
-                              fontSize: "0.65rem",
-                              height: 18,
-                              mt: 0.5,
-                            }}
-                          />
-                        </Box>
-                      </Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: institutionalColors.textPrimary }}>
+                        {log.accion}
+                      </Typography>
+                      <Chip label={severity} size="small"
+                        sx={{ bgcolor: `${color}15`, color, fontSize: "0.65rem", height: 18, mt: 0.5 }} />
                     </TableCell>
 
+                    {/* Instancia */}
                     <TableCell>
-                      <Box>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: "medium",
-                            color: institutionalColors.textPrimary,
-                          }}
-                        >
-                          {log.entity}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: institutionalColors.textSecondary }}
-                        >
-                          ID: {log.entityId}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <BusinessIcon fontSize="small" sx={{ color: institutionalColors.primary }} />
+                        <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
+                          {log.nombreInstancia || (log.idInstancia ? `ID: ${log.idInstancia}` : "—")}
                         </Typography>
                       </Box>
                     </TableCell>
 
+                    {/* Entidad */}
                     <TableCell>
-                      <Box>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: institutionalColors.textSecondary }}
-                        >
-                          {log.details}
+                      <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
+                        {log.entidadTipo || "—"}
+                      </Typography>
+                      {log.idEntidad && (
+                        <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
+                          ID: {log.idEntidad}
                         </Typography>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            mt: 0.5,
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{ color: institutionalColors.textSecondary }}
-                          >
-                            IP: {log.ip}
-                          </Typography>
-                        </Box>
-                      </Box>
+                      )}
                     </TableCell>
 
+                    {/* IP */}
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
+                        {log.ipOrigen || "—"}
+                      </Typography>
+                    </TableCell>
+
+                    {/* Detalle */}
                     <TableCell>
                       <Tooltip title="Ver detalles">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewDetails(log)}
-                          sx={{ color: institutionalColors.primary }}
-                        >
+                        <IconButton size="small" sx={{ color: institutionalColors.primary }}
+                          onClick={() => { setSelectedLog(log); setModalOpen(true); }}>
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-          {/* Paginación */}
-          <Box
-            sx={{
-              p: 2,
-              borderTop: `1px solid ${institutionalColors.lightBlue}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              bgcolor: "white",
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{ color: institutionalColors.textSecondary }}
-            >
-              Mostrando {(page - 1) * rowsPerPage + 1} -{" "}
-              {Math.min(page * rowsPerPage, filteredLogs.length)} de{" "}
-              {filteredLogs.length} eventos
-            </Typography>
-            <Pagination
-              count={Math.ceil(filteredLogs.length / rowsPerPage)}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              size="small"
-              color="primary"
-              sx={{
-                "& .MuiPaginationItem-root.Mui-selected": {
-                  bgcolor: institutionalColors.primary,
-                  color: "white",
-                  "&:hover": {
-                    bgcolor: institutionalColors.secondary,
-                  },
-                },
-              }}
-            />
-          </Box>
-        </Paper>
-
-        {/* Información de auditoría */}
-        <Paper
-          elevation={0}
-          sx={{
-            mt: 2,
-            p: 2,
-            bgcolor: "white",
-            border: `1px solid ${institutionalColors.lightBlue}`,
-          }}
-        >
-          <Typography
-            variant="subtitle1"
-            sx={{
-              color: institutionalColors.primary,
-              mb: 2,
-              fontWeight: "bold",
-            }}
-          >
-            Resumen de Mis Actividades Recientes
+        {/* Paginación */}
+        <Box sx={{ p: 2, borderTop: "1px solid #e5e7eb", display: "flex",
+                   justifyContent: "space-between", alignItems: "center", bgcolor: "white" }}>
+          <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
+            Mostrando {Math.min((page - 1) * rowsPerPage + 1, filteredLogs.length)}–
+            {Math.min(page * rowsPerPage, filteredLogs.length)} de {filteredLogs.length}
           </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="subtitle2"
-                sx={{ color: institutionalColors.textPrimary, mb: 1 }}
-              >
-                Distribución de Mis Acciones
-              </Typography>
-              <Stack spacing={1}>
-                {Object.entries({
-                  "Certificados asignados": stats.certificadosAsignados,
-                  "Documentos subidos": stats.documentosSubidos,
-                  "Usuarios agregados": auditLogs.filter(
-                    (log) => log.action === "USER_ADD_ASSOCIATION",
-                  ).length,
-                  "Perfiles consultados": auditLogs.filter(
-                    (log) => log.action === "PROFILE_VIEW",
-                  ).length,
-                  "Inicios de sesión": auditLogs.filter(
-                    (log) => log.action === "LOGIN_SUCCESS",
-                  ).length,
-                }).map(([type, count]) => (
-                  <Box
-                    key={type}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{ color: institutionalColors.textSecondary }}
-                    >
-                      {type}:
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        width: "60%",
-                      }}
-                    >
-                      <LinearProgress
-                        variant="determinate"
-                        value={(count / stats.misAcciones) * 100}
-                        sx={{
-                          flex: 1,
-                          height: 6,
-                          borderRadius: 3,
-                          bgcolor: "#e0e0e0",
-                          "& .MuiLinearProgress-bar": {
-                            bgcolor: institutionalColors.primary,
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: "bold",
-                          minWidth: 24,
-                          color: institutionalColors.primary,
-                        }}
-                      >
-                        {count}
-                      </Typography>
-                    </Box>
-                  </Box>
+          <Pagination count={Math.ceil(filteredLogs.length / rowsPerPage)} page={page}
+            onChange={(_, v) => setPage(v)} size="small" color="primary"
+            sx={{ "& .MuiPaginationItem-root.Mui-selected": { bgcolor: institutionalColors.primary, color: "white" } }} />
+        </Box>
+      </Paper>
+
+      <ActivityDetailModal open={modalOpen}
+        onClose={() => { setModalOpen(false); setSelectedLog(null); }}
+        activity={selectedLog} />
+
+      <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)}>
+        <DialogTitle>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <FileDownloadIcon sx={{ color: institutionalColors.primary }} />
+            <Typography variant="h6">Exportar Logs</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <FormControl component="fieldset" sx={{ mb: 3 }}>
+              <FormLabel component="legend">Formato</FormLabel>
+              <RadioGroup value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}>
+                {[["csv","CSV (Excel)"],["json","JSON"],["txt","Texto plano"]].map(([v,l]) => (
+                  <FormControlLabel key={v} value={v} control={<Radio />} label={l} />
                 ))}
-              </Stack>
-            </Grid>
+              </RadioGroup>
+            </FormControl>
+            <FormControl component="fieldset">
+              <FormLabel component="legend">Alcance</FormLabel>
+              <RadioGroup value={exportScope} onChange={(e) => setExportScope(e.target.value)}>
+                <FormControlLabel value="filtered" control={<Radio />} label={`Solo filtrados (${filteredLogs.length})`} />
+                <FormControlLabel value="all"      control={<Radio />} label={`Todos (${auditLogs.length})`} />
+              </RadioGroup>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExportDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={handleExportConfirm} variant="contained" startIcon={<DownloadIcon />}
+            sx={{ bgcolor: institutionalColors.primary, "&:hover": { bgcolor: institutionalColors.secondary } }}>
+            Exportar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="subtitle2"
-                sx={{ color: institutionalColors.textPrimary, mb: 1 }}
-              >
-                Acciones de Otros Usuarios Relacionadas Conmigo
-              </Typography>
-              <Stack spacing={1}>
-                {Object.entries({
-                  "Permisos otorgados por Fernanda": auditLogs.filter(
-                    (log) =>
-                      log.action === "PERMISSION_GRANT" &&
-                      log.user.name === "Fernanda López",
-                  ).length,
-                  "Acciones de comité": auditLogs.filter(
-                    (log) =>
-                      log.user.role === "comite" && log.user.name !== "Yo",
-                  ).length,
-                  "Acciones de agentes": auditLogs.filter(
-                    (log) => log.user.role === "agente",
-                  ).length,
-                }).map(([type, count]) => (
-                  <Box
-                    key={type}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{ color: institutionalColors.textSecondary }}
-                    >
-                      {type}:
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        width: "60%",
-                      }}
-                    >
-                      <LinearProgress
-                        variant="determinate"
-                        value={
-                          (count / (stats.total - stats.misAcciones)) * 100
-                        }
-                        sx={{
-                          flex: 1,
-                          height: 6,
-                          borderRadius: 3,
-                          bgcolor: "#e0e0e0",
-                          "& .MuiLinearProgress-bar": {
-                            bgcolor: institutionalColors.info,
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: "bold",
-                          minWidth: 24,
-                          color: institutionalColors.info,
-                        }}
-                      >
-                        {count}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
-              </Stack>
-            </Grid>
-          </Grid>
-        </Paper>
-      </Box>
-
-      {/* Modal de detalles */}
-      <ActivityDetailModal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        activity={selectedActivity}
-      />
-
-      {/* Snackbar para notificaciones */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+      <Snackbar open={snackbar.open} autoHideDuration={3000}
+        onClose={() => setSnackbar(p => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(p => ({ ...p, open: false }))} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
