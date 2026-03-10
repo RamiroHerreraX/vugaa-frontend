@@ -2,12 +2,14 @@
 import API from './api';
 
 export const getMiExpediente = async () => {
-  try {
-    const response = await API.get('/expedientes/mi-expediente');
-    return response.data;
-  } catch (error) {
-    throw error.response?.data || { mensaje: 'Error al obtener expediente' };
-  }
+  const user = JSON.parse(localStorage.getItem('user'));
+  const response = await API.get('/expedientes/mi-expediente', {
+    params: {
+      usuarioId: user.id,
+      instanciaId: user.instanciaId
+    }
+  });
+  return response.data;
 };
 
 export const getCertificaciones = async (expedienteId) => {
