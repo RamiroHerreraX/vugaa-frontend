@@ -47,7 +47,7 @@ import AdminAuditLog from "./pages/admin/AdminAuditLog";
 
 // Páginas de Comité
 import CommitteeDashboard from "./pages/committee/CommitteeDashboard";
-import PendingReviews from "./pages/committee/PendingReviews";
+
 
 // Páginas de Usuario agente
 import UserDashboard from "./pages/agente/dashboard/Dashboard";
@@ -174,7 +174,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="pending" element={<PendingReviews />} />
+              
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<CommitteeDashboard />} />
             </Route>
