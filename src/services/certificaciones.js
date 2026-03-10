@@ -7,18 +7,28 @@ export const getCertificacionesPorExpediente = async (idExpediente) => {
 };
 
 export const crearCertificacionCompleta = async (
-  formData, idInstancia, idExpediente, idPrograma, mongoDocumentoId
+  formData, idInstancia, idExpediente, idPrograma, archivo
 ) => {
-  const response = await API.post(`${ENDPOINT}/completa`, {
-    idInstancia, idPrograma, idExpediente,
-    nombre:          formData.nombre,
-    institucion:     formData.institucion,
-    horas:           parseInt(formData.horas),
-    fechaEmision:    formData.fecha,
-    mongoDocumentoId,
-    nombreArchivo:   formData.nombreArchivo,
-    descripcion:     formData.descripcion ?? '',
+  const dto = {
+    idInstancia,
+    idPrograma,
+    idExpediente,
+    nombre:       formData.nombre,
+    institucion:  formData.institucion,
+    horas:        parseInt(formData.horas),
+    fechaEmision: formData.fecha,
+    nombreArchivo: formData.nombreArchivo,
+    descripcion:  formData.descripcion ?? '',
+  };
+
+  const form = new FormData();
+  form.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
+  form.append('archivo', archivo);
+
+  const response = await API.post(`${ENDPOINT}/completa`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
   });
+
   return response.data;
 };
 
