@@ -91,8 +91,6 @@ const colors = {
   }
 };
 
-
-
 const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [addDialog, setAddDialog] = useState(false);
@@ -107,6 +105,7 @@ const [showSuggestion, setShowSuggestion] = useState(false);
 const [saving, setSaving]                 = useState(false);
 const [showPass, setShowPass]             = useState({ actual: false, nuevo: false, confirmar: false });
 const [snackbar, setSnackbar]             = useState({ open: false, message: '', severity: 'success' });
+const [fieldErrors, setFieldErrors]       = useState({}); // Nuevo estado para errores de campos
 
 // Constantes fuera del componente (antes del const Profile = ...)
 const STEPS = [
@@ -133,7 +132,40 @@ const fieldSx = {
   '& .MuiInputLabel-root.Mui-focused': { color: colors.primary.main }
 };
 
- 
+// ===== FUNCIONES DE VALIDACIÓN =====
+const validateRequiredFields = () => {
+  const errors = {};
+  const requiredFields = [
+    { field: 'curp', label: 'CURP' },
+    { field: 'rfc', label: 'RFC' },
+    { field: 'patenteAduanal', label: 'Patente Aduanal' },
+    { field: 'fechaNacimiento', label: 'Fecha de nacimiento' },
+    { field: 'lugarNacimiento', label: 'Lugar de nacimiento' },
+    { field: 'nacionalidad', label: 'Nacionalidad' },
+    { field: 'telefono', label: 'Teléfono principal' }
+  ];
+
+  requiredFields.forEach(item => {
+    if (!formData[item.field] || formData[item.field].toString().trim() === '') {
+      errors[item.field] = `${item.label} es obligatorio`;
+    }
+  });
+
+  setFieldErrors(errors);
+  return Object.keys(errors).length === 0;
+};
+
+const getStepWithErrors = () => {
+  // Determinar qué paso tiene el primer error para navegar automáticamente
+  if (fieldErrors.curp || fieldErrors.rfc || fieldErrors.patenteAduanal || 
+      fieldErrors.fechaNacimiento || fieldErrors.lugarNacimiento || fieldErrors.nacionalidad) {
+    return 0; // Paso de Datos Personales
+  }
+  if (fieldErrors.telefono) {
+    return 1; // Paso de Contacto
+  }
+  return null;
+};
 
 useEffect(() => {
   const cargarPerfil = async () => {
@@ -246,6 +278,14 @@ useEffect(() => {
   };
 
   const handleInputChange = (field) => (event) => {
+    // Limpiar error del campo cuando el usuario empieza a escribir
+    if (fieldErrors[field]) {
+      setFieldErrors({
+        ...fieldErrors,
+        [field]: null
+      });
+    }
+    
     setFormData({
       ...formData,
       [field]: event.target.value
@@ -261,18 +301,46 @@ useEffect(() => {
   };
 
 const handleSave = async () => {
+  // Validar campos requeridos primero
+  if (!validateRequiredFields()) {
+    // Mostrar mensaje de error
+    setSnackbar({
+      open: true,
+      message: 'Por favor completa todos los campos obligatorios',
+      severity: 'error'
+    });
+    
+    // Navegar al paso que contiene el primer error
+    const stepWithError = getStepWithErrors();
+    if (stepWithError !== null) {
+      setActiveStep(stepWithError);
+    }
+    
+    return;
+  }
+
   // Validar contraseña si se quiere cambiar
   if (formData.passwordNuevo) {
     if (!formData.passwordActual) {
-      console.error('Debes ingresar tu contraseña actual');
+      setSnackbar({
+        open: true,
+        message: 'Debes ingresar tu contraseña actual',
+        severity: 'error'
+      });
       return;
     }
     if (formData.passwordNuevo !== formData.confirmarPassword) {
-      console.error('Las contraseñas no coinciden');
+      setSnackbar({
+        open: true,
+        message: 'Las contraseñas no coinciden',
+        severity: 'error'
+      });
       return;
     }
   }
 
+  setSaving(true);
+  
   try {
     // 1. Actualizar perfil_agente + expediente + perfilCompleto
     await usuarioService.completarPerfil(
@@ -328,9 +396,23 @@ const handleSave = async () => {
     }));
 
     setEditMode(false);
+    
+    // Mostrar mensaje de éxito
+    setSnackbar({
+      open: true,
+      message: 'Perfil guardado exitosamente',
+      severity: 'success'
+    });
 
   } catch (error) {
     console.error('Error al guardar perfil:', error);
+    setSnackbar({
+      open: true,
+      message: 'Error al guardar el perfil',
+      severity: 'error'
+    });
+  } finally {
+    setSaving(false);
   }
 };
 
@@ -457,6 +539,22 @@ const handleDownloadCertificate = async () => {
 
   return (
     <Box>
+      {/* Snackbar para mensajes */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h4" sx={{ color: colors.primary.dark, fontWeight: 'bold' }}>
@@ -925,7 +1023,7 @@ const handleDownloadCertificate = async () => {
           </Button>
         ) : (
           <>
-            <Button onClick={() => { setEditMode(false); setShowSuggestion(false); }}
+            <Button onClick={() => { setEditMode(false); setShowSuggestion(false); setFieldErrors({}); }}
               sx={{
                 color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)',
                 borderRadius: 2, textTransform: 'none',
@@ -1032,25 +1130,73 @@ const handleDownloadCertificate = async () => {
                 <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>🪪 Identidad</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <TextField label="Nombre Completo" fullWidth size="small" value={formData.nombre}
-                      onChange={handleInputChange('nombre')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Nombre Completo" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.nombre}
+                      onChange={handleInputChange('nombre')} 
+                      disabled={!editMode} 
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField label="CURP" fullWidth size="small" value={formData.curp}
-                      onChange={handleInputChange('curp')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="CURP" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.curp}
+                      onChange={handleInputChange('curp')} 
+                      disabled={!editMode}
+                      error={!!fieldErrors.curp}
+                      helperText={fieldErrors.curp}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField label="RFC" fullWidth size="small" value={formData.rfc}
-                      onChange={handleInputChange('rfc')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="RFC" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.rfc}
+                      onChange={handleInputChange('rfc')} 
+                      disabled={!editMode}
+                      error={!!fieldErrors.rfc}
+                      helperText={fieldErrors.rfc}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField label="Patente Aduanal" fullWidth size="small" value={formData.patenteAduanal}
-                      onChange={handleInputChange('patenteAduanal')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Patente Aduanal" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.patenteAduanal}
+                      onChange={handleInputChange('patenteAduanal')} 
+                      disabled={!editMode}
+                      error={!!fieldErrors.patenteAduanal}
+                      helperText={fieldErrors.patenteAduanal}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField label="Fecha de Nacimiento" type="date" fullWidth size="small"
-                      value={formData.fechaNacimiento} onChange={handleInputChange('fechaNacimiento')}
-                      disabled={!editMode} InputLabelProps={{ shrink: true }} sx={fieldSx} />
+                    <TextField 
+                      label="Fecha de Nacimiento" 
+                      type="date" 
+                      fullWidth 
+                      size="small"
+                      value={formData.fechaNacimiento} 
+                      onChange={handleInputChange('fechaNacimiento')}
+                      disabled={!editMode}
+                      InputLabelProps={{ shrink: true }}
+                      error={!!fieldErrors.fechaNacimiento}
+                      helperText={fieldErrors.fechaNacimiento}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                 </Grid>
               </Paper>
@@ -1060,17 +1206,43 @@ const handleDownloadCertificate = async () => {
                 <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>📝 Datos Adicionales</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
-                    <TextField label="Lugar de Nacimiento" fullWidth size="small" value={formData.lugarNacimiento}
-                      onChange={handleInputChange('lugarNacimiento')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Lugar de Nacimiento" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.lugarNacimiento}
+                      onChange={handleInputChange('lugarNacimiento')} 
+                      disabled={!editMode}
+                      error={!!fieldErrors.lugarNacimiento}
+                      helperText={fieldErrors.lugarNacimiento}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField label="Nacionalidad" fullWidth size="small" value={formData.nacionalidad}
-                      onChange={handleInputChange('nacionalidad')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Nacionalidad" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.nacionalidad}
+                      onChange={handleInputChange('nacionalidad')} 
+                      disabled={!editMode}
+                      error={!!fieldErrors.nacionalidad}
+                      helperText={fieldErrors.nacionalidad}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <TextField select label="Estado Civil" fullWidth size="small"
-                      value={formData.estadoCivil} onChange={handleInputChange('estadoCivil')}
-                      disabled={!editMode} sx={fieldSx}>
+                    <TextField 
+                      select 
+                      label="Estado Civil" 
+                      fullWidth 
+                      size="small"
+                      value={formData.estadoCivil} 
+                      onChange={handleInputChange('estadoCivil')}
+                      disabled={!editMode} 
+                      sx={fieldSx}>
                       {['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Unión Libre'].map(v => (
                         <MenuItem key={v} value={v}>{v}</MenuItem>
                       ))}
@@ -1092,12 +1264,29 @@ const handleDownloadCertificate = async () => {
                 <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>📱 Teléfonos</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <TextField label="Teléfono Principal" fullWidth size="small" value={formData.telefono}
-                      onChange={handleInputChange('telefono')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Teléfono Principal" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.telefono}
+                      onChange={handleInputChange('telefono')} 
+                      disabled={!editMode}
+                      error={!!fieldErrors.telefono}
+                      helperText={fieldErrors.telefono}
+                      required
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <TextField label="Teléfono Alternativo" fullWidth size="small" value={formData.telefonoAlternativo}
-                      onChange={handleInputChange('telefonoAlternativo')} disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Teléfono Alternativo" 
+                      fullWidth 
+                      size="small" 
+                      value={formData.telefonoAlternativo}
+                      onChange={handleInputChange('telefonoAlternativo')} 
+                      disabled={!editMode} 
+                      sx={fieldSx} 
+                    />
                   </Grid>
                 </Grid>
               </Paper>
@@ -1107,13 +1296,26 @@ const handleDownloadCertificate = async () => {
                 <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>✉️ Correos Electrónicos</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <TextField label="Correo Principal (no editable)" fullWidth size="small"
-                      value={user?.email || ''} disabled sx={fieldSx} />
+                    <TextField 
+                      label="Correo Principal (no editable)" 
+                      fullWidth 
+                      size="small"
+                      value={user?.email || ''} 
+                      disabled 
+                      sx={fieldSx} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <TextField label="Correo Alternativo" type="email" fullWidth size="small"
-                      value={formData.emailAlternativo} onChange={handleInputChange('emailAlternativo')}
-                      disabled={!editMode} sx={fieldSx} />
+                    <TextField 
+                      label="Correo Alternativo" 
+                      type="email" 
+                      fullWidth 
+                      size="small"
+                      value={formData.emailAlternativo} 
+                      onChange={handleInputChange('emailAlternativo')}
+                      disabled={!editMode} 
+                      sx={fieldSx} 
+                    />
                   </Grid>
                 </Grid>
               </Paper>
@@ -1129,17 +1331,31 @@ const handleDownloadCertificate = async () => {
             <Grid item xs={12} md={6}>
               <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
                 <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>🏢 Domicilio Fiscal</Typography>
-                <TextField label="Dirección Fiscal Oficial" fullWidth size="small"
-                  value={formData.domicilioFiscal} onChange={handleInputChange('domicilioFiscal')}
-                  disabled={!editMode} multiline rows={4} sx={fieldSx} />
+                <TextField 
+                  label="Dirección Fiscal Oficial" 
+                  fullWidth 
+                  size="small"
+                  value={formData.domicilioFiscal} 
+                  onChange={handleInputChange('domicilioFiscal')}
+                  disabled={!editMode} 
+                  multiline rows={4} 
+                  sx={fieldSx} 
+                />
               </Paper>
             </Grid>
             <Grid item xs={12} md={6}>
               <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${colors.primary.main}15`, bgcolor: '#F7FAFC' }}>
                 <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.primary.dark, mb: 2 }}>🏠 Domicilio Particular</Typography>
-                <TextField label="Dirección Particular" fullWidth size="small"
-                  value={formData.domicilioParticular} onChange={handleInputChange('domicilioParticular')}
-                  disabled={!editMode} multiline rows={4} sx={fieldSx} />
+                <TextField 
+                  label="Dirección Particular" 
+                  fullWidth 
+                  size="small"
+                  value={formData.domicilioParticular} 
+                  onChange={handleInputChange('domicilioParticular')}
+                  disabled={!editMode} 
+                  multiline rows={4} 
+                  sx={fieldSx} 
+                />
               </Paper>
             </Grid>
           </Grid>
@@ -1157,9 +1373,13 @@ const handleDownloadCertificate = async () => {
                   Opcional — solo rellena si deseas cambiarla
                 </Typography>
                 <Stack spacing={2}>
-                  <TextField label="Contraseña Actual" fullWidth size="small"
+                  <TextField 
+                    label="Contraseña Actual" 
+                    fullWidth 
+                    size="small"
                     type={showPass.actual ? 'text' : 'password'}
-                    value={formData.passwordActual} onChange={handleInputChange('passwordActual')}
+                    value={formData.passwordActual} 
+                    onChange={handleInputChange('passwordActual')}
                     disabled={!editMode}
                     InputProps={{
                       endAdornment: (
@@ -1168,10 +1388,15 @@ const handleDownloadCertificate = async () => {
                         </IconButton>
                       )
                     }}
-                    sx={fieldSx} />
-                  <TextField label="Nueva Contraseña" fullWidth size="small"
+                    sx={fieldSx} 
+                  />
+                  <TextField 
+                    label="Nueva Contraseña" 
+                    fullWidth 
+                    size="small"
                     type={showPass.nuevo ? 'text' : 'password'}
-                    value={formData.passwordNuevo} onChange={handleInputChange('passwordNuevo')}
+                    value={formData.passwordNuevo} 
+                    onChange={handleInputChange('passwordNuevo')}
                     disabled={!editMode}
                     InputProps={{
                       endAdornment: (
@@ -1180,10 +1405,15 @@ const handleDownloadCertificate = async () => {
                         </IconButton>
                       )
                     }}
-                    sx={fieldSx} />
-                  <TextField label="Confirmar Nueva Contraseña" fullWidth size="small"
+                    sx={fieldSx} 
+                  />
+                  <TextField 
+                    label="Confirmar Nueva Contraseña" 
+                    fullWidth 
+                    size="small"
                     type={showPass.confirmar ? 'text' : 'password'}
-                    value={formData.confirmarPassword} onChange={handleInputChange('confirmarPassword')}
+                    value={formData.confirmarPassword} 
+                    onChange={handleInputChange('confirmarPassword')}
                     disabled={!editMode}
                     error={formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== ''}
                     helperText={formData.passwordNuevo !== formData.confirmarPassword && formData.confirmarPassword !== '' ? 'Las contraseñas no coinciden' : ''}
@@ -1194,7 +1424,8 @@ const handleDownloadCertificate = async () => {
                         </IconButton>
                       )
                     }}
-                    sx={fieldSx} />
+                    sx={fieldSx} 
+                  />
                   {formData.passwordNuevo && formData.passwordNuevo === formData.confirmarPassword && (
                     <Alert severity="success" sx={{ borderRadius: 2 }}>✅ Las contraseñas coinciden</Alert>
                   )}
