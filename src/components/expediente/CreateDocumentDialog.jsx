@@ -29,7 +29,6 @@ const institutionalColors = {
   textSecondary: "#7f8c8d",
 };
 
-// Opciones de renovación
 const renovacionOptions = [
   { label: "30 días (mensual)", value: 30 },
   { label: "90 días (trimestral)", value: 90 },
@@ -38,19 +37,8 @@ const renovacionOptions = [
   { label: "730 días (bianual)", value: 730 },
 ];
 
-// Opciones de Formato Esperado
-const formatosOptions = [
-  "PDF",
-  "DOCX",
-  "XLSX",
-  "PPTX",
-  "TXT",
-  "CSV",
-  "PNG",
-  "JPG",
-];
+const formatosOptions = ["PDF", "DOCX", "XLSX", "PPTX", "TXT", "CSV", "PNG", "JPG"];
 
-// Opciones de etiquetas
 const etiquetasOptions = [
   "Finanzas",
   "Legal",
@@ -59,6 +47,65 @@ const etiquetasOptions = [
   "Administrativo",
   "Otro",
 ];
+
+// Select múltiple con botón "Listo" para cerrar el menú
+const MultiSelectWithDone = ({ labelId, label, value, onChange, options }) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <FormControl fullWidth>
+      <InputLabel id={labelId}>{label}</InputLabel>
+      <Select
+        labelId={labelId}
+        multiple
+        open={open}
+        onOpen={() => setOpen(true)}
+        onClose={() => setOpen(false)}
+        value={value}
+        onChange={onChange}
+        input={<OutlinedInput label={label} />}
+        renderValue={(selected) => (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {selected.map((val) => (
+              <Chip key={val} label={val} />
+            ))}
+          </Box>
+        )}
+      >
+        {options.map((opt) => (
+          <MenuItem key={opt} value={opt}>
+            {opt}
+          </MenuItem>
+        ))}
+
+        {/* Botón para cerrar el menú */}
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            borderTop: "1px solid #e0e0e0",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => setOpen(false)}
+            sx={{
+              bgcolor: institutionalColors.primary,
+              "&:hover": { bgcolor: institutionalColors.secondary },
+              textTransform: "none",
+              boxShadow: "none",
+            }}
+          >
+            Listo
+          </Button>
+        </Box>
+      </Select>
+    </FormControl>
+  );
+};
 
 const CreateDocumentDialog = ({ open, onClose, onSuccess, apartadoId }) => {
   const pendingSuccess = useRef(null);
@@ -107,8 +154,8 @@ const CreateDocumentDialog = ({ open, onClose, onSuccess, apartadoId }) => {
         nombreArchivo: documento.nombreArchivo,
         periodoRevision: documento.renovacion || 0,
         descripcion: documento.descripcion || "",
-        etiquetas: documento.etiquetas.join(","), 
-        formatoEsperado: documento.formatoEsperado.join(","), 
+        etiquetas: documento.etiquetas.join(","),
+        formatoEsperado: documento.formatoEsperado.join(","),
         idApartado: apartadoId,
       };
 
@@ -122,9 +169,7 @@ const CreateDocumentDialog = ({ open, onClose, onSuccess, apartadoId }) => {
       handleClose();
     } catch (err) {
       console.error("Error al crear documento:", err);
-      setError(
-        err.response?.data?.message || "Error al crear el documento"
-      );
+      setError(err.response?.data?.message || "Error al crear el documento");
     } finally {
       setLoading(false);
     }
@@ -165,13 +210,12 @@ const CreateDocumentDialog = ({ open, onClose, onSuccess, apartadoId }) => {
             onChange={(e) =>
               setDocumento({ ...documento, nombreArchivo: e.target.value })
             }
-            error={!documento.nombreArchivo && error}
+            error={!documento.nombreArchivo && !!error}
             helperText={
               !documento.nombreArchivo && error ? "Campo requerido" : ""
             }
           />
 
-          {/* Renovación */}
           <FormControl fullWidth>
             <InputLabel id="renovacion-label">Renovación</InputLabel>
             <Select
@@ -201,65 +245,25 @@ const CreateDocumentDialog = ({ open, onClose, onSuccess, apartadoId }) => {
             }
           />
 
-          {/* Etiquetas */}
-          <FormControl fullWidth>
-            <InputLabel id="etiquetas-label">Etiquetas</InputLabel>
-            <Select
-              labelId="etiquetas-label"
-              multiple
-              value={documento.etiquetas}
-              onChange={(e) =>
-                setDocumento({
-                  ...documento,
-                  etiquetas: e.target.value,
-                })
-              }
-              input={<OutlinedInput label="Etiquetas" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </Box>
-              )}
-            >
-              {etiquetasOptions.map((tag) => (
-                <MenuItem key={tag} value={tag}>
-                  {tag}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <MultiSelectWithDone
+            labelId="etiquetas-label"
+            label="Etiquetas"
+            value={documento.etiquetas}
+            onChange={(e) =>
+              setDocumento({ ...documento, etiquetas: e.target.value })
+            }
+            options={etiquetasOptions}
+          />
 
-          {/* Formato Esperado */}
-          <FormControl fullWidth>
-            <InputLabel id="formato-label">Formato Esperado</InputLabel>
-            <Select
-              labelId="formato-label"
-              multiple
-              value={documento.formatoEsperado}
-              onChange={(e) =>
-                setDocumento({
-                  ...documento,
-                  formatoEsperado: e.target.value,
-                })
-              }
-              input={<OutlinedInput label="Formato Esperado" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </Box>
-              )}
-            >
-              {formatosOptions.map((formato) => (
-                <MenuItem key={formato} value={formato}>
-                  {formato}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <MultiSelectWithDone
+            labelId="formato-label"
+            label="Formato Esperado"
+            value={documento.formatoEsperado}
+            onChange={(e) =>
+              setDocumento({ ...documento, formatoEsperado: e.target.value })
+            }
+            options={formatosOptions}
+          />
         </Stack>
       </DialogContent>
 

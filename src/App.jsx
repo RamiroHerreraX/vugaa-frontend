@@ -32,7 +32,7 @@ import SuperAExpedienteConfig from "./pages/superadmin/SuperAConfigExpediente";
 import SuperAReports from "./pages/superadmin/SuperAReports";
 import SuperAProfile from "./pages/superadmin/SuperAProfile";
 import SuperAAlerts from "./pages/superadmin/SuperAAlerts";
-
+import Adminprofile from "./pages/superadmin/Adminprofile";
 // Páginas de Admin
 import AdminDashboard from "./pages/admin/Dashboard";
 import SystemConfig from "./pages/admin/SystemConfig";
@@ -127,6 +127,15 @@ function App() {
               <Route path="alerts" element={<SuperAAlerts />} />
             </Route>
 
+             <Route
+              path="/supera/profileI"
+              element={
+                <ProtectedRoute allowedRoles={["supera"]}>
+                  <Adminprofile />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Rutas protegidas - Admin */}
             <Route
               path="/admin"
@@ -148,7 +157,9 @@ function App() {
               <Route path="/admin/users/:id/review" element={<UserReview />} />
               <Route path="/admin/config" element={<SystemConfig />} />
               <Route path="/admin/profile" element={<AdminProfile />} />
+            
             </Route>
+           
 
             {/* Rutas protegidas - Comité */}
             <Route

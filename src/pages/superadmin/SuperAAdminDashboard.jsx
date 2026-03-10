@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect} from "react";
 import {
   Box,
   Typography,
@@ -30,7 +30,12 @@ import {
 
 import FolderIcon from "@mui/icons-material/Folder";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import PerfilIncompletoModal from "../../components/common/PerfilIncompletoModal";
 
+
+ 
 // Colores institucionales
 const institutionalColors = {
   primary: '#133B6B',      // Azul oscuro principal
@@ -48,6 +53,17 @@ const institutionalColors = {
 };
 
 const SystemInstancesDashboard = () => {
+  const [openPerfilModal, setOpenPerfilModal] = useState(false);
+ const { perfilIncompleto, user } = useAuth();
+   // Efecto para mostrar el modal si el perfil está incompleto
+  useEffect(() => {
+    if (perfilIncompleto) {
+      setOpenPerfilModal(true);
+    } else {
+      setOpenPerfilModal(false); // Cerrar si el perfil se completó
+    }
+  }, [perfilIncompleto]);
+  
 
   // Estadísticas de las instancias - Ampliado a 6 cards
   const systemStats = [
@@ -956,6 +972,11 @@ const SystemInstancesDashboard = () => {
           </Typography>
         </Box>
       </Box>
+            {/* Modal de Perfil Incompleto */}
+            <PerfilIncompletoModal
+              open={openPerfilModal}
+              onClose={() => setOpenPerfilModal(false)}
+            />
     </Box>
   );
 };

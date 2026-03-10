@@ -25,7 +25,6 @@ const institutionalColors = {
   secondary: "#1a4c7a",
 };
 
-// Renovación
 const renovacionOptions = [
   { label: "30 días (mensual)", value: 30 },
   { label: "90 días (trimestral)", value: 90 },
@@ -34,19 +33,8 @@ const renovacionOptions = [
   { label: "730 días (bianual)", value: 730 },
 ];
 
-// Formatos
-const formatosOptions = [
-  "PDF",
-  "DOCX",
-  "XLSX",
-  "PPTX",
-  "TXT",
-  "CSV",
-  "PNG",
-  "JPG",
-];
+const formatosOptions = ["PDF", "DOCX", "XLSX", "PPTX", "TXT", "CSV", "PNG", "JPG"];
 
-// Etiquetas
 const etiquetasOptions = [
   "Finanzas",
   "Legal",
@@ -56,13 +44,64 @@ const etiquetasOptions = [
   "Otro",
 ];
 
-const EditDocumentDialog = ({
-  open,
-  onClose,
-  onUpdated,
-  documento,
-  apartadoId,
-}) => {
+// Select múltiple con botón "Listo" para cerrar el menú
+const MultiSelectWithDone = ({ label, value, onChange, options }) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <FormControl fullWidth>
+      <InputLabel>{label}</InputLabel>
+      <Select
+        multiple
+        open={open}
+        onOpen={() => setOpen(true)}
+        onClose={() => setOpen(false)}
+        value={value}
+        onChange={onChange}
+        input={<OutlinedInput label={label} />}
+        renderValue={(selected) => (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {selected.map((val) => (
+              <Chip key={val} label={val} />
+            ))}
+          </Box>
+        )}
+      >
+        {options.map((opt) => (
+          <MenuItem key={opt} value={opt}>
+            {opt}
+          </MenuItem>
+        ))}
+
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            borderTop: "1px solid #e0e0e0",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => setOpen(false)}
+            sx={{
+              bgcolor: institutionalColors.primary,
+              "&:hover": { bgcolor: institutionalColors.secondary },
+              textTransform: "none",
+              boxShadow: "none",
+            }}
+          >
+            Listo
+          </Button>
+        </Box>
+      </Select>
+    </FormControl>
+  );
+};
+
+const EditDocumentDialog = ({ open, onClose, onUpdated, documento, apartadoId }) => {
   const [editedDocumento, setEditedDocumento] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -117,39 +156,29 @@ const EditDocumentDialog = ({
       <DialogTitle>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <EditIcon sx={{ color: institutionalColors.primary }} />
-          <Typography variant="h6">
-            Editar Documento
-          </Typography>
+          <Typography variant="h6">Editar Documento</Typography>
         </Box>
       </DialogTitle>
 
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
 
-          {/* Nombre */}
           <TextField
             fullWidth
             label="Nombre del Archivo *"
             value={editedDocumento.nombreArchivo}
             onChange={(e) =>
-              setEditedDocumento({
-                ...editedDocumento,
-                nombreArchivo: e.target.value,
-              })
+              setEditedDocumento({ ...editedDocumento, nombreArchivo: e.target.value })
             }
           />
 
-          {/* Renovación */}
           <FormControl fullWidth>
             <InputLabel>Renovación</InputLabel>
             <Select
               value={editedDocumento.renovacion}
               label="Renovación"
               onChange={(e) =>
-                setEditedDocumento({
-                  ...editedDocumento,
-                  renovacion: e.target.value,
-                })
+                setEditedDocumento({ ...editedDocumento, renovacion: e.target.value })
               }
             >
               {renovacionOptions.map((opt) => (
@@ -160,7 +189,6 @@ const EditDocumentDialog = ({
             </Select>
           </FormControl>
 
-          {/* Descripción */}
           <TextField
             fullWidth
             multiline
@@ -168,79 +196,33 @@ const EditDocumentDialog = ({
             label="Descripción"
             value={editedDocumento.descripcion}
             onChange={(e) =>
-              setEditedDocumento({
-                ...editedDocumento,
-                descripcion: e.target.value,
-              })
+              setEditedDocumento({ ...editedDocumento, descripcion: e.target.value })
             }
           />
 
-          {/* Etiquetas */}
-          <FormControl fullWidth>
-            <InputLabel>Etiquetas</InputLabel>
-            <Select
-              multiple
-              value={editedDocumento.etiquetas}
-              onChange={(e) =>
-                setEditedDocumento({
-                  ...editedDocumento,
-                  etiquetas: e.target.value,
-                })
-              }
-              input={<OutlinedInput label="Etiquetas" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </Box>
-              )}
-            >
-              {etiquetasOptions.map((tag) => (
-                <MenuItem key={tag} value={tag}>
-                  {tag}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <MultiSelectWithDone
+            label="Etiquetas"
+            value={editedDocumento.etiquetas}
+            onChange={(e) =>
+              setEditedDocumento({ ...editedDocumento, etiquetas: e.target.value })
+            }
+            options={etiquetasOptions}
+          />
 
-          {/* Formato Esperado */}
-          <FormControl fullWidth>
-            <InputLabel>Formato Esperado</InputLabel>
-            <Select
-              multiple
-              value={editedDocumento.formatoEsperado}
-              onChange={(e) =>
-                setEditedDocumento({
-                  ...editedDocumento,
-                  formatoEsperado: e.target.value,
-                })
-              }
-              input={<OutlinedInput label="Formato Esperado" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </Box>
-              )}
-            >
-              {formatosOptions.map((formato) => (
-                <MenuItem key={formato} value={formato}>
-                  {formato}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <MultiSelectWithDone
+            label="Formato Esperado"
+            value={editedDocumento.formatoEsperado}
+            onChange={(e) =>
+              setEditedDocumento({ ...editedDocumento, formatoEsperado: e.target.value })
+            }
+            options={formatosOptions}
+          />
 
         </Stack>
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>
-          Cancelar
-        </Button>
-
+        <Button onClick={onClose}>Cancelar</Button>
         <Button
           onClick={handleUpdate}
           variant="contained"
