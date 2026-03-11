@@ -27,11 +27,15 @@ import {
   Fade,
   Tab,
   Tabs,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
   Save as SaveIcon,
   Folder as FolderIcon,
   Description as DescriptionIcon,
@@ -47,6 +51,10 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Public as PublicIcon,
   Business as BusinessIcon,
+  Visibility as VisibilityIcon,
+  PowerSettingsNew as PowerIcon,
+  Restore as RestoreIcon,
+  Warning as WarningIcon,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
@@ -54,7 +62,7 @@ import { useAuth } from "../../context/AuthContext";
 
 import {
   getApartadosPorInstanciaConGlobales,
-  desactivarApartado,
+  cambiarEstadoApartado,
 } from "../../services/apartado";
 
 import {
@@ -70,7 +78,7 @@ import EditDocumentDialogAdmin from "../../components/expedienteAdmin/EditDocume
 import CreateProgramaDialogAdmin from "../../components/programasAdmin/CreateProgramaDialogAdmin";
 import EditProgramaDialogAdmin from "../../components/programasAdmin/EditProgramaDialogAdmin";
 
-import { getProgramasPorApartado, eliminarPrograma } from "../../services/programas";
+import { getProgramasPorApartado, cambiarEstadoPrograma } from "../../services/programas";
 
 import {
   institutionalColors,
@@ -78,9 +86,86 @@ import {
   getCategoryColor,
 } from "../../utils/iconosUtils";
 
+// Modal de confirmación personalizado
+const ConfirmDialog = ({ open, onClose, onConfirm, title, message, confirmText = "Confirmar", cancelText = "Cancelar", severity = "warning" }) => {
+  const getColorBySeverity = () => {
+    switch (severity) {
+      case 'error': return institutionalColors.error;
+      case 'success': return institutionalColors.success;
+      case 'info': return institutionalColors.info;
+      default: return institutionalColors.warning;
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-description"
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          minWidth: 400,
+        }
+      }}
+    >
+      <DialogTitle id="confirm-dialog-title" sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 1,
+        borderBottom: `1px solid ${alpha(institutionalColors.primary, 0.1)}`,
+        pb: 2
+      }}>
+        <WarningIcon sx={{ color: getColorBySeverity() }} />
+        <Typography variant="h6" component="span" sx={{ fontWeight: 'bold' }}>
+          {title}
+        </Typography>
+      </DialogTitle>
+      <DialogContent sx={{ py: 3 }}>
+        <DialogContentText id="confirm-dialog-description" sx={{ color: institutionalColors.textPrimary }}>
+          {message}
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, pt: 0 }}>
+        <Button 
+          onClick={onClose}
+          variant="outlined"
+          sx={{
+            borderColor: institutionalColors.border,
+            color: institutionalColors.textSecondary,
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: institutionalColors.primary,
+              bgcolor: alpha(institutionalColors.primary, 0.04),
+            }
+          }}
+        >
+          {cancelText}
+        </Button>
+        <Button
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
+          variant="contained"
+          autoFocus
+          sx={{
+            bgcolor: getColorBySeverity(),
+            textTransform: 'none',
+            '&:hover': {
+              bgcolor: alpha(getColorBySeverity(), 0.8),
+            }
+          }}
+        >
+          {confirmText}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 // ─── Utilidad: normalizar un programa recibido del backend ───────────────────
-// El backend puede devolver el ID como "id", "idPrograma" o "programaId".
-// Siempre dejamos ambos campos poblados para no depender del contexto.
 const normalizePrograma = (programa) => {
   const id =
     programa?.id ||
@@ -127,6 +212,16 @@ const ConfigExpediente = () => {
   const [openCreatePrograma, setOpenCreatePrograma] = useState(false);
   const [openEditPrograma, setOpenEditPrograma] = useState(false);
 
+  // Estado para el modal de confirmación
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    severity: "warning",
+    confirmText: "Confirmar",
+  });
+
   const [currentApartado, setCurrentApartado] = useState(null);
   const [currentDocumento, setCurrentDocumento] = useState(null);
   const [currentPrograma, setCurrentPrograma] = useState(null);
@@ -135,10 +230,10 @@ const ConfigExpediente = () => {
   const [expandedCategory, setExpandedCategory] = useState(null);
 
   // ─── Permisos ─────────────────────────────────────────────────────────────
-  const canDeleteCategory = (apartado) =>
+  const canEditCategory = (apartado) =>
     !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  const canEditCategory = (apartado) =>
+  const canToggleCategoryStatus = (apartado) =>
     !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
   const canModifyDocument = (apartado) =>
@@ -153,7 +248,7 @@ const ConfigExpediente = () => {
   const canAddPrograma = (apartado) =>
     !!(user && !apartado.esGlobal && user.instanciaId === apartado.idInstancia);
 
-  // ─── Carga de datos ───────────────────────────────────────────────────────
+  // ─── Carga de datos (solo al montar) ─────────────────────────────────────
   useEffect(() => {
     cargarApartados();
   }, []);
@@ -180,10 +275,10 @@ const ConfigExpediente = () => {
               getDocumentosPorApartado(apartado.idApartado),
               getProgramasPorApartado(apartado.idApartado),
             ]);
+
             return {
               ...apartado,
               documentos: documentos || [],
-              // ✅ Normalizar todos los programas al cargar para coherencia
               programas: (programas || []).map(normalizePrograma),
             };
           } catch (err) {
@@ -196,14 +291,12 @@ const ConfigExpediente = () => {
         })
       );
 
-      const activos = apartadosConDatos.filter((ap) => ap.activo !== false);
-
-      const globales = activos
+      const globales = apartadosConDatos
         .filter((ap) => ap.idInstancia == null)
         .sort((a, b) => (a.orden || 0) - (b.orden || 0))
         .map((ap) => ({ ...ap, esGlobal: true }));
 
-      const deInstancia = activos
+      const deInstancia = apartadosConDatos
         .filter(
           (ap) =>
             ap.idInstancia != null && ap.idInstancia === user.instanciaId
@@ -240,6 +333,8 @@ const ConfigExpediente = () => {
     const list = activeView === 0 ? apartadosInstancia : apartadosGlobales;
     return {
       totalCategories: list.length,
+      activeCategories: list.filter((ap) => ap.activo !== false).length,
+      inactiveCategories: list.filter((ap) => ap.activo === false).length,
       totalDocuments: list.reduce(
         (t, ap) => t + (ap.documentos?.length || 0),
         0
@@ -254,6 +349,29 @@ const ConfigExpediente = () => {
 
   const stats = getCurrentStats();
 
+  // Función para mostrar el modal de confirmación
+  const showConfirmDialog = (title, message, onConfirm, severity = "warning", confirmText = "Confirmar") => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      onConfirm: () => onConfirm(),
+      severity,
+      confirmText,
+    });
+  };
+
+  // ─── Helpers de actualización local ──────────────────────────────────────
+  // Actualiza un apartado en ambas listas sin recargar
+  const updateApartadoEnListas = (idApartado, updater) => {
+    setApartadosInstancia((prev) =>
+      prev.map((ap) => ap.idApartado === idApartado ? updater(ap) : ap)
+    );
+    setApartadosGlobales((prev) =>
+      prev.map((ap) => ap.idApartado === idApartado ? updater(ap) : ap)
+    );
+  };
+
   // ─── Categorías ───────────────────────────────────────────────────────────
   const handleAddCategory = () => setOpenCreateCategory(true);
 
@@ -262,8 +380,44 @@ const ConfigExpediente = () => {
     setOpenEditCategory(true);
   };
 
+  const handleToggleCategoryStatus = async (apartado) => {
+    const nuevoEstado = apartado.activo === false;
+    const accion = nuevoEstado ? "activar" : "desactivar";
+    
+    showConfirmDialog(
+      `${accion === "activar" ? "Activar" : "Desactivar"} Categoría`,
+      `¿Está seguro de ${accion} la categoría "${apartado.nombre}"?`,
+      async () => {
+        // Actualización optimista inmediata
+        updateApartadoEnListas(apartado.idApartado, (ap) => ({ ...ap, activo: nuevoEstado }));
+
+        try {
+          await cambiarEstadoApartado(apartado.idApartado, nuevoEstado);
+          showSnackbar(
+            nuevoEstado
+              ? "Categoría activada exitosamente"
+              : "Categoría desactivada exitosamente"
+          );
+        } catch (err) {
+          console.error("Error cambiando estado de la categoría:", err);
+          // Revertir en caso de error
+          updateApartadoEnListas(apartado.idApartado, (ap) => ({ ...ap, activo: !nuevoEstado }));
+          showSnackbar("Error al cambiar el estado de la categoría", "error");
+        }
+      },
+      nuevoEstado ? "success" : "warning",
+      accion === "activar" ? "Activar" : "Desactivar"
+    );
+  };
+
   const handleCreateCategorySuccess = (nuevoApartado) => {
-    const completo = { ...nuevoApartado, documentos: [], programas: [], esGlobal: false };
+    const completo = { 
+      ...nuevoApartado, 
+      documentos: [], 
+      programas: [], 
+      esGlobal: false,
+      activo: true 
+    };
     setApartadosInstancia((prev) =>
       [...prev, completo].sort((a, b) => (a.orden || 0) - (b.orden || 0))
     );
@@ -282,6 +436,9 @@ const ConfigExpediente = () => {
                 documentos: ap.documentos || [],
                 programas: ap.programas || [],
                 esGlobal: ap.esGlobal,
+                activo: apartadoActualizado.activo !== undefined
+                  ? apartadoActualizado.activo
+                  : ap.activo,
               }
             : ap
         )
@@ -292,29 +449,6 @@ const ConfigExpediente = () => {
     setOpenEditCategory(false);
     setCurrentApartado(null);
     showSnackbar("Categoría actualizada exitosamente");
-  };
-
-  const handleDeleteCategory = async (apartadoId) => {
-    if (
-      !window.confirm(
-        "¿Está seguro de eliminar esta categoría y todos sus documentos y programas?"
-      )
-    )
-      return;
-
-    try {
-      await desactivarApartado(apartadoId);
-      setApartadosInstancia((prev) =>
-        prev.filter((ap) => ap.idApartado !== apartadoId)
-      );
-      setApartadosGlobales((prev) =>
-        prev.filter((ap) => ap.idApartado !== apartadoId)
-      );
-      showSnackbar("Categoría eliminada exitosamente");
-    } catch (err) {
-      console.error("Error eliminando categoría:", err);
-      showSnackbar("Error al eliminar la categoría", "error");
-    }
   };
 
   // ─── Documentos ───────────────────────────────────────────────────────────
@@ -334,103 +468,73 @@ const ConfigExpediente = () => {
   };
 
   const handleCreateDocumentSuccess = (apartadoId, nuevoDocumento) => {
-    const update = (list) =>
-      list.map((ap) =>
-        ap.idApartado === apartadoId
-          ? {
-              ...ap,
-              documentos: [...(ap.documentos || []), nuevoDocumento].sort(
-                (a, b) => (a.orden || 0) - (b.orden || 0)
-              ),
-            }
-          : ap
-      );
-
-    setApartadosInstancia((prev) => update(prev));
-    setApartadosGlobales((prev) => update(prev));
+    updateApartadoEnListas(apartadoId, (ap) => ({
+      ...ap,
+      documentos: [...(ap.documentos || []), nuevoDocumento].sort(
+        (a, b) => (a.orden || 0) - (b.orden || 0)
+      ),
+    }));
     setOpenCreateDocument(false);
     setCurrentApartado(null);
     showSnackbar("Documento creado exitosamente");
   };
 
   const handleUpdateDocumentSuccess = (apartadoId, documentoActualizado) => {
-    const update = (list) =>
-      list.map((ap) =>
-        ap.idApartado === apartadoId
-          ? {
-              ...ap,
-              documentos: (ap.documentos || [])
-                .map((doc) =>
-                  doc.idDocumento === documentoActualizado.idDocumento
-                    ? { ...doc, ...documentoActualizado }
-                    : doc
-                )
-                .sort((a, b) => (a.orden || 0) - (b.orden || 0)),
-            }
-          : ap
-      );
-
-    setApartadosInstancia((prev) => update(prev));
-    setApartadosGlobales((prev) => update(prev));
+    updateApartadoEnListas(apartadoId, (ap) => ({
+      ...ap,
+      documentos: (ap.documentos || [])
+        .map((doc) =>
+          doc.idDocumento === documentoActualizado.idDocumento
+            ? { ...doc, ...documentoActualizado }
+            : doc
+        )
+        .sort((a, b) => (a.orden || 0) - (b.orden || 0)),
+    }));
     setOpenEditDocument(false);
     setCurrentApartado(null);
     setCurrentDocumento(null);
     showSnackbar("Documento actualizado exitosamente");
   };
 
-  const handleDeleteDocument = async (apartadoId, documentoId) => {
-    const buscar = (list) =>
-      (list.find((a) => a.idApartado === apartadoId)?.documentos || []).find(
-        (doc) => doc.idDocumento === documentoId
-      );
+  const handleToggleDocumentStatus = async (apartadoId, documento) => {
+    const documentoId = documento.idDocumento;
+    const nuevoEstado = !documento.activo;
+    const accion = nuevoEstado ? "activar" : "desactivar";
 
-    const documento =
-      buscar(apartadosInstancia) || buscar(apartadosGlobales);
+    showConfirmDialog(
+      `${accion === "activar" ? "Activar" : "Desactivar"} Documento`,
+      `¿Está seguro de ${accion} el documento "${documento.nombreArchivo}"?`,
+      async () => {
+        // Actualización optimista inmediata
+        updateApartadoEnListas(apartadoId, (ap) => ({
+          ...ap,
+          documentos: (ap.documentos || []).map((doc) =>
+            doc.idDocumento === documentoId ? { ...doc, activo: nuevoEstado } : doc
+          ),
+        }));
 
-    if (!documentoId || !documento) {
-      showSnackbar("No se puede modificar: documento no encontrado", "error");
-      return;
-    }
-
-    const estaActivo = documento.activo !== false;
-    const accion = estaActivo ? "desactivar" : "activar";
-
-    if (!window.confirm(`¿Está seguro de ${accion} este documento?`)) return;
-
-    try {
-      const documentoActualizado = await toggleEstadoDocumento(documentoId);
-
-      const nuevoActivo =
-        documentoActualizado?.activo !== undefined
-          ? Boolean(documentoActualizado.activo)
-          : !estaActivo;
-
-      const update = (list) =>
-        list.map((ap) =>
-          ap.idApartado === apartadoId
-            ? {
-                ...ap,
-                documentos: (ap.documentos || []).map((doc) =>
-                  doc.idDocumento === documentoId
-                    ? { ...doc, ...documentoActualizado, activo: nuevoActivo }
-                    : doc
-                ),
-              }
-            : ap
-        );
-
-      setApartadosInstancia((prev) => update(prev));
-      setApartadosGlobales((prev) => update(prev));
-
-      showSnackbar(
-        estaActivo
-          ? "Documento desactivado exitosamente"
-          : "Documento activado exitosamente"
-      );
-    } catch (err) {
-      console.error("Error cambiando estado del documento:", err);
-      showSnackbar("Error al cambiar el estado del documento", "error");
-    }
+        try {
+          await toggleEstadoDocumento(documentoId);
+          showSnackbar(
+            nuevoEstado
+              ? "Documento activado exitosamente"
+              : "Documento desactivado exitosamente"
+          );
+        } catch (err) {
+          console.error("Error cambiando estado del documento:", err);
+          // Revertir en caso de error
+          updateApartadoEnListas(apartadoId, (ap) => ({
+            ...ap,
+            documentos: (ap.documentos || []).map((doc) =>
+              doc.idDocumento === documentoId ? { ...doc, activo: !nuevoEstado } : doc
+            ),
+          }));
+          showSnackbar("Error al cambiar el estado del documento", "error");
+        }
+      },
+      nuevoEstado ? "success" : "warning",
+      accion === "activar" ? "Activar" : "Desactivar"
+    );
   };
 
   // ─── Programas ────────────────────────────────────────────────────────────
@@ -449,9 +553,42 @@ const ConfigExpediente = () => {
     setOpenEditPrograma(true);
   };
 
-  // ✅ CORRECCIÓN: ahora recibe (apartadoId, nuevoPrograma) directamente
-  // desde el modal, sin depender del estado selectedApartadoId que puede
-  // haberse limpiado antes de que onExited dispare.
+  const handleToggleProgramaStatus = async (apartadoId, programa) => {
+    const nuevoEstado = !programa.activo;
+    const accion = nuevoEstado ? "activar" : "desactivar";
+    
+    showConfirmDialog(
+      `${accion === "activar" ? "Activar" : "Desactivar"} Programa`,
+      `¿Está seguro de ${accion} el programa "${programa.nombre}"?`,
+      async () => {
+        // Actualización optimista inmediata
+        updateApartadoEnListas(apartadoId, (ap) => ({
+          ...ap,
+          programas: (ap.programas || []).map((prog) =>
+            prog.id === programa.id ? { ...prog, activo: nuevoEstado } : prog
+          ),
+        }));
+
+        try {
+          await cambiarEstadoPrograma(programa.id, nuevoEstado);
+          showSnackbar(`Programa ${accion}do exitosamente`);
+        } catch (err) {
+          console.error(`Error al ${accion} programa:`, err);
+          // Revertir en caso de error
+          updateApartadoEnListas(apartadoId, (ap) => ({
+            ...ap,
+            programas: (ap.programas || []).map((prog) =>
+              prog.id === programa.id ? { ...prog, activo: !nuevoEstado } : prog
+            ),
+          }));
+          showSnackbar(`Error al ${accion} el programa`, "error");
+        }
+      },
+      nuevoEstado ? "success" : "warning",
+      accion === "activar" ? "Activar" : "Desactivar"
+    );
+  };
+
   const handleCreateProgramaSuccess = (apartadoId, nuevoPrograma) => {
     if (!apartadoId) {
       console.error("handleCreateProgramaSuccess: apartadoId es null");
@@ -461,32 +598,20 @@ const ConfigExpediente = () => {
 
     const programaNormalizado = normalizePrograma(nuevoPrograma);
 
-    const update = (list) =>
-      list.map((ap) =>
-        ap.idApartado === apartadoId
-          ? {
-              ...ap,
-              programas: [
-                ...(Array.isArray(ap.programas) ? ap.programas : []),
-                programaNormalizado,
-              ].sort((a, b) => (a.id || 0) - (b.id || 0)),
-            }
-          : ap
-      );
+    updateApartadoEnListas(apartadoId, (ap) => ({
+      ...ap,
+      programas: [
+        ...(Array.isArray(ap.programas) ? ap.programas : []),
+        programaNormalizado,
+      ].sort((a, b) => (a.id || 0) - (b.id || 0)),
+    }));
 
-    setApartadosInstancia((prev) => update(prev));
-    setApartadosGlobales((prev) => update(prev));
-
-    // Limpiar estado del modal DESPUÉS de actualizar la lista
     setOpenCreatePrograma(false);
     setCurrentApartado(null);
     setSelectedApartadoId(null);
     showSnackbar("Programa creado exitosamente");
   };
 
-  // ✅ CORRECCIÓN: onSuccess en EditProgramaDialogAdmin llama con (programa),
-  // y aquí leemos el apartadoId desde currentApartado que todavía está vivo
-  // porque el modal llama onSuccess ANTES de cerrar.
   const handleUpdateProgramaSuccess = (programaActualizado) => {
     const apartadoId = currentApartado?.idApartado;
 
@@ -498,67 +623,22 @@ const ConfigExpediente = () => {
 
     const programaNormalizado = normalizePrograma(programaActualizado);
 
-    const update = (list) =>
-      list.map((ap) =>
-        ap.idApartado === apartadoId
-          ? {
-              ...ap,
-              programas: (Array.isArray(ap.programas) ? ap.programas : [])
-                .map((prog) =>
-                  prog.id === programaNormalizado.id ||
-                  prog.idPrograma === programaNormalizado.id
-                    ? { ...prog, ...programaNormalizado }
-                    : prog
-                )
-                .sort((a, b) => (a.id || 0) - (b.id || 0)),
-            }
-          : ap
-      );
-
-    setApartadosInstancia((prev) => update(prev));
-    setApartadosGlobales((prev) => update(prev));
+    updateApartadoEnListas(apartadoId, (ap) => ({
+      ...ap,
+      programas: (Array.isArray(ap.programas) ? ap.programas : [])
+        .map((prog) =>
+          prog.id === programaNormalizado.id ||
+          prog.idPrograma === programaNormalizado.id
+            ? { ...prog, ...programaNormalizado }
+            : prog
+        )
+        .sort((a, b) => (a.id || 0) - (b.id || 0)),
+    }));
 
     setOpenEditPrograma(false);
     setCurrentApartado(null);
     setCurrentPrograma(null);
     showSnackbar("Programa actualizado exitosamente");
-  };
-
-  const handleDeletePrograma = async (apartadoId, programaId) => {
-    const programa = (
-      getCurrentApartados().find((a) => a.idApartado === apartadoId)
-        ?.programas || []
-    ).find((prog) => prog.id === programaId);
-
-    if (!programaId || !programa) {
-      showSnackbar("No se puede eliminar: programa no encontrado", "error");
-      return;
-    }
-
-    if (!window.confirm("¿Está seguro de eliminar este programa?")) return;
-
-    try {
-      await eliminarPrograma(programaId);
-
-      const update = (list) =>
-        list.map((ap) =>
-          ap.idApartado === apartadoId
-            ? {
-                ...ap,
-                programas: (ap.programas || []).filter(
-                  (prog) => prog.id !== programaId
-                ),
-              }
-            : ap
-        );
-
-      setApartadosInstancia((prev) => update(prev));
-      setApartadosGlobales((prev) => update(prev));
-      showSnackbar("Programa eliminado exitosamente");
-    } catch (err) {
-      console.error("Error eliminando programa:", err);
-      showSnackbar("Error al eliminar el programa", "error");
-    }
   };
 
   // ─── Helpers de UI ────────────────────────────────────────────────────────
@@ -588,12 +668,11 @@ const ConfigExpediente = () => {
     return `Revisión cada ${days} días`;
   };
 
-  const getReviewIcon = (days) =>
-    days <= 30 ? (
-      <ScheduleIcon fontSize="small" />
-    ) : (
-      <TimerIcon fontSize="small" />
-    );
+  const getReviewIcon = (days) => {
+    if (days <= 30) return <ScheduleIcon fontSize="small" />;
+    if (days <= 90) return <TimerIcon fontSize="small" />;
+    return <ScheduleIcon fontSize="small" />;
+  };
 
   const getTipoProgramaColor = (tipo) => {
     switch (tipo?.toLowerCase()) {
@@ -610,8 +689,12 @@ const ConfigExpediente = () => {
 
   const getTipoProgramaIcon = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case "frontend":
+      case 'backend':
+        return <CodeIcon fontSize="small" />;
+      case 'frontend':
         return <ComputerIcon fontSize="small" />;
+      case 'fullstack':
+        return <CodeIcon fontSize="small" />;
       default:
         return <CodeIcon fontSize="small" />;
     }
@@ -771,104 +854,295 @@ const ConfigExpediente = () => {
             "@media (max-width: 600px)": { gridTemplateColumns: "1fr" },
           }}
         >
-          {[
-            {
-              color: institutionalColors.primary,
-              icon: <FolderIcon />,
-              label: `Categorías ${activeView === 0 ? "de Instancia" : "Globales"}`,
-              value: stats.totalCategories,
-              sub: `${stats.requiredCategories} obligatorias`,
-            },
-            {
-              color: institutionalColors.success,
-              icon: <DescriptionIcon />,
-              label: "Documentos Totales",
-              value: stats.totalDocuments,
-              sub: null,
-            },
-            {
-              color: institutionalColors.warning,
-              icon: <CodeIcon />,
-              label: "Programas Totales",
-              value: stats.totalProgramas,
-              sub: null,
-            },
-            {
-              color: institutionalColors.info,
-              icon: <SaveIcon />,
-              label: "Categorías Obligatorias",
-              value: stats.requiredCategories,
-              sub: `De ${stats.totalCategories} categorías totales`,
-            },
-          ].map(({ color, icon, label, value, sub }) => (
-            <Card
-              key={label}
+          <Card
+            sx={{
+              borderLeft: `4px solid ${institutionalColors.primary}`,
+              height: 120,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <CardContent
               sx={{
-                borderLeft: `4px solid ${color}`,
-                height: 120,
+                p: 1.5,
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                overflow: "hidden",
+                justifyContent: "space-between",
+                height: "100%",
               }}
             >
-              <CardContent
+              <Box
                 sx={{
-                  p: 1.5,
-                  flex: 1,
                   display: "flex",
-                  flexDirection: "column",
+                  alignItems: "flex-start",
                   justifyContent: "space-between",
+                  gap: 1,
+                  mb: 1,
                 }}
               >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    gap: 1,
-                    mb: 1,
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Box sx={{ color }}>{icon}</Box>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: institutionalColors.textSecondary,
-                        fontWeight: 500,
-                        fontSize: "0.75rem",
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {label}
-                    </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ color: institutionalColors.primary }}>
+                    <FolderIcon />
                   </Box>
                   <Typography
-                    variant="h5"
-                    sx={{
-                      color: institutionalColors.textPrimary,
-                      fontWeight: "bold",
-                      fontSize: "1.5rem",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {value}
-                  </Typography>
-                </Box>
-                {sub && (
-                  <Typography
-                    variant="caption"
+                    variant="body2"
                     sx={{
                       color: institutionalColors.textSecondary,
-                      fontSize: "0.7rem",
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      lineHeight: 1.2,
                     }}
                   >
-                    {sub}
+                    Categorías {activeView === 0 ? "de Instancia" : "Globales"}
                   </Typography>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </Box>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: institutionalColors.textPrimary,
+                    fontWeight: "bold",
+                    fontSize: "1.5rem",
+                    lineHeight: 1,
+                    textAlign: "right",
+                  }}
+                >
+                  {stats.totalCategories}
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-end",
+                  gap: 0.5,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: institutionalColors.textSecondary,
+                    fontSize: "0.7rem",
+                    lineHeight: 1.2,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  {stats.activeCategories} activas · {stats.inactiveCategories} inactivas
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Card
+            sx={{
+              borderLeft: `4px solid ${institutionalColors.success}`,
+              height: 120,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 1.5,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                height: "100%",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  mb: 1,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ color: institutionalColors.success }}>
+                    <DescriptionIcon />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: institutionalColors.textSecondary,
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Documentos Totales
+                  </Typography>
+                </Box>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: institutionalColors.textPrimary,
+                    fontWeight: "bold",
+                    fontSize: "1.5rem",
+                    lineHeight: 1,
+                    textAlign: "right",
+                  }}
+                >
+                  {stats.totalDocuments}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Card
+            sx={{
+              borderLeft: `4px solid ${institutionalColors.warning}`,
+              height: 120,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 1.5,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                height: "100%",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  mb: 1,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ color: institutionalColors.warning }}>
+                    <CodeIcon />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: institutionalColors.textSecondary,
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Programas Totales
+                  </Typography>
+                </Box>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: institutionalColors.textPrimary,
+                    fontWeight: "bold",
+                    fontSize: "1.5rem",
+                    lineHeight: 1,
+                    textAlign: "right",
+                  }}
+                >
+                  {stats.totalProgramas}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Card
+            sx={{
+              borderLeft: `4px solid ${institutionalColors.info}`,
+              height: 120,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 1.5,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                height: "100%",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  mb: 1,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ color: institutionalColors.info }}>
+                    <SaveIcon />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: institutionalColors.textSecondary,
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Categorías Obligatorias
+                  </Typography>
+                </Box>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: institutionalColors.textPrimary,
+                    fontWeight: "bold",
+                    fontSize: "1.5rem",
+                    lineHeight: 1,
+                    textAlign: "right",
+                  }}
+                >
+                  {stats.requiredCategories}
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-end",
+                  gap: 0.5,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: institutionalColors.textSecondary,
+                    fontSize: "0.7rem",
+                    lineHeight: 1.2,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  De {stats.totalCategories} categorías totales
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
         </Box>
       </Box>
 
@@ -1048,12 +1322,15 @@ const ConfigExpediente = () => {
                         "&:before": { display: "none" },
                         transition: "all 0.2s",
                         "&:hover": { boxShadow: 4 },
+                        opacity: apartado.activo === false ? 0.7 : 1,
                       }}
                     >
                       <AccordionSummary
                         expandIcon={<ExpandMoreIcon />}
                         sx={{
-                          bgcolor: "#fff",
+                          bgcolor: apartado.activo === false 
+                            ? alpha(institutionalColors.error, 0.05)
+                            : "#fff",
                           "&:hover": {
                             bgcolor: alpha(institutionalColors.primary, 0.02),
                           },
@@ -1095,17 +1372,34 @@ const ConfigExpediente = () => {
                                 alignItems: "center",
                                 gap: 1,
                                 mb: 0.5,
+                                flexWrap: "wrap",
                               }}
                             >
                               <Typography
                                 variant="h6"
                                 sx={{
                                   fontWeight: "bold",
-                                  color: institutionalColors.textPrimary,
+                                  color: apartado.activo === false ? institutionalColors.textMuted : institutionalColors.textPrimary,
+                                  textDecoration: apartado.activo === false ? "line-through" : "none",
                                 }}
                               >
                                 {apartado.nombre}
                               </Typography>
+                              
+                              {apartado.activo === false && (
+                                <Chip
+                                  label="INACTIVO"
+                                  size="small"
+                                  sx={{
+                                    height: 22,
+                                    fontSize: "0.7rem",
+                                    fontWeight: "bold",
+                                    bgcolor: alpha(institutionalColors.error, 0.1),
+                                    color: institutionalColors.error,
+                                  }}
+                                />
+                              )}
+                              
                               {apartado.obligatorio && (
                                 <Chip
                                   label="OBLIGATORIO"
@@ -1186,23 +1480,38 @@ const ConfigExpediente = () => {
                                 </IconButton>
                               </Tooltip>
                             )}
-                            {!apartado.esGlobal && canDeleteCategory(apartado) && (
-                              <Tooltip title="Eliminar categoría" arrow>
+                            
+                            {!apartado.esGlobal && canToggleCategoryStatus(apartado) && (
+                              <Tooltip
+                                title={apartado.activo === false ? "Activar categoría" : "Desactivar categoría"}
+                                arrow
+                              >
                                 <IconButton
                                   component="span"
                                   size="small"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleDeleteCategory(apartado.idApartado);
+                                    handleToggleCategoryStatus(apartado);
                                   }}
                                   sx={{
-                                    color: institutionalColors.error,
+                                    color: apartado.activo === false 
+                                      ? institutionalColors.success 
+                                      : institutionalColors.warning,
                                     "&:hover": {
-                                      bgcolor: alpha(institutionalColors.error, 0.1),
+                                      bgcolor: alpha(
+                                        apartado.activo === false 
+                                          ? institutionalColors.success 
+                                          : institutionalColors.warning, 
+                                        0.1
+                                      ),
                                     },
                                   }}
                                 >
-                                  <DeleteIcon fontSize="small" />
+                                  {apartado.activo === false ? (
+                                    <RestoreIcon fontSize="small" />
+                                  ) : (
+                                    <PowerIcon fontSize="small" />
+                                  )}
                                 </IconButton>
                               </Tooltip>
                             )}
@@ -1234,6 +1543,7 @@ const ConfigExpediente = () => {
                                           borderLeft: `4px solid ${institutionalColors.primary}`,
                                           alignItems: "flex-start",
                                           transition: "all 0.2s",
+                                          opacity: documento.activo === false ? 0.7 : 1,
                                           "&:hover": {
                                             transform: "translateX(4px)",
                                             boxShadow: 2,
@@ -1245,10 +1555,7 @@ const ConfigExpediente = () => {
                                             sx={{
                                               width: 32,
                                               height: 32,
-                                              bgcolor: alpha(
-                                                institutionalColors.primary,
-                                                0.1
-                                              ),
+                                              bgcolor: alpha(institutionalColors.primary, 0.1),
                                               color: institutionalColors.primary,
                                             }}
                                           >
@@ -1271,6 +1578,7 @@ const ConfigExpediente = () => {
                                               sx={{
                                                 fontWeight: "bold",
                                                 color: institutionalColors.textPrimary,
+                                                textDecoration: documento.activo === false ? "line-through" : "none",
                                               }}
                                             >
                                               {documento.nombreArchivo}
@@ -1282,10 +1590,7 @@ const ConfigExpediente = () => {
                                                 label="INACTIVO"
                                                 sx={{
                                                   height: 24,
-                                                  bgcolor: alpha(
-                                                    institutionalColors.error,
-                                                    0.1
-                                                  ),
+                                                  bgcolor: alpha(institutionalColors.error, 0.1),
                                                   color: institutionalColors.error,
                                                 }}
                                               />
@@ -1295,10 +1600,7 @@ const ConfigExpediente = () => {
                                                 label="ACTIVO"
                                                 sx={{
                                                   height: 24,
-                                                  bgcolor: alpha(
-                                                    institutionalColors.success,
-                                                    0.1
-                                                  ),
+                                                  bgcolor: alpha(institutionalColors.success, 0.1),
                                                   color: institutionalColors.success,
                                                 }}
                                               />
@@ -1370,30 +1672,30 @@ const ConfigExpediente = () => {
                                                   <IconButton
                                                     size="small"
                                                     onClick={() =>
-                                                      handleDeleteDocument(
+                                                      handleToggleDocumentStatus(
                                                         apartado.idApartado,
-                                                        documento.idDocumento
+                                                        documento
                                                       )
                                                     }
                                                     sx={{
                                                       color:
                                                         documento.activo === false
                                                           ? institutionalColors.success
-                                                          : institutionalColors.error,
+                                                          : institutionalColors.warning,
                                                       "&:hover": {
                                                         bgcolor: alpha(
                                                           documento.activo === false
                                                             ? institutionalColors.success
-                                                            : institutionalColors.error,
+                                                            : institutionalColors.warning,
                                                           0.1
                                                         ),
                                                       },
                                                     }}
                                                   >
                                                     {documento.activo === false ? (
-                                                      <CheckCircleIcon fontSize="small" />
+                                                      <RestoreIcon fontSize="small" />
                                                     ) : (
-                                                      <VisibilityOffIcon fontSize="small" />
+                                                      <PowerIcon fontSize="small" />
                                                     )}
                                                   </IconButton>
                                                 </Tooltip>
@@ -1405,12 +1707,13 @@ const ConfigExpediente = () => {
                                   ))}
                               </List>
 
-                              {!apartado.esGlobal && canAddDocument(apartado) && (
+                              {!apartado.esGlobal && canAddDocument(apartado) && apartado.activo !== false && (
                                 <Button
                                   variant="outlined"
                                   startIcon={<AddIcon />}
                                   size="medium"
                                   onClick={() => handleAddDocument(apartado.idApartado)}
+                                  disabled={apartado.activo === false}
                                   sx={{
                                     mt: 2,
                                     color: institutionalColors.primary,
@@ -1423,6 +1726,19 @@ const ConfigExpediente = () => {
                                 >
                                   Agregar Documento a esta Categoría
                                 </Button>
+                              )}
+                              
+                              {apartado.activo === false && (
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    mt: 2,
+                                    color: institutionalColors.error,
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  * Esta categoría está inactiva. No se pueden agregar nuevos documentos hasta que se active.
+                                </Typography>
                               )}
                             </>
                           ) : (
@@ -1447,6 +1763,7 @@ const ConfigExpediente = () => {
                                           borderLeft: `4px solid ${getTipoProgramaColor(programa.tipo)}`,
                                           alignItems: "flex-start",
                                           transition: "all 0.2s",
+                                          opacity: programa.activo === false ? 0.7 : 1,
                                           "&:hover": {
                                             transform: "translateX(4px)",
                                             boxShadow: 2,
@@ -1484,6 +1801,7 @@ const ConfigExpediente = () => {
                                               sx={{
                                                 fontWeight: "bold",
                                                 color: institutionalColors.textPrimary,
+                                                textDecoration: programa.activo === false ? "line-through" : "none",
                                               }}
                                             >
                                               {programa.nombre}
@@ -1509,9 +1827,12 @@ const ConfigExpediente = () => {
                                             {programa.activo === false && (
                                               <Chip
                                                 size="small"
-                                                label="Inactivo"
-                                                color="default"
-                                                sx={{ height: 24 }}
+                                                label="INACTIVO"
+                                                sx={{
+                                                  height: 24,
+                                                  bgcolor: alpha(institutionalColors.error, 0.1),
+                                                  color: institutionalColors.error,
+                                                }}
                                               />
                                             )}
                                           </Box>
@@ -1535,6 +1856,7 @@ const ConfigExpediente = () => {
                                               p: 1.5,
                                               borderRadius: 2,
                                               bgcolor: alpha(institutionalColors.primary, 0.03),
+                                              fontSize: "0.75rem",
                                             }}
                                           >
                                             <Box>
@@ -1641,26 +1963,42 @@ const ConfigExpediente = () => {
 
                                             {!apartado.esGlobal &&
                                               canModifyPrograma(apartado) && (
-                                                <Tooltip title="Eliminar programa" arrow>
+                                                <Tooltip
+                                                  title={
+                                                    programa.activo === false
+                                                      ? "Activar programa"
+                                                      : "Desactivar programa"
+                                                  }
+                                                  arrow
+                                                >
                                                   <IconButton
                                                     size="small"
                                                     onClick={() =>
-                                                      handleDeletePrograma(
+                                                      handleToggleProgramaStatus(
                                                         apartado.idApartado,
-                                                        programa.id
+                                                        programa
                                                       )
                                                     }
                                                     sx={{
-                                                      color: institutionalColors.error,
+                                                      color:
+                                                        programa.activo === false
+                                                          ? institutionalColors.success
+                                                          : institutionalColors.warning,
                                                       "&:hover": {
                                                         bgcolor: alpha(
-                                                          institutionalColors.error,
+                                                          programa.activo === false
+                                                            ? institutionalColors.success
+                                                            : institutionalColors.warning,
                                                           0.1
                                                         ),
                                                       },
                                                     }}
                                                   >
-                                                    <DeleteIcon fontSize="small" />
+                                                    {programa.activo === false ? (
+                                                      <RestoreIcon fontSize="small" />
+                                                    ) : (
+                                                      <PowerIcon fontSize="small" />
+                                                    )}
                                                   </IconButton>
                                                 </Tooltip>
                                               )}
@@ -1671,12 +2009,13 @@ const ConfigExpediente = () => {
                                   ))}
                               </List>
 
-                              {!apartado.esGlobal && canAddPrograma(apartado) && (
+                              {!apartado.esGlobal && canAddPrograma(apartado) && apartado.activo !== false && (
                                 <Button
                                   variant="outlined"
                                   startIcon={<AddIcon />}
                                   size="medium"
                                   onClick={() => handleAddPrograma(apartado.idApartado)}
+                                  disabled={apartado.activo === false}
                                   sx={{
                                     mt: 2,
                                     color: institutionalColors.warning,
@@ -1690,6 +2029,19 @@ const ConfigExpediente = () => {
                                   Agregar Programa a esta Categoría
                                 </Button>
                               )}
+                              
+                              {apartado.activo === false && (
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    mt: 2,
+                                    color: institutionalColors.error,
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  * Esta categoría está inactiva. No se pueden agregar nuevos programas hasta que se active.
+                                </Typography>
+                              )}
                             </>
                           )}
                         </Box>
@@ -1701,6 +2053,18 @@ const ConfigExpediente = () => {
           </Box>
         </Paper>
       </Box>
+
+      {/* Modal de Confirmación Personalizado */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText="Cancelar"
+        severity={confirmDialog.severity}
+      />
 
       {/* ── Modales ── */}
       <CreateCategoryDialogAdmin
@@ -1753,7 +2117,7 @@ const ConfigExpediente = () => {
           setCurrentApartado(null);
           setSelectedApartadoId(null);
         }}
-        onSuccess={handleCreateProgramaSuccess}  // ← recibe (apartadoId, programa)
+        onSuccess={handleCreateProgramaSuccess}
         apartadoId={selectedApartadoId}
         esGlobal={false}
       />
@@ -1765,7 +2129,7 @@ const ConfigExpediente = () => {
           setCurrentApartado(null);
           setCurrentPrograma(null);
         }}
-        onSuccess={handleUpdateProgramaSuccess}  // ← recibe (programa)
+        onSuccess={handleUpdateProgramaSuccess}
         apartadoId={currentApartado?.idApartado}
         programa={currentPrograma}
         esGlobal={currentApartado?.esGlobal || false}
@@ -1781,7 +2145,12 @@ const ConfigExpediente = () => {
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{ width: "100%", borderRadius: 2, boxShadow: 3 }}
+          sx={{
+            width: "100%",
+            borderRadius: 2,
+            boxShadow: 3,
+            "& .MuiAlert-icon": { fontSize: 24 },
+          }}
           elevation={6}
           variant="filled"
         >
