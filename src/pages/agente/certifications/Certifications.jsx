@@ -12,6 +12,8 @@ import AddCertificationModal from '../../../components/subirCertificacion/AddCer
 import { getMiExpediente } from '../../../services/expediente';
 // Agrega al import del service
 import { getCertificacionesPorExpediente, eliminarCertificacionCompleta ,editarCertificacionCompleta   } from '../../../services/certificaciones';
+import { getTodosApartados } from '../../../services/apartado';
+import { getProgramasPorApartadoActivos } from '../../../services/programas';
 import {
   Box,
   Grid,
@@ -124,11 +126,7 @@ const colors = {
 
 
 // ========== CONSTANTES ==========
-const PROGRAMAS = {
-  formacionEtica: 1,
-  actualizacionTecnica: 2,
-  otros: 3
-};
+
 
 // ========== MODAL MODIFICADO ==========
 
@@ -224,6 +222,35 @@ const Certifications = () => {
   };
   cargar();
 }, [user?.id]);;// Asumiendo que tienes el usuario en contexto
+const [programasDisponibles, setProgramasDisponibles] = useState([]);
+
+useEffect(() => {
+  const cargarProgramas = async () => {
+    if (!user?.instanciaId) return;
+    try {
+      const todos = await getTodosApartados();
+      const globalesYDeInstancia = todos.filter(
+        a => !a.idInstancia || a.idInstancia === user.instanciaId
+      );
+
+      const programas = [];
+      for (const apartado of globalesYDeInstancia) {
+        try {
+          const progs = await getProgramasPorApartadoActivos(apartado.idApartado);
+          programas.push(...progs);
+        } catch (e) {
+          console.error(`Error cargando programas del apartado ${apartado.idApartado}:`, e);
+        }
+      }
+      // Agregar opción "Otros" al final
+      programas.push({ id: null, nombre: 'Otros' });
+      setProgramasDisponibles(programas);
+    } catch (error) {
+      console.error('Error cargando programas:', error);
+    }
+  };
+  cargarProgramas();
+}, [user?.instanciaId]);
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -497,7 +524,9 @@ useEffect(() => {
     // PASO 2: Obtener IDs del contexto de autenticación
     const idInstancia = user?.instanciaId; // Ajusta según tu contexto
      
-    const idPrograma = PROGRAMAS[nuevaCertificacion.subseccion] || PROGRAMAS.otros;
+    const idPrograma = nuevaCertificacion.subseccion !== 'otros' 
+  ? nuevaCertificacion.subseccion  // ya es el id del programa (número)
+  : null;
 
     // PASO 3: Llamar al servicio que crea la certificación completa
     const nuevaCert = await crearCertificacionCompleta(
@@ -528,7 +557,8 @@ useEffect(() => {
       documents: 1,
       lastUpdate: new Date().toLocaleDateString('es-MX'),
       subseccion: nuevaCert.nombrePrograma || 
-                 (nuevaCertificacion.subseccion === 'formacionEtica' ? 'Formación Ética y Cumplimiento' : 'Actualización Técnica y Aduanera'),
+            programasDisponibles.find(p => p.id === nuevaCertificacion.subseccion)?.nombre || 
+            'Otros',
       horas: parseInt(nuevaCertificacion.horas),
       tipo: nuevaCertificacion.tipoDocumento,
       autoridad: nuevaCertificacion.institucion,
@@ -1664,6 +1694,7 @@ useEffect(() => {
   uploading={uploading}
   uploadProgress={uploadProgress}
   saving={saving}
+  programasDisponibles={programasDisponibles}
 />
       <PreviewModal />
       <EditCertificationModal

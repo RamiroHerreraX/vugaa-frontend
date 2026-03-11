@@ -3,9 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from "../../../context/AuthContext"; 
 import { getTodosApartados } from '../../../services/apartado';
 import { subirDocumento, getDocumentosSubidosPorApartado, eliminarDocumentoSubido, descargarArchivo , obtenerArchivoBlob} from '../../../services/documentoSubido';
-import { getDocumentosPorApartado } from '../../../services/documentoExpediente';
+import { getDocumentosPorApartadoActivos,  getDocumentosPorApartado } from '../../../services/documentoExpediente';
 import { getMiExpediente } from '../../../services/expediente';
-import { getProgramasPorApartado } from '../../../services/programas';
+import { getProgramasPorApartadoActivos } from '../../../services/programas';
 import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
 import {
   crearCertificacionCompleta,
@@ -726,13 +726,15 @@ const Expediente = () => {
           globales.map(async (apartado) => {
             let programas = [];
             try {
-              programas = await getProgramasPorApartado(apartado.idApartado);
+               programas = await getProgramasPorApartadoActivos(apartado.idApartado);
+  console.log(` Programas activos apartado ${apartado.idApartado}:`, programas);
             } catch (error) {
               console.error(`Error cargando programas del apartado ${apartado.idApartado}:`, error);
             }
             let documentos = [];
             try {
-              documentos = await getDocumentosPorApartado(apartado.idApartado);
+              documentos = await getDocumentosPorApartadoActivos(apartado.idApartado);
+              console.log(`📄 Docs activos apartado ${apartado.idApartado}:`, documentos); 
             } catch (error) {
               console.error(`Error cargando docs del apartado ${apartado.idApartado}:`, error);
             }

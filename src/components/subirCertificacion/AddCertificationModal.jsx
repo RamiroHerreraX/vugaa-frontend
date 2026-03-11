@@ -21,7 +21,8 @@ import {
     Add as AddIcon,
     Close as CloseIcon,
     CloudUpload as CloudUploadIcon,
-    CheckCircle as CheckCircleIcon
+    CheckCircle as CheckCircleIcon,
+    School as SchoolIcon
 } from '@mui/icons-material';
 
 const colors = {
@@ -61,6 +62,7 @@ const colors = {
  * - uploadProgress: number
  * - saving: boolean
  * - subseccionFija: string | null  — si viene, oculta el selector y muestra chip con el nombre del programa
+ * - programasDisponibles: Array<{ id: number|null, nombre: string }> — lista de programas para el selector
  */
 const AddCertificationModal = ({
     open,
@@ -74,6 +76,7 @@ const AddCertificationModal = ({
     uploadProgress,
     saving,
     subseccionFija = null,
+    programasDisponibles = [],
 }) => {
 
     const handleClose = () => {
@@ -87,7 +90,7 @@ const AddCertificationModal = ({
         nuevaCertificacion.archivo &&
         nuevaCertificacion.horas &&
         nuevaCertificacion.institucion &&
-        (subseccionFija || nuevaCertificacion.subseccion);
+        (subseccionFija || nuevaCertificacion.subseccion !== '');
 
     return (
         <Dialog
@@ -120,13 +123,14 @@ const AddCertificationModal = ({
             <DialogContent sx={{ py: 3, px: 3 }}>
                 <Grid container spacing={2.5}>
 
-                    {/* Subsección — selector normal o chip fijo si viene de un programa */}
+                    {/* Subsección — chip fijo si viene de un programa, selector dinámico si no */}
                     {subseccionFija ? (
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
                                 Programa
                             </Typography>
                             <Chip
+                                icon={<SchoolIcon sx={{ fontSize: '1rem !important' }} />}
                                 label={subseccionFija}
                                 size="small"
                                 sx={{
@@ -140,7 +144,7 @@ const AddCertificationModal = ({
                     ) : (
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>
-                                Subsección <span style={{ color: colors.status.error }}>*</span>
+                                Programa / Subsección <span style={{ color: colors.status.error }}>*</span>
                             </Typography>
                             <TextField
                                 select
@@ -149,11 +153,43 @@ const AddCertificationModal = ({
                                 value={nuevaCertificacion.subseccion}
                                 onChange={onFieldChange('subseccion')}
                                 required
-                                disabled={saving}
+                                disabled={saving || programasDisponibles.length === 0}
+                                placeholder={programasDisponibles.length === 0 ? 'Cargando programas...' : ''}
+                                helperText={
+                                    programasDisponibles.length === 0
+                                        ? 'Cargando programas disponibles...'
+                                        : 'Selecciona el programa al que pertenece esta certificación'
+                                }
                             >
-                                <MenuItem value="formacionEtica">Formación Ética y Cumplimiento</MenuItem>
-                                <MenuItem value="actualizacionTecnica">Actualización Técnica y Aduanera</MenuItem>
-                                <MenuItem value="otros">Otros</MenuItem>
+                                {programasDisponibles.map(prog => (
+                                    <MenuItem
+                                        key={prog.id ?? 'otros'}
+                                        value={prog.id ?? 'otros'}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <SchoolIcon sx={{
+                                                fontSize: '1rem',
+                                                color: prog.id === null
+                                                    ? colors.text.secondary
+                                                    : colors.accents.purple
+                                            }} />
+                                            <span>{prog.nombre}</span>
+                                            {prog.id === null && (
+                                                <Chip
+                                                    label="Sin programa"
+                                                    size="small"
+                                                    sx={{
+                                                        height: '18px',
+                                                        fontSize: '0.6rem',
+                                                        ml: 0.5,
+                                                        bgcolor: '#f5f5f5',
+                                                        color: colors.text.secondary
+                                                    }}
+                                                />
+                                            )}
+                                        </Box>
+                                    </MenuItem>
+                                ))}
                             </TextField>
                         </Grid>
                     )}
