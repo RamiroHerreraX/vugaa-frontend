@@ -42,6 +42,7 @@ const CreateProgramaDialog = ({
     tipo: "VIDEO",
     activo: true,
     configuracionJson: "", // 🔥 nuevo campo JSON
+    requiereValidacion: false, // ✅ NUEVO CAMPO
   });
 
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,7 @@ const CreateProgramaDialog = ({
         tipo: "VIDEO",
         activo: true,
         configuracionJson: "",
+        requiereValidacion: false, // ✅ Reiniciar campo
       });
       setError(null);
     }
@@ -88,6 +90,7 @@ const CreateProgramaDialog = ({
           ? parseInt(programa.horasRequeridas)
           : null,
         configuracionJson: programa.configuracionJson || null,
+        requiereValidacion: programa.requiereValidacion, // ✅ Incluir el nuevo campo
         idInstancia: esGlobal ? null : idInstancia,
         idApartado: apartadoId || null,  // ← Usamos apartadoId aquí
       };
@@ -203,6 +206,20 @@ const CreateProgramaDialog = ({
             }
             placeholder='Ejemplo: {"duracionMaxima": 30}'
             disabled={loading}
+          />
+
+          {/* ✅ NUEVO: Requiere Validación */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={programa.requiereValidacion}
+                onChange={(e) =>
+                  setPrograma({ ...programa, requiereValidacion: e.target.checked })
+                }
+                disabled={loading}
+              />
+            }
+            label="Requiere Validación por Comité"
           />
 
           {/* Activo */}

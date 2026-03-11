@@ -42,17 +42,14 @@ import {
   Timer as TimerIcon,
   AdminPanelSettings as AdminPanelSettingsIcon,
   Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon,
   Category as CategoryIcon,
   Code as CodeIcon,
   Computer as ComputerIcon,
-  VisibilityOff as VisibilityOffIcon,
-  Visibility as VisibilityIcon,
   PowerSettingsNew as PowerIcon,
   Restore as RestoreIcon,
-  Delete as DeleteIcon,
   Warning as WarningIcon,
+  VerifiedUser as VerifiedUserIcon, // ✅ Nuevo icono para validación
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
@@ -640,11 +637,11 @@ const ConfigExpediente = () => {
 
   const getTipoProgramaColor = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case 'backend':
+      case 'etica':
         return institutionalColors.success;
-      case 'frontend':
+      case 'tecnica':
         return institutionalColors.info;
-      case 'fullstack':
+      case 'gestion':
         return institutionalColors.warning;
       default:
         return institutionalColors.primary;
@@ -653,12 +650,12 @@ const ConfigExpediente = () => {
 
   const getTipoProgramaIcon = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case 'backend':
+      case 'etica':
+        return <VerifiedUserIcon fontSize="small" />;
+      case 'tecnica':
         return <CodeIcon fontSize="small" />;
-      case 'frontend':
-        return <ComputerIcon fontSize="small" />;
-      case 'fullstack':
-        return <CodeIcon fontSize="small" />;
+      case 'gestion':
+        return <CategoryIcon fontSize="small" />;
       default:
         return <CodeIcon fontSize="small" />;
     }
@@ -1480,70 +1477,72 @@ const ConfigExpediente = () => {
                                           </Avatar>
                                         </ListItemIcon>
 
-                                        {/* Título con badges */}
-                                        <Box
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            flexWrap: "wrap",
-                                            gap: 1,
-                                            mb: 1,
-                                          }}
-                                        >
-                                          <Typography
-                                            variant="subtitle1"
+                                        <Box sx={{ flex: 1 }}>
+                                          {/* Título con badges */}
+                                          <Box
                                             sx={{
-                                              fontWeight: "bold",
-                                              color: institutionalColors.textPrimary,
-                                              textDecoration: documento.activo === false ? 'line-through' : 'none',
+                                              display: "flex",
+                                              alignItems: "center",
+                                              flexWrap: "wrap",
+                                              gap: 1,
+                                              mb: 1,
                                             }}
                                           >
-                                            {documento.nombreArchivo}
-                                          </Typography>
-
-                                          {documento.activo === false ? (
-                                            <Chip
-                                              size="small"
-                                              label="INACTIVO"
-                                              color="default"
+                                            <Typography
+                                              variant="subtitle1"
                                               sx={{
-                                                height: 24,
-                                                bgcolor: alpha(institutionalColors.error, 0.1),
-                                                color: institutionalColors.error,
+                                                fontWeight: "bold",
+                                                color: institutionalColors.textPrimary,
+                                                textDecoration: documento.activo === false ? 'line-through' : 'none',
                                               }}
-                                            />
-                                          ) : (
-                                            <Chip
-                                              size="small"
-                                              label="ACTIVO"
-                                              sx={{
-                                                height: 24,
-                                                bgcolor: alpha(institutionalColors.success, 0.1),
-                                                color: institutionalColors.success,
-                                              }}
-                                            />
-                                          )}
-
-                                          {documento.periodoRevision > 0 && (
-                                            <Tooltip
-                                              title={getReviewDescription(documento)}
-                                              arrow
                                             >
+                                              {documento.nombreArchivo}
+                                            </Typography>
+
+                                            {documento.activo === false ? (
                                               <Chip
                                                 size="small"
-                                                icon={getReviewIcon(documento.periodoRevision)}
-                                                label={getReviewDescription(documento)}
+                                                label="INACTIVO"
+                                                color="default"
                                                 sx={{
                                                   height: 24,
-                                                  bgcolor: alpha(institutionalColors.info, 0.1),
-                                                  color: institutionalColors.info,
-                                                  "& .MuiChip-icon": {
-                                                    color: institutionalColors.info,
-                                                  },
+                                                  bgcolor: alpha(institutionalColors.error, 0.1),
+                                                  color: institutionalColors.error,
                                                 }}
                                               />
-                                            </Tooltip>
-                                          )}
+                                            ) : (
+                                              <Chip
+                                                size="small"
+                                                label="ACTIVO"
+                                                sx={{
+                                                  height: 24,
+                                                  bgcolor: alpha(institutionalColors.success, 0.1),
+                                                  color: institutionalColors.success,
+                                                }}
+                                              />
+                                            )}
+
+                                            {documento.periodoRevision > 0 && (
+                                              <Tooltip
+                                                title={getReviewDescription(documento)}
+                                                arrow
+                                              >
+                                                <Chip
+                                                  size="small"
+                                                  icon={getReviewIcon(documento.periodoRevision)}
+                                                  label={getReviewDescription(documento)}
+                                                  sx={{
+                                                    height: 24,
+                                                    bgcolor: alpha(institutionalColors.info, 0.1),
+                                                    color: institutionalColors.info,
+                                                    "& .MuiChip-icon": {
+                                                      color: institutionalColors.info,
+                                                    },
+                                                  }}
+                                                />
+                                              </Tooltip>
+                                            )}
+                                          </Box>
                                         </Box>
 
                                         <ListItemSecondaryAction>
@@ -1718,6 +1717,25 @@ const ConfigExpediente = () => {
                                                 }}
                                               />
                                             )}
+
+                                            {/* ✅ NUEVO: Badge de Requiere Validación */}
+                                            {programa.requiereValidacion && (
+                                              <Tooltip title="Requiere validación por comité" arrow>
+                                                <Chip
+                                                  size="small"
+                                                  icon={<VerifiedUserIcon />}
+                                                  label="Requiere validación"
+                                                  sx={{
+                                                    height: 24,
+                                                    bgcolor: alpha(institutionalColors.info, 0.1),
+                                                    color: institutionalColors.info,
+                                                    "& .MuiChip-icon": {
+                                                      color: institutionalColors.info,
+                                                    },
+                                                  }}
+                                                />
+                                              </Tooltip>
+                                            )}
                                           </Box>
 
                                           {/* Descripción */}
@@ -1735,7 +1753,7 @@ const ConfigExpediente = () => {
                                           <Box
                                             sx={{
                                               display: "grid",
-                                              gridTemplateColumns: "repeat(3, 1fr)",
+                                              gridTemplateColumns: "repeat(4, 1fr)",
                                               gap: 1,
                                               mt: 1,
                                               p: 1.5,
@@ -1768,6 +1786,16 @@ const ConfigExpediente = () => {
                                               </Typography>
                                               <Typography variant="body2" fontWeight="medium">
                                                 {programa.configuracionJson ? '✓ Configurado' : 'Sin configurar'}
+                                              </Typography>
+                                            </Box>
+
+                                            {/* ✅ NUEVO: Columna de Validación en el grid */}
+                                            <Box>
+                                              <Typography variant="caption" color="textSecondary" display="block">
+                                                Validación
+                                              </Typography>
+                                              <Typography variant="body2" fontWeight="medium">
+                                                {programa.requiereValidacion ? 'Requiere' : 'No requiere'}
                                               </Typography>
                                             </Box>
                                           </Box>

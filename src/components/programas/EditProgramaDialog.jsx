@@ -121,6 +121,19 @@ const EditProgramaDialog = ({
             ))}
           </TextField>
 
+          {/* ✅ NUEVO: Requiere Validación */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.requiereValidacion || false}
+                onChange={(e) =>
+                  setForm({ ...form, requiereValidacion: e.target.checked })
+                }
+              />
+            }
+            label="Requiere Validación por Comité"
+          />
+
           <FormControlLabel
             control={
               <Switch
