@@ -183,8 +183,6 @@ const CreateUserModal = ({
       newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
     if (!formData.rolNombre)
       newErrors.rolNombre = 'Debe seleccionar un rol';
-    if (!formData.regionNombre)
-      newErrors.regionNombre = 'Debe seleccionar una región';
     if (esRolComite(formData.rolNombre) && !formData.rolEspecifico)
       newErrors.rolEspecifico = 'Debe seleccionar un cargo para el comité';
     setErrors(newErrors);
@@ -201,7 +199,6 @@ const CreateUserModal = ({
     formData.rolNombre &&
     formData.nombre?.trim().length >= 3 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-    formData.regionNombre &&
     (!isComite || formData.rolEspecifico) &&
     password?.length >= 6;
 
@@ -408,37 +405,6 @@ const CreateUserModal = ({
             )}
 
           </Grid>
-        </Box>
-
-        {/* Alertas debajo de la tarjeta blanca */}
-        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {userInstanciaNombre && (
-            <Alert
-              severity="info"
-              icon={<InfoIcon sx={{ fontSize: 18 }} />}
-              sx={{
-                borderRadius: 2,
-                bgcolor: `${colors.primary.light}12`,
-                border: `1px solid ${colors.primary.light}30`,
-                '& .MuiAlert-message': { fontSize: '0.82rem' }
-              }}
-            >
-              <strong>Instancia:</strong> {userInstanciaNombre}
-            </Alert>
-          )}
-
-          <Alert
-            severity="success"
-            icon={<InfoIcon sx={{ fontSize: 18 }} />}
-            sx={{
-              borderRadius: 2,
-              bgcolor: `${colors.secondary.light}12`,
-              border: `1px solid ${colors.secondary.light}30`,
-              '& .MuiAlert-message': { fontSize: '0.82rem' }
-            }}
-          >
-            <strong>Nota:</strong> El usuario se creará automáticamente como <strong>activo</strong> por defecto.
-          </Alert>
         </Box>
       </DialogContent>
 

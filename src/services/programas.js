@@ -66,11 +66,18 @@ export const getProgramasPorApartadoActivos = async (idApartado) => {
   return response.data;
 };
 
+// 🆕 NUEVO MÉTODO: LISTAR PROGRAMAS GLOBALES + DE UNA INSTANCIA ESPECÍFICA
 // ========================================
-// 🔹 ELIMINAR (SOFT DELETE)
+export const getProgramasGlobalesYPorInstancia = async (idInstancia) => {
+  const response = await API.get(`${ENDPOINT}/combinado/${idInstancia}`);
+  return response.data;
+};
+
 // ========================================
-export const eliminarPrograma = async (idPrograma) => {
-  await API.delete(`${ENDPOINT}/${idPrograma}`);
+// 🔹 CAMBIAR ESTADO (ACTIVAR/DESACTIVAR)
+// ========================================
+export const cambiarEstadoPrograma = async (idPrograma, activo) => {
+  await API.patch(`${ENDPOINT}/${idPrograma}/estado?activo=${activo}`);
 };
 
 // ========================================
