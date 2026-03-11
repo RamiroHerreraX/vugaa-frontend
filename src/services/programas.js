@@ -59,6 +59,14 @@ export const getProgramasPorApartado = async (idApartado) => {
 };
 
 // ========================================
+//  LISTAR POR APARTADO (SOLO ACTIVOS)
+// ========================================
+export const getProgramasPorApartadoActivos = async (idApartado) => {
+  const response = await API.get(`${ENDPOINT}/apartado/${idApartado}/activos`);
+  return response.data;
+};
+
+// ========================================
 // 🔹 ELIMINAR (SOFT DELETE)
 // ========================================
 export const eliminarPrograma = async (idPrograma) => {
