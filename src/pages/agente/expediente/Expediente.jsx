@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from "../../../context/AuthContext"; 
 import { getTodosApartados } from '../../../services/apartado';
 import { subirDocumento, getDocumentosSubidosPorApartado, eliminarDocumentoSubido, descargarArchivo , obtenerArchivoBlob} from '../../../services/documentoSubido';
-import { getDocumentosPorApartado } from '../../../services/documentoExpediente';
+import { getDocumentosPorApartadoActivos,  getDocumentosPorApartado } from '../../../services/documentoExpediente';
 import { getMiExpediente } from '../../../services/expediente';
 import { getProgramasPorApartado } from '../../../services/programas';
 import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
@@ -732,7 +732,8 @@ const Expediente = () => {
             }
             let documentos = [];
             try {
-              documentos = await getDocumentosPorApartado(apartado.idApartado);
+              documentos = await getDocumentosPorApartadoActivos(apartado.idApartado);
+              console.log(`📄 Docs activos apartado ${apartado.idApartado}:`, documentos); 
             } catch (error) {
               console.error(`Error cargando docs del apartado ${apartado.idApartado}:`, error);
             }

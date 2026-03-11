@@ -80,3 +80,27 @@ export const actualizarRequiereValidacion = async (idDocumento, requiereValidaci
   );
   return response.data;
 };
+
+// ========================================
+// 🔹 LISTAR POR EXPEDIENTE (SOLO ACTIVOS)
+// ========================================
+export const getDocumentosPorExpedienteActivos = async (idExpediente) => {
+  const response = await API.get(`${ENDPOINT}/expediente/${idExpediente}/activos`);
+  return response.data;
+};
+
+// ========================================
+// 🔹 LISTAR POR APARTADO (SOLO ACTIVOS)
+// ========================================
+export const getDocumentosPorApartadoActivos = async (idApartado) => {
+  const response = await API.get(`${ENDPOINT}/apartado/${idApartado}/activos`);
+  return response.data;
+};
+
+// ========================================
+// 🔹 LISTAR POR INSTANCIA (SOLO ACTIVOS)
+// ========================================
+export const getDocumentosPorInstanciaActivos = async (idInstancia) => {
+  const response = await API.get(`${ENDPOINT}/instancia/${idInstancia}/activos`);
+  return response.data;
+};
