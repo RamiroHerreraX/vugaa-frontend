@@ -303,19 +303,16 @@ useEffect(() => {
 const handleSave = async () => {
   // Validar campos requeridos primero
   if (!validateRequiredFields()) {
-    // Mostrar mensaje de error
     setSnackbar({
       open: true,
       message: 'Por favor completa todos los campos obligatorios',
       severity: 'error'
     });
     
-    // Navegar al paso que contiene el primer error
     const stepWithError = getStepWithErrors();
     if (stepWithError !== null) {
       setActiveStep(stepWithError);
     }
-    
     return;
   }
 
@@ -337,15 +334,22 @@ const handleSave = async () => {
       });
       return;
     }
+    if (formData.passwordNuevo.length < 8) {
+      setSnackbar({
+        open: true,
+        message: 'La nueva contraseña debe tener al menos 8 caracteres',
+        severity: 'error'
+      });
+      return;
+    }
   }
 
   setSaving(true);
   
   try {
-    // 1. Actualizar perfil_agente + expediente + perfilCompleto
-    await usuarioService.completarPerfil(
+    // ✅ PASO 1: Actualizar perfil_agente (SOLO ACTUALIZA, NO CREA EXPEDIENTE)
+    await usuarioService.actualizarPerfilAgente(
       user.id,
-      user.instanciaId,
       {
         curp:                formData.curp,
         rfc:                 formData.rfc,
@@ -362,17 +366,19 @@ const handleSave = async () => {
       }
     );
 
-    // 2. Actualizar nombre en usuarios
-    await usuarioService.update(user.id, {
-      id:               user.id,
-      nombre:           formData.nombre,
-      email:            user.email,
-      activo:           true,
-      bloqueado:        false,
-      intentosFallidos: 0,
-    });
+    // ✅ PASO 2: Actualizar nombre en usuarios (si cambió)
+    if (formData.nombre !== user.nombre) {
+      await usuarioService.update(user.id, {
+        id:               user.id,
+        nombre:           formData.nombre,
+        email:            user.email,
+        activo:           true,
+        bloqueado:        false,
+        intentosFallidos: 0,
+      });
+    }
 
-    // 3. Cambiar contraseña si se proporcionó
+    // ✅ PASO 3: Cambiar contraseña si se proporcionó
     if (formData.passwordNuevo) {
       await usuarioService.cambiarPassword(
         user.id,
@@ -381,13 +387,13 @@ const handleSave = async () => {
       );
     }
 
-    // 4. Actualizar localStorage
-   updateUser({ 
-  nombre: formData.nombre, 
-  perfilCompleto: true 
-});
+    // ✅ PASO 4: Actualizar localStorage (SOLO EL NOMBRE, NO perfilCompleto)
+    updateUser({ 
+      nombre: formData.nombre
+      // ⚠️ NO TOCAR perfilCompleto
+    });
 
-    // 5. Limpiar campos de contraseña
+    // ✅ PASO 5: Limpiar campos de contraseña
     setFormData(prev => ({
       ...prev,
       passwordActual:    '',
@@ -397,10 +403,9 @@ const handleSave = async () => {
 
     setEditMode(false);
     
-    // Mostrar mensaje de éxito
     setSnackbar({
       open: true,
-      message: 'Perfil guardado exitosamente',
+      message: 'Perfil actualizado exitosamente',
       severity: 'success'
     });
 
@@ -408,7 +413,7 @@ const handleSave = async () => {
     console.error('Error al guardar perfil:', error);
     setSnackbar({
       open: true,
-      message: 'Error al guardar el perfil',
+      message: error.response?.data?.message || error.error || 'Error al guardar el perfil',
       severity: 'error'
     });
   } finally {

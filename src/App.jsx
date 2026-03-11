@@ -56,6 +56,7 @@ import Declaraciones from "./pages/agente/expediente/Declaraciones";
 import Notificaciones from "./pages/agente/notifications/AlertsAgent";
 import Expediente from "./pages/agente/expediente/Expediente";
 import Profile from "./pages/agente/profile/Profile_agent";
+import CompleteProfile from "./pages/agente/profile/CompleteProfile";
 import AuditAgent from "./pages/agente/auditoria/AuditAgent";
 
 // Componente protegido
@@ -225,7 +226,18 @@ function App() {
               <Route path="expediente" element={<Expediente />} />
               <Route path="perfil" element={<Profile />} />
               <Route path="auditoria-agente" element={<AuditAgent />} />
+            
+              
             </Route>
+              {/* ✅ RUTA INDEPENDIENTE - Completar Perfil (sin navbar) */}
+              <Route
+                path="/dashboard/completar-perfil"
+                element={
+                  <ProtectedRoute allowedRoles={["agente", "profesionista", "empresario"]}>
+                    <CompleteProfile />
+                  </ProtectedRoute>
+                }
+              />
 
             {/* Ruta por defecto */}
             <Route path="/" element={<Navigate to="/inicio" />} />
