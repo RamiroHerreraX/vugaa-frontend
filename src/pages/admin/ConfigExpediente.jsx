@@ -55,6 +55,8 @@ import {
   PowerSettingsNew as PowerIcon,
   Restore as RestoreIcon,
   Warning as WarningIcon,
+  VerifiedUser as VerifiedUserIcon,
+  GppGood as GppGoodIcon,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 
@@ -183,6 +185,7 @@ const normalizePrograma = (programa) => {
     tipo: programa?.tipo || "VIDEO",
     activo: programa?.activo !== undefined ? programa.activo : true,
     configuracionJson: programa?.configuracionJson || "",
+    requiereValidacion: programa?.requiereValidacion || false,
     idInstancia: programa?.idInstancia || null,
     idApartado: programa?.idApartado || null,
   };
@@ -676,12 +679,10 @@ const ConfigExpediente = () => {
 
   const getTipoProgramaColor = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case "backend":
-        return institutionalColors.success;
-      case "frontend":
+      case "video":
         return institutionalColors.info;
-      case "fullstack":
-        return institutionalColors.warning;
+      case "documento":
+        return institutionalColors.success;
       default:
         return institutionalColors.primary;
     }
@@ -689,12 +690,10 @@ const ConfigExpediente = () => {
 
   const getTipoProgramaIcon = (tipo) => {
     switch (tipo?.toLowerCase()) {
-      case 'backend':
-        return <CodeIcon fontSize="small" />;
-      case 'frontend':
+      case 'video':
         return <ComputerIcon fontSize="small" />;
-      case 'fullstack':
-        return <CodeIcon fontSize="small" />;
+      case 'documento':
+        return <DescriptionIcon fontSize="small" />;
       default:
         return <CodeIcon fontSize="small" />;
     }
@@ -1834,6 +1833,25 @@ const ConfigExpediente = () => {
                                                   color: institutionalColors.error,
                                                 }}
                                               />
+                                            )}
+
+                                            {/* ✅ NUEVO: Chip para Requiere Validación */}
+                                            {programa.requiereValidacion && (
+                                              <Tooltip title="Requiere validación por comité" arrow>
+                                                <Chip
+                                                  size="small"
+                                                  icon={<GppGoodIcon fontSize="small" />}
+                                                  label="REQUIERE VALIDACIÓN"
+                                                  sx={{
+                                                    height: 24,
+                                                    bgcolor: alpha(institutionalColors.info, 0.1),
+                                                    color: institutionalColors.info,
+                                                    "& .MuiChip-icon": {
+                                                      color: institutionalColors.info,
+                                                    },
+                                                  }}
+                                                />
+                                              </Tooltip>
                                             )}
                                           </Box>
 

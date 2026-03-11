@@ -12,6 +12,8 @@ import {
   CircularProgress,
   Alert,
   MenuItem,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import { editarPrograma, editarProgramaGlobal } from "../../services/programas";
@@ -50,6 +52,7 @@ const EditProgramaDialogAdmin = ({
         idPrograma: id,
         horasRequeridas: programa.horasRequeridas?.toString() || "",
         configuracionJson: programa.configuracionJson || "",
+        requiereValidacion: programa.requiereValidacion || false,
       });
       setError(null);
     }
@@ -85,6 +88,7 @@ const EditProgramaDialogAdmin = ({
         configuracionJson: form.configuracionJson?.trim() || null,
         idInstancia: form.idInstancia || null,
         idApartado: form.idApartado || null,
+        requiereValidacion: form.requiereValidacion,
       };
 
       const response = esGlobal
@@ -210,6 +214,19 @@ const EditProgramaDialogAdmin = ({
             placeholder='Ejemplo: {"duracionMaxima": 30}'
             disabled={loading}
             helperText="Campo opcional para configuración adicional en formato JSON"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.requiereValidacion || false}
+                onChange={(e) =>
+                  setForm({ ...form, requiereValidacion: e.target.checked })
+                }
+                disabled={loading}
+              />
+            }
+            label="Requiere Validación por Comité"
           />
         </Stack>
       </DialogContent>
