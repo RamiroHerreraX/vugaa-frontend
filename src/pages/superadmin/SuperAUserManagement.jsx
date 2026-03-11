@@ -50,7 +50,10 @@ import usuarioService from "../../services/usuarioService";
 import rolService from "../../services/rol";
 import regionesService from "../../services/regiones";
 import UserViewModal from "../../components/usuarioSuper/UserViewModal";
-import { getInstancias, cambiarInstanciaUsuario } from "../../services/Instancia";
+import {
+  getInstancias,
+  cambiarInstanciaUsuario,
+} from "../../services/Instancia";
 import CreateUserModal from "../../components/usuarioSuper/CreateUserModal"; // <-- Importamos el nuevo modal
 
 const colors = {
@@ -90,7 +93,13 @@ const getRoleColor = (rolNombre) => {
 };
 
 // Modal para cambiar instancia
-const ChangeInstanciaModal = ({ open, onClose, user, onSave, availableInstancias }) => {
+const ChangeInstanciaModal = ({
+  open,
+  onClose,
+  user,
+  onSave,
+  availableInstancias,
+}) => {
   const [selectedInstancia, setSelectedInstancia] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -119,11 +128,19 @@ const ChangeInstanciaModal = ({ open, onClose, user, onSave, availableInstancias
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
-        <Typography variant="h6" sx={{ color: colors.primary.dark, fontWeight: 'bold' }}>
+      <DialogTitle
+        sx={{ bgcolor: "#f8f9fa", borderBottom: "1px solid #e0e0e0" }}
+      >
+        <Typography
+          variant="h6"
+          sx={{ color: colors.primary.dark, fontWeight: "bold" }}
+        >
           Cambiar Instancia
         </Typography>
-        <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 0.5 }}>
+        <Typography
+          variant="body2"
+          sx={{ color: colors.text.secondary, mt: 0.5 }}
+        >
           Usuario: {user.nombre}
         </Typography>
       </DialogTitle>
@@ -136,15 +153,26 @@ const ChangeInstanciaModal = ({ open, onClose, user, onSave, availableInstancias
             onChange={(e) => setSelectedInstancia(e.target.value)}
           >
             {availableInstancias.map((instancia) => (
-              <MenuItem key={instancia.id || instancia.id_instancia} value={instancia.id?.toString() || instancia.id_instancia?.toString()}>
+              <MenuItem
+                key={instancia.id || instancia.id_instancia}
+                value={
+                  instancia.id?.toString() || instancia.id_instancia?.toString()
+                }
+              >
                 {instancia.nombre}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
       </DialogContent>
-      <DialogActions sx={{ p: 2, borderTop: '1px solid #e0e0e0', bgcolor: '#f8f9fa' }}>
-        <Button onClick={onClose} variant="outlined" sx={{ color: colors.text.secondary }}>
+      <DialogActions
+        sx={{ p: 2, borderTop: "1px solid #e0e0e0", bgcolor: "#f8f9fa" }}
+      >
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          sx={{ color: colors.text.secondary }}
+        >
           Cancelar
         </Button>
         <Button
@@ -153,11 +181,11 @@ const ChangeInstanciaModal = ({ open, onClose, user, onSave, availableInstancias
           disabled={!selectedInstancia || loading}
           sx={{
             bgcolor: colors.primary.main,
-            '&:hover': { bgcolor: colors.primary.dark },
-            '&.Mui-disabled': { bgcolor: colors.primary.light }
+            "&:hover": { bgcolor: colors.primary.dark },
+            "&.Mui-disabled": { bgcolor: colors.primary.light },
           }}
         >
-          {loading ? 'Guardando...' : 'Guardar'}
+          {loading ? "Guardando..." : "Guardar"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -174,10 +202,12 @@ const UserManagement = () => {
   const [availableInstancias, setAvailableInstancias] = useState([]);
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [openViewModal, setOpenViewModal] = useState(false);
-  const [openChangeInstanciaModal, setOpenChangeInstanciaModal] = useState(false);
+  const [openChangeInstanciaModal, setOpenChangeInstanciaModal] =
+    useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUserForView, setSelectedUserForView] = useState(null);
-  const [selectedUserForInstancia, setSelectedUserForInstancia] = useState(null);
+  const [selectedUserForInstancia, setSelectedUserForInstancia] =
+    useState(null);
   const [page, setPage] = useState(1);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -222,8 +252,8 @@ const UserManagement = () => {
       const data = await usuarioService.findAgrupadosPorInstancia();
 
       // data viene como { instanciaId: [usuarios] }
-      const usuarios = Object.values(data).flat();
-
+      const todosUsuarios = Object.values(data).flat();
+      const usuarios = todosUsuarios.filter((u) => u.id !== user?.id);
       setUsers(usuarios);
 
       console.log("Usuarios con instancia:", usuarios);
@@ -296,16 +326,6 @@ const UserManagement = () => {
       setAvailableRegions(regions);
     }
   }, [users, availableRegions.length, loadingRegions]);
-
-  // Obtener cargos ocupados del comité
-  const getCargosOcupados = (excludeUserId = null) => {
-    return users
-      .filter(
-        (u) =>
-          esRolComite(u.rolNombre) && u.rolEspecifico && u.id !== excludeUserId,
-      )
-      .map((u) => u.rolEspecifico);
-  };
 
   const stats = useMemo(() => {
     const s = {
@@ -425,30 +445,31 @@ const UserManagement = () => {
     setPassword("");
     setShowPassword(false);
   };
-
-  // Guardar usuario usando el nuevo modal
   const handleCreateUser = async (userData, passwordValue) => {
-    try {
-      // El userData ya viene con instanciaId incluido desde el modal
-      const newUserDTO = {
-        email: userData.email,
-        password: passwordValue,
-        nombre: userData.nombre,
-        activo: userData.activo,
-        rolNombre: userData.rolNombre,
-        regionNombre: userData.regionNombre,
-        instanciaId: userData.instanciaId,
-        rolEspecifico: null, // Los admins no tienen rol específico
-      };
+    const newUserDTO = {
+      email: userData.email,
+      password: passwordValue,
+      nombre: userData.nombre,
+      activo: userData.activo,
+      rolNombre: userData.rolNombre,
+      instanciaId: userData.instanciaId,
+      rolEspecifico: null,
+    };
 
-      console.log("📤 Creando usuario:", newUserDTO);
+    try {
       await usuarioService.create(newUserDTO);
-      await cargarUsuarios();
       mostrarSnackbar("Administrador creado exitosamente", "success");
       handleCloseModals();
     } catch (error) {
       console.error("Error en creación:", error);
-      mostrarSnackbar(error.error || "Error al crear el administrador", "error");
+      mostrarSnackbar(
+        error.error || "Error al crear el administrador",
+        "error",
+      );
+      handleCloseModals();
+    } finally {
+      // ✅ Siempre recargar, sin importar resultado
+      await cargarUsuarios();
     }
   };
 
@@ -845,7 +866,7 @@ const UserManagement = () => {
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        
+
                         <Tooltip title="Cambiar instancia">
                           <IconButton
                             size="small"

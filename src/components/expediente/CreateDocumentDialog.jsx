@@ -30,6 +30,7 @@ const institutionalColors = {
 };
 
 const renovacionOptions = [
+  { label: "No requiere renovación", value: 0 },
   { label: "30 días (mensual)", value: 30 },
   { label: "90 días (trimestral)", value: 90 },
   { label: "180 días (semestral)", value: 180 },
@@ -37,7 +38,16 @@ const renovacionOptions = [
   { label: "730 días (bianual)", value: 730 },
 ];
 
-const formatosOptions = ["PDF", "DOCX", "XLSX", "PPTX", "TXT", "CSV", "PNG", "JPG"];
+const formatosOptions = [
+  "PDF",
+  "DOCX",
+  "XLSX",
+  "PPTX",
+  "TXT",
+  "CSV",
+  "PNG",
+  "JPG",
+];
 
 const etiquetasOptions = [
   "Finanzas",

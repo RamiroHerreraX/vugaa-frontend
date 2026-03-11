@@ -24,7 +24,7 @@ import {
   Pagination,
   Tabs,
   Tab,
-  Badge,
+  Checkbox,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -46,7 +46,6 @@ import {
 } from "@mui/icons-material";
 
 import asociacionService from "../../services/asociacion";
-
 import AssociateUserDialog from "../../components/asociados/AssociateUserDialog";
 import AddCertificationDialog from "../../components/asociados/AddCertificationDialog";
 import UserDetailsDialog from "../../components/asociados/UserDetailsDialog";
@@ -108,7 +107,6 @@ const mapApiUserToLocal = (apiUser) => {
     permisoAsociacion: apiUser.permisoAsociacion || false,
     regionNombre: apiUser.regionNombre || "Sin región",
     avatar: initials || "?",
-    // Mantenemos la estructura para certificaciones aunque venga vacía del backend
     associationCertifications: [],
   };
 };
@@ -143,10 +141,10 @@ const UserManagement = () => {
   });
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const rowsPerPage = 10;
   const [users, setUsers] = useState([]);
+  const [selectedUserIds, setSelectedUserIds] = useState(new Set());
 
   // Estado diálogo confirmación quitar usuario
   const [confirmDialog, setConfirmDialog] = useState({
@@ -154,54 +152,6 @@ const UserManagement = () => {
     user: null,
   });
   const [removingUser, setRemovingUser] = useState(false);
-
-  const [newCertification, setNewCertification] = useState({
-    name: "",
-    type: "operativa",
-    hoursValue: "",
-  });
-  const [certificationFiles, setCertificationFiles] = useState([]);
-  const [certificationUploading, setCertificationUploading] = useState(false);
-  const [certificationUploadProgress, setCertificationUploadProgress] = useState(0);
-  const [uploadFiles, setUploadFiles] = useState([]);
-
-  // Mantenemos las definiciones necesarias para los diálogos
-  const certificationTypes = [
-    { value: "etica_cumplimiento", label: "Formación ética y cumplimiento", color: "#455a64" },
-    { value: "actualizacion_aduanera", label: "Actualización técnica aduanera", color: "#1565c0" },
-    { value: "operativa", label: "Operativa", color: institutionalColors.primary },
-    { value: "fiscal", label: "Fiscal", color: institutionalColors.success },
-    { value: "legal", label: "Legal", color: "#9c27b0" },
-    { value: "administrativa", label: "Administrativa", color: institutionalColors.warning },
-    { value: "seguridad", label: "Seguridad", color: institutionalColors.error },
-  ];
-
-  const recognitionLevels = [
-    { value: 1, label: "Nivel I", color: "#6b7280", icon: "I", minCertifications: 1, maxCertifications: 3 },
-    { value: 2, label: "Nivel II", color: "#4b5563", icon: "II", minCertifications: 4, maxCertifications: 7 },
-    { value: 3, label: "Nivel III", color: "#1f2937", icon: "III", minCertifications: 8, maxCertifications: Infinity },
-  ];
-
-  const getRoleColorStatic = (role) => {
-    const colors = {
-      admin: institutionalColors.success,
-      comite: institutionalColors.primary,
-      agente: "#526F78",
-      profesionista: "#2e7d32",
-      empresario: "#ed6c02",
-    };
-    return colors[role] || institutionalColors.textSecondary;
-  };
-
-  // Funciones necesarias para los diálogos
-  const getRecognitionLevel = (user) => 1; // Valor por defecto
-  const getRecognitionLevelInfo = (level) => recognitionLevels[0];
-  const getMembershipDuration = () => "N/A";
-  const getFileIcon = (fileType) => null;
-  const formatFileSize = (bytes) => "0 Bytes";
-  const getRoleColor = (role) => getRoleColorStatic(role);
-  const getCertificationColor = (type) =>
-    certificationTypes.find((t) => t.value === type)?.color || institutionalColors.textSecondary;
 
   // Obtener idAsociacion
   useEffect(() => {
@@ -256,6 +206,11 @@ const UserManagement = () => {
     cargarUsuarios();
   }, [cargarUsuarios]);
 
+  // Limpiar selecciones al cambiar de pestaña o búsqueda
+  useEffect(() => {
+    setSelectedUserIds(new Set());
+  }, [selectedTab, searchTerm]);
+
   // Estadísticas
   const stats = useMemo(() => {
     const total = users.length;
@@ -293,6 +248,58 @@ const UserManagement = () => {
     return filteredUsers.slice(start, start + rowsPerPage);
   }, [filteredUsers, page]);
 
+  // Handlers de selección múltiple
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      const allIds = paginatedUsers.map(user => user.id);
+      setSelectedUserIds(new Set(allIds));
+    } else {
+      setSelectedUserIds(new Set());
+    }
+  };
+
+  const handleSelectUser = (userId) => {
+    setSelectedUserIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkCertification = () => {
+    const selectedUsersList = users.filter(u => selectedUserIds.has(u.id));
+    const usersWithoutPermission = selectedUsersList.filter(u => u.estado !== "CON_PERMISO");
+    
+    if (usersWithoutPermission.length > 0) {
+      setSnackbar({
+        open: true,
+        message: `${usersWithoutPermission.length} usuario(s) seleccionado(s) no tienen permiso para certificaciones.`,
+        severity: "warning",
+      });
+      return;
+    }
+
+    if (selectedUsersList.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Selecciona al menos un usuario para asignar certificación.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    // Aquí iría la lógica para certificación masiva
+    setSnackbar({
+      open: true,
+      message: `Funcionalidad de certificación masiva para ${selectedUsersList.length} usuario(s) - En desarrollo`,
+      severity: "info",
+    });
+  };
+
   // Handlers
   const handleAddExistingUser = () => setOpenAddUserDialog(true);
 
@@ -322,6 +329,11 @@ const UserManagement = () => {
     try {
       await usuarioService.quitarAsociacionUsuario(user.id);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setSelectedUserIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(user.id);
+        return newSet;
+      });
       setSnackbar({
         open: true,
         message: `${user.nombre} fue removido de la asociación correctamente.`,
@@ -339,8 +351,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleAddCertification = (userId) => {
-    const user = users.find((u) => u.id === userId);
+  const handleAddCertification = (user) => {
     if (user.estado !== "CON_PERMISO") {
       setSnackbar({
         open: true,
@@ -350,87 +361,20 @@ const UserManagement = () => {
       return;
     }
     setSelectedUser(user);
-    setNewCertification({ name: "", type: "operativa", hoursValue: "" });
-    setCertificationFiles([]);
     setOpenCertificationDialog(true);
   };
 
-  const handleCertificationFileSelect = (e) =>
-    setCertificationFiles((p) => [...p, ...Array.from(e.target.files)]);
-
-  const handleRemoveCertificationFile = (i) =>
-    setCertificationFiles((p) => p.filter((_, idx) => idx !== i));
-
-  const handleSaveCertification = async () => {
-    if (!newCertification.name) {
-      setSnackbar({
-        open: true,
-        message: "El nombre de la certificación es obligatorio",
-        severity: "warning",
-      });
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      // Simulamos la subida de archivos
-      let documents = [];
-      if (certificationFiles.length > 0) {
-        setCertificationUploading(true);
-        for (let i = 0; i <= 100; i += 10) {
-          await new Promise((r) => setTimeout(r, 100));
-          setCertificationUploadProgress(i);
-        }
-        documents = certificationFiles.map((file, idx) => ({
-          id: Date.now() + idx,
-          name: file.name,
-          url: URL.createObjectURL(file),
-          type: file.type,
-          size: file.size,
-          uploadDate: new Date().toISOString(),
-          uploadedBy: "admin@asociacion.com",
-        }));
-        setCertificationUploading(false);
-      }
-
-      const certification = {
-        id: Date.now(),
-        ...newCertification,
-        hoursValue: newCertification.hoursValue ? parseInt(newCertification.hoursValue) : 0,
-        status: "active",
-        documents,
-      };
-
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === selectedUser.id
-            ? {
-                ...u,
-                associationCertifications: [...(u.associationCertifications || []), certification],
-              }
-            : u
-        )
-      );
-
-      setOpenCertificationDialog(false);
-      setCertificationFiles([]);
-      setSnackbar({
-        open: true,
-        message: documents.length > 0
-          ? `Certificación agregada con ${documents.length} documento(s)`
-          : "Certificación agregada correctamente",
-        severity: "success",
-      });
-    } catch {
-      setSnackbar({
-        open: true,
-        message: "Error al guardar la certificación",
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-      setCertificationUploading(false);
-    }
+  const handleCertificationSaved = (user, certification) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? {
+              ...u,
+              associationCertifications: [...(u.associationCertifications || []), certification],
+            }
+          : u
+      )
+    );
   };
 
   const handleEditCertification = (user, certification) => {
@@ -444,13 +388,22 @@ const UserManagement = () => {
     }
     setSelectedUser(user);
     setSelectedCertification(certification);
-    setNewCertification({
-      name: certification.name,
-      type: certification.type,
-      hoursValue: certification.hoursValue || "",
-    });
-    setCertificationFiles([]);
     setOpenCertificationDialog(true);
+  };
+
+  const handleCertificationUpdated = (user, certification) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? {
+              ...u,
+              associationCertifications: u.associationCertifications.map((c) =>
+                c.id === certification.id ? certification : c
+              ),
+            }
+          : u
+      )
+    );
   };
 
   const handleDeleteCertification = async (userId, certificationId) => {
@@ -506,75 +459,24 @@ const UserManagement = () => {
     }
     setSelectedUser(user);
     setSelectedCertification(certification);
-    setUploadFiles([]);
-    setUploadProgress(0);
     setOpenUploadDialog(true);
   };
 
-  const handleFileSelect = (e) =>
-    setUploadFiles((p) => [...p, ...Array.from(e.target.files)]);
-
-  const handleRemoveFile = (i) =>
-    setUploadFiles((p) => p.filter((_, idx) => idx !== i));
-
-  const handleUploadFiles = async () => {
-    if (uploadFiles.length === 0) {
-      setSnackbar({
-        open: true,
-        message: "Selecciona al menos un archivo para subir",
-        severity: "warning",
-      });
-      return;
-    }
-
-    setUploading(true);
-    setUploadProgress(0);
-    try {
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise((r) => setTimeout(r, 200));
-        setUploadProgress(i);
-      }
-
-      const newDocuments = uploadFiles.map((file, idx) => ({
-        id: Date.now() + idx,
-        name: file.name,
-        url: URL.createObjectURL(file),
-        type: file.type,
-        size: file.size,
-        uploadDate: new Date().toISOString(),
-        uploadedBy: "admin@asociacion.com",
-      }));
-
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id !== selectedUser.id
-            ? user
-            : {
-                ...user,
-                associationCertifications: user.associationCertifications.map((cert) =>
-                  cert.id === selectedCertification.id
-                    ? { ...cert, documents: [...(cert.documents || []), ...newDocuments] }
-                    : cert
-                ),
-              }
-        )
-      );
-
-      setSnackbar({
-        open: true,
-        message: `${uploadFiles.length} archivo(s) subido(s) correctamente`,
-        severity: "success",
-      });
-      setOpenUploadDialog(false);
-    } catch {
-      setSnackbar({
-        open: true,
-        message: "Error al subir los archivos",
-        severity: "error",
-      });
-    } finally {
-      setUploading(false);
-    }
+  const handleDocumentsUploaded = (user, certification, newDocuments) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id !== user.id
+          ? u
+          : {
+              ...u,
+              associationCertifications: u.associationCertifications.map((cert) =>
+                cert.id === certification.id
+                  ? { ...cert, documents: [...(cert.documents || []), ...newDocuments] }
+                  : cert
+              ),
+            }
+      )
+    );
   };
 
   const handleViewDocuments = (user, certification) => {
@@ -583,44 +485,21 @@ const UserManagement = () => {
     setOpenDocumentDialog(true);
   };
 
-  const handleDeleteDocument = async (documentId) => {
-    if (!selectedUser || !selectedCertification) return;
-    
-    setLoading(true);
-    try {
-      await new Promise((r) => setTimeout(r, 500));
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id !== selectedUser.id
-            ? user
-            : {
-                ...user,
-                associationCertifications: user.associationCertifications.map((cert) =>
-                  cert.id === selectedCertification.id
-                    ? { ...cert, documents: cert.documents.filter((doc) => doc.id !== documentId) }
-                    : cert
-                ),
-              }
-        )
-      );
-      setSelectedCertification((prev) => ({
-        ...prev,
-        documents: prev.documents.filter((doc) => doc.id !== documentId),
-      }));
-      setSnackbar({
-        open: true,
-        message: "Documento eliminado correctamente",
-        severity: "success",
-      });
-    } catch {
-      setSnackbar({
-        open: true,
-        message: "Error al eliminar el documento",
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleDocumentDeleted = (user, certification, documentId) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id !== user.id
+          ? u
+          : {
+              ...u,
+              associationCertifications: u.associationCertifications.map((cert) =>
+                cert.id === certification.id
+                  ? { ...cert, documents: cert.documents.filter((doc) => doc.id !== documentId) }
+                  : cert
+              ),
+            }
+      )
+    );
   };
 
   const handleExportCSV = () => {
@@ -832,6 +711,49 @@ const UserManagement = () => {
         />
       </Paper>
 
+      {/* Acciones masivas */}
+      {selectedUserIds.size > 0 && !loadingUsers && !isInitializing && (
+        <Paper
+          elevation={2}
+          sx={{
+            p: 1.5,
+            bgcolor: institutionalColors.lightBlue,
+            border: `1px solid ${institutionalColors.primary}30`,
+          }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Typography variant="body2" sx={{ color: institutionalColors.primary }}>
+              <strong>{selectedUserIds.size}</strong> usuario(s) seleccionado(s)
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<VerifiedIcon />}
+              onClick={handleBulkCertification}
+              disabled={loading}
+              sx={{
+                bgcolor: institutionalColors.primary,
+                "&:hover": { bgcolor: institutionalColors.secondary },
+              }}
+            >
+              Asignar certificación
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setSelectedUserIds(new Set())}
+              disabled={loading}
+              sx={{
+                borderColor: institutionalColors.textSecondary,
+                color: institutionalColors.textSecondary,
+              }}
+            >
+              Limpiar selección
+            </Button>
+          </Stack>
+        </Paper>
+      )}
+
       {/* Tabla */}
       <Paper
         elevation={1}
@@ -954,6 +876,14 @@ const UserManagement = () => {
             <Table stickyHeader size="medium">
               <TableHead>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={paginatedUsers.length > 0 && selectedUserIds.size === paginatedUsers.length}
+                      indeterminate={selectedUserIds.size > 0 && selectedUserIds.size < paginatedUsers.length}
+                      onChange={handleSelectAll}
+                      sx={{ color: institutionalColors.primary }}
+                    />
+                  </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: institutionalColors.primary }}>
                     Usuario
                   </TableCell>
@@ -983,6 +913,18 @@ const UserManagement = () => {
               <TableBody>
                 {paginatedUsers.map((user) => (
                   <TableRow key={user.id} hover>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectedUserIds.has(user.id)}
+                        onChange={() => handleSelectUser(user.id)}
+                        disabled={user.estado !== "CON_PERMISO"}
+                        sx={{ 
+                          color: user.estado === "CON_PERMISO" 
+                            ? institutionalColors.primary 
+                            : institutionalColors.textSecondary 
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={2} alignItems="center">
                         <Avatar
@@ -1079,7 +1021,7 @@ const UserManagement = () => {
                               size="small"
                               onClick={() => {
                                 if (user.estado === "CON_PERMISO") {
-                                  handleAddCertification(user.id);
+                                  handleAddCertification(user);
                                 } else {
                                   setSnackbar({
                                     open: true,
@@ -1166,34 +1108,17 @@ const UserManagement = () => {
         onClose={() => {
           setOpenCertificationDialog(false);
           setSelectedCertification(null);
-          setCertificationFiles([]);
         }}
-        selectedUser={selectedUser}
-        selectedCertification={selectedCertification}
-        newCertification={newCertification}
-        onCertificationChange={setNewCertification}
-        certificationFiles={certificationFiles}
-        onFileSelect={handleCertificationFileSelect}
-        onRemoveFile={handleRemoveCertificationFile}
-        onSave={handleSaveCertification}
-        loading={loading}
-        certificationUploading={certificationUploading}
-        certificationUploadProgress={certificationUploadProgress}
-        certificationTypes={certificationTypes}
-        getFileIcon={getFileIcon}
-        formatFileSize={formatFileSize}
+        user={selectedUser}
+        certification={selectedCertification}
+        onSave={handleCertificationSaved}
+        onUpdate={handleCertificationUpdated}
       />
 
       <UserDetailsDialog
         open={openDetailsDialog}
         onClose={() => setOpenDetailsDialog(false)}
-        selectedUser={selectedUser}
-        getRecognitionLevel={getRecognitionLevel}
-        getRecognitionLevelInfo={getRecognitionLevelInfo}
-        getRoleColor={getRoleColor}
-        getCertificationColor={getCertificationColor}
-        getMembershipDuration={getMembershipDuration}
-        certificationTypes={certificationTypes}
+        user={selectedUser}
         onEditCertification={handleEditCertification}
         onDeleteCertification={handleDeleteCertification}
         onViewDocuments={handleViewDocuments}
@@ -1203,30 +1128,21 @@ const UserManagement = () => {
       <DocumentsDialog
         open={openDocumentDialog}
         onClose={() => setOpenDocumentDialog(false)}
-        selectedUser={selectedUser}
-        selectedCertification={selectedCertification}
-        onDeleteDocument={handleDeleteDocument}
+        user={selectedUser}
+        certification={selectedCertification}
+        onDocumentDeleted={handleDocumentDeleted}
         onUploadDocuments={() => {
           setOpenDocumentDialog(false);
           handleUploadDocuments(selectedUser, selectedCertification);
         }}
-        getFileIcon={getFileIcon}
-        formatFileSize={formatFileSize}
       />
 
       <UploadDocumentsDialog
         open={openUploadDialog}
         onClose={() => !uploading && setOpenUploadDialog(false)}
-        selectedUser={selectedUser}
-        selectedCertification={selectedCertification}
-        uploadFiles={uploadFiles}
-        onFileSelect={handleFileSelect}
-        onRemoveFile={handleRemoveFile}
-        onUpload={handleUploadFiles}
-        uploading={uploading}
-        uploadProgress={uploadProgress}
-        getFileIcon={getFileIcon}
-        formatFileSize={formatFileSize}
+        user={selectedUser}
+        certification={selectedCertification}
+        onUploadComplete={handleDocumentsUploaded}
       />
     </Box>
   );

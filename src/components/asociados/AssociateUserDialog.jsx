@@ -20,8 +20,11 @@ import {
   MenuItem,
   Alert,
   Snackbar,
+  Checkbox,
+  FormControlLabel,
+  Box,
 } from "@mui/material";
-import { PersonAdd as PersonAddIcon } from "@mui/icons-material";
+import { PersonAdd as PersonAddIcon, GroupAdd as GroupAddIcon } from "@mui/icons-material";
 import UsuarioService from "../../services/usuarioService";
 import asociacionService from "../../services/asociacion";
 
@@ -36,10 +39,12 @@ const avatarRoleColor = "#1976d2";
 
 const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [processingUsers, setProcessingUsers] = useState(new Set());
 
   // ✅ idAsociacion como estado — se carga de forma asíncrona
   const [idAsociacion, setIdAsociacion] = useState(null);
@@ -57,19 +62,26 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
     }
   };
 
+  // Limpiar selecciones cuando se cierra el diálogo
+  useEffect(() => {
+    if (!open) {
+      setSelectedUsers(new Set());
+      setProcessingUsers(new Set());
+      setSearchTerm("");
+      setRegionFilter("");
+    }
+  }, [open]);
+
   // ── Paso 1: cargar idAsociacion cuando se abre el dialog ─────────────────
-  // Se dispara cada vez que `open` cambia a true y aún no tenemos idAsociacion.
   useEffect(() => {
     if (!open) return;
 
-    // Si ya lo tenemos en localStorage (guardado por findByUsuarioId) lo usamos directo
     const idAsociacionCached = getFromStorage("idAsociacion");
     if (idAsociacionCached) {
       setIdAsociacion(idAsociacionCached);
       return;
     }
 
-    // Si no está en caché, lo pedimos al backend
     const idUsuario = getFromStorage("id");
     if (!idUsuario) {
       setSnackbar({
@@ -83,7 +95,6 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
     const cargarAsociacion = async () => {
       setLoadingAsociacion(true);
       try {
-        // findByUsuarioId también guarda idAsociacion en localStorage
         const asociacion = await asociacionService.findByUsuarioId(idUsuario);
         console.log("Asociación cargada en AssociateUserDialog:", asociacion);
         setIdAsociacion(asociacion.idAsociacion);
@@ -102,7 +113,7 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
     cargarAsociacion();
   }, [open]);
 
-  // ── Paso 2: cargar usuarios sin asociación cuando tenemos instanciaId ────
+  // ── Paso 2: cargar usuarios sin asociación ───────────────────────────────
   useEffect(() => {
     if (!open) return;
 
@@ -126,7 +137,100 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
     fetchUsuarios();
   }, [open]);
 
-  // ── Agregar usuario a la asociación ──────────────────────────────────────
+  // ── Manejar selección de usuarios ────────────────────────────────────────
+  const handleSelectUser = (userId) => {
+    setSelectedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      const allIds = filteredUsers.map(user => user.id);
+      setSelectedUsers(new Set(allIds));
+    } else {
+      setSelectedUsers(new Set());
+    }
+  };
+
+  // ── Agregar usuarios seleccionados a la asociación ───────────────────────
+  const handleAgregarSeleccionados = async () => {
+    if (!idAsociacion) {
+      setSnackbar({
+        open: true,
+        message: "No se encontró el ID de la asociación. Por favor inicia sesión nuevamente.",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (selectedUsers.size === 0) {
+      setSnackbar({
+        open: true,
+        message: "Por favor selecciona al menos un usuario para agregar.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setLoading(true);
+    const usersToProcess = Array.from(selectedUsers);
+    const successfulUsers = [];
+    const failedUsers = [];
+
+    // Marcar usuarios como procesando
+    setProcessingUsers(new Set(usersToProcess));
+
+    for (const userId of usersToProcess) {
+      try {
+        const user = availableUsers.find(u => u.id === userId);
+        await UsuarioService.actualizarAsociacionUsuario(userId, idAsociacion);
+        console.log(`Usuario ${user?.nombre} agregado a la asociación ${idAsociacion}`);
+        successfulUsers.push(user);
+      } catch (error) {
+        console.error(`Error al agregar usuario ${userId}:`, error);
+        const user = availableUsers.find(u => u.id === userId);
+        failedUsers.push(user?.nombre || userId);
+      }
+    }
+
+    // Actualizar lista de usuarios disponibles (quitar los exitosos)
+    const successfulIds = successfulUsers.map(u => u.id);
+    setAvailableUsers((prev) => prev.filter((u) => !successfulIds.includes(u.id)));
+
+    // Notificar al padre de cada usuario agregado exitosamente
+    successfulUsers.forEach(user => {
+      onAddUser(user);
+    });
+
+    // Mostrar mensaje de resultado
+    if (failedUsers.length === 0) {
+      setSnackbar({
+        open: true,
+        message: `${successfulUsers.length} usuario(s) agregado(s) correctamente.`,
+        severity: "success",
+      });
+    } else {
+      setSnackbar({
+        open: true,
+        message: `${successfulUsers.length} agregado(s), ${failedUsers.length} fallaron: ${failedUsers.join(", ")}`,
+        severity: "warning",
+      });
+    }
+
+    // Limpiar selecciones y procesamiento
+    setSelectedUsers(new Set());
+    setProcessingUsers(new Set());
+    setLoading(false);
+  };
+
+  // ── Agregar un solo usuario (función original) ───────────────────────────
   const handleAgregarUsuario = async (user) => {
     if (!idAsociacion) {
       setSnackbar({
@@ -138,12 +242,18 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
     }
 
     setLoading(true);
+    setProcessingUsers(new Set([user.id]));
+    
     try {
       await UsuarioService.actualizarAsociacionUsuario(user.id, idAsociacion);
       console.log(`Usuario ${user.nombre} agregado a la asociación ${idAsociacion}`);
 
-      // Quitar al usuario de la lista para que no aparezca de nuevo
       setAvailableUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setSelectedUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(user.id);
+        return newSet;
+      });
 
       setSnackbar({
         open: true,
@@ -151,7 +261,6 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
         severity: "success",
       });
 
-      // Notificar al componente padre
       onAddUser(user);
     } catch (error) {
       console.error("Error al agregar usuario a la asociación:", error);
@@ -161,6 +270,7 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
         severity: "error",
       });
     } finally {
+      setProcessingUsers(new Set());
       setLoading(false);
     }
   };
@@ -188,7 +298,6 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
     return filteredByText.filter((u) => u.regionNombre === regionFilter);
   }, [filteredByText, regionFilter]);
 
-  // Está inicializando si aún no tiene idAsociacion y lo está cargando
   const isInitializing = loadingAsociacion && !idAsociacion;
 
   return (
@@ -210,16 +319,17 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
           <Stack direction="row" spacing={2} alignItems="center">
             <PersonAddIcon sx={{ color: institutionalColors.primary }} />
             <Typography variant="h6" sx={{ color: institutionalColors.textPrimary }}>
-              Agregar Usuario Existente a la Asociación
+              Agregar Usuarios a la Asociación
             </Typography>
           </Stack>
         </DialogTitle>
 
         <DialogContent>
           <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }} paragraph>
-            Selecciona un usuario existente en el sistema para agregarlo a tu
-            asociación. <strong>IMPORTANTE:</strong> El permiso para subir documentos lo
-            debe dar el usuario desde su dispositivo.
+            Selecciona uno o varios usuarios para agregarlos a tu asociación.
+            Puedes usar los checkboxes para selección múltiple.
+            <strong> IMPORTANTE:</strong> El permiso para subir documentos lo
+            debe dar cada usuario desde su dispositivo.
           </Typography>
 
           {/* Filtros */}
@@ -250,6 +360,42 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
             </Stack>
           </Stack>
 
+          {/* Botones de acción masiva */}
+          {!isInitializing && !loading && filteredUsers.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={filteredUsers.length > 0 && selectedUsers.size === filteredUsers.length}
+                      indeterminate={selectedUsers.size > 0 && selectedUsers.size < filteredUsers.length}
+                      onChange={handleSelectAll}
+                      size="small"
+                      sx={{ color: institutionalColors.primary }}
+                    />
+                  }
+                  label="Seleccionar todos"
+                />
+                {selectedUsers.size > 0 && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<GroupAddIcon />}
+                    onClick={handleAgregarSeleccionados}
+                    disabled={loading || !idAsociacion}
+                    sx={{ 
+                      bgcolor: institutionalColors.primary, 
+                      "&:hover": { bgcolor: institutionalColors.secondary },
+                      ml: "auto !important"
+                    }}
+                  >
+                    Agregar {selectedUsers.size} usuario(s)
+                  </Button>
+                )}
+              </Stack>
+            </Box>
+          )}
+
           {/* Spinner de inicialización o de carga de usuarios */}
           {isInitializing || loading ? (
             <Stack alignItems="center" mt={3} mb={3} spacing={1}>
@@ -263,6 +409,15 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={filteredUsers.length > 0 && selectedUsers.size === filteredUsers.length}
+                        indeterminate={selectedUsers.size > 0 && selectedUsers.size < filteredUsers.length}
+                        onChange={handleSelectAll}
+                        size="small"
+                        sx={{ color: institutionalColors.primary }}
+                      />
+                    </TableCell>
                     <TableCell sx={{ color: institutionalColors.primary }}>Usuario</TableCell>
                     <TableCell sx={{ color: institutionalColors.primary }}>Email</TableCell>
                     <TableCell sx={{ color: institutionalColors.primary }}>Rol</TableCell>
@@ -273,6 +428,15 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
                 <TableBody>
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id} hover>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedUsers.has(user.id)}
+                          onChange={() => handleSelectUser(user.id)}
+                          size="small"
+                          disabled={processingUsers.has(user.id)}
+                          sx={{ color: institutionalColors.primary }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Avatar sx={{ width: 32, height: 32, bgcolor: avatarRoleColor, fontWeight: "bold", color: "white" }}>
@@ -281,6 +445,9 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
                           <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
                             {user.nombre || "Usuario sin nombre"}
                           </Typography>
+                          {processingUsers.has(user.id) && (
+                            <CircularProgress size={16} sx={{ ml: 1 }} />
+                          )}
                         </Stack>
                       </TableCell>
                       <TableCell>
@@ -298,10 +465,20 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        <Button size="small" variant="contained"
+                        <Button 
+                          size="small" 
+                          variant="outlined"
                           onClick={() => handleAgregarUsuario(user)}
-                          disabled={loading || !idAsociacion}
-                          sx={{ bgcolor: institutionalColors.primary, "&:hover": { bgcolor: institutionalColors.secondary } }}>
+                          disabled={loading || !idAsociacion || processingUsers.has(user.id)}
+                          sx={{ 
+                            color: institutionalColors.primary,
+                            borderColor: institutionalColors.primary,
+                            "&:hover": { 
+                              bgcolor: `${institutionalColors.primary}10`,
+                              borderColor: institutionalColors.secondary 
+                            }
+                          }}
+                        >
                           Agregar
                         </Button>
                       </TableCell>
@@ -309,7 +486,7 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
                   ))}
                   {filteredUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ color: institutionalColors.textSecondary }}>
+                      <TableCell colSpan={6} align="center" sx={{ color: institutionalColors.textSecondary }}>
                         No se encontraron usuarios.
                       </TableCell>
                     </TableRow>
@@ -321,7 +498,9 @@ const AssociateUserDialog = ({ open, onClose, onAddUser }) => {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
         </DialogActions>
       </Dialog>
     </>

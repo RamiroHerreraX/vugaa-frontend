@@ -10,28 +10,24 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [tokenExpiration, setTokenExpiration] = useState(null);
 
-  // 🔴 NUEVO: Función separada para logout local
   const performLocalLogout = useCallback((redirect = true) => {
-    // Limpiar localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     localStorage.removeItem('tokenExpiration');
-    
-    // Limpiar estado
+    localStorage.removeItem('tenant'); // ✅ Limpiar el tenant al cerrar sesión
+
     setUser(null);
     setTokenExpiration(null);
-    
-    // Limpiar headers de axios
+
     delete API.defaults.headers.common['Authorization'];
-    
-    // Redirigir si es necesario
+
     if (redirect) {
       window.location.href = '/login';
     }
   }, []);
 
-  // Verificar token periódicamente (CORREGIDO)
+  // Verificar token periódicamente
   useEffect(() => {
     const checkToken = async () => {
       const token = localStorage.getItem('token');
@@ -40,7 +36,6 @@ export const AuthProvider = ({ children }) => {
       try {
         await API.get('/auth/verificar-token');
       } catch (error) {
-        // Solo hacer logout si no es 401 (porque 401 significa token expirado)
         if (error.response?.status !== 401) {
           performLocalLogout(false);
         }
@@ -55,7 +50,7 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
     const expiration = localStorage.getItem('tokenExpiration');
-    
+
     if (token && userStr && expiration) {
       if (Date.now() > parseInt(expiration)) {
         performLocalLogout(false);
@@ -64,8 +59,6 @@ export const AuthProvider = ({ children }) => {
           const userData = JSON.parse(userStr);
           setUser(userData);
           setTokenExpiration(parseInt(expiration));
-          
-          // Configurar token en axios
           API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         } catch (error) {
           console.error('Error parsing user data', error);
@@ -88,15 +81,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password, tenant) => {
     try {
-      const response = await API.post('/auth/login', 
+      const response = await API.post('/auth/login',
         { email, password },
-        { 
+        {
           headers: {
             'X-Tenant-ID': tenant
-          } 
+          }
         }
       );
-      
+
       if (response.data.token) {
         const roleMap = {
           'SUPERADMIN': 'supera',
@@ -119,18 +112,19 @@ export const AuthProvider = ({ children }) => {
         };
 
         const expiration = Date.now() + (response.data.expiresIn || 86400000);
-        
+
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('refreshToken', response.data.refreshToken || '');
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('tokenExpiration', expiration.toString());
-        
-        // Configurar token en axios
+        localStorage.setItem('tenant', tenant); // ✅ Guardar el tenant con el que inició sesión
+
         API.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-        
+
         setUser(userData);
         setTokenExpiration(expiration);
-        
+
+        console.log(`Login exitoso para: ${userData.nombre} (tenant: ${tenant})`);
         return { success: true, user: userData };
       } else {
         return { success: false, error: response.data.mensaje || 'Error al iniciar sesión' };
@@ -141,29 +135,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 🔴 NUEVO: Logout mejorado que siempre limpia localmente
   const logout = async (options = {}) => {
     const { redirect = true } = options;
-    
+
     try {
       const token = localStorage.getItem('token');
-      
+
       if (token) {
-        // Intentar logout en backend, pero sin esperar y con manejo de errores
         await API.post('/auth/logout', {}, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          timeout: 3000 // Timeout de 3 segundos
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 3000
         }).catch(error => {
-          // Ignorar errores específicos (incluyendo 401)
           console.log('Error en logout del backend (ignorado):', error.message);
         });
       }
     } catch (error) {
       console.error('Error inesperado en logout:', error);
     } finally {
-      // SIEMPRE limpiar el estado local
       performLocalLogout(redirect);
     }
   };
@@ -172,14 +160,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const response = await API.post('/auth/recuperar-password', { email });
-      return { 
-        success: true, 
-        mensaje: response.data.mensaje || 'Si el email existe, recibirás instrucciones' 
+      return {
+        success: true,
+        mensaje: response.data.mensaje || 'Si el email existe, recibirás instrucciones'
       };
     } catch (error) {
-      return { 
-        success: true, 
-        mensaje: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña' 
+      return {
+        success: true,
+        mensaje: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña'
       };
     } finally {
       setLoading(false);
@@ -194,14 +182,14 @@ export const AuthProvider = ({ children }) => {
         nuevaPassword,
         confirmarPassword
       });
-      return { 
-        success: true, 
-        mensaje: response.data.mensaje || 'Contraseña actualizada exitosamente' 
+      return {
+        success: true,
+        mensaje: response.data.mensaje || 'Contraseña actualizada exitosamente'
       };
     } catch (error) {
-      return { 
-        success: false, 
-        mensaje: error.response?.data?.mensaje || 'Error al restablecer la contraseña' 
+      return {
+        success: false,
+        mensaje: error.response?.data?.mensaje || 'Error al restablecer la contraseña'
       };
     } finally {
       setLoading(false);
@@ -214,16 +202,13 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const response = await API.post('/auth/refresh-token', { refreshToken });
-      
+
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         const expiration = Date.now() + (response.data.expiresIn || 86400000);
         localStorage.setItem('tokenExpiration', expiration.toString());
         setTokenExpiration(expiration);
-        
-        // Actualizar token en axios
         API.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-        
         return true;
       }
     } catch (error) {

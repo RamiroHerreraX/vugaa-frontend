@@ -31,7 +31,6 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 
-// Importar el logo
 import vugaaLogo from "../../assets/Vugaa_logo.jpeg";
 
 const Login = () => {
@@ -48,12 +47,10 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Opciones de instancias
+  // ✅ Solo instancias que existen en la base de datos
   const tenantOptions = [
     { value: "caaarem", label: "CAAAREM (Principal)", color: "#133B6B" },
-    { value: "test", label: "Instancia de Pruebas", color: "#00C2D1" },
-    { value: "ingenieria", label: "Facultad de Ingeniería", color: "#0099FF" },
-    { value: "medicina", label: "Facultad de Medicina", color: "#6C5CE7" },
+    { value: "MADRE", label: "INSTANCIA MADRE", color: "#133B6B" },
   ];
 
   const validateEmail = (email) => {
@@ -67,9 +64,8 @@ const Login = () => {
     setEmailError("");
     setPasswordError("");
 
-    // Validaciones
     let isValid = true;
-    
+
     if (!email) {
       setEmailError("El email es obligatorio");
       isValid = false;
@@ -97,11 +93,10 @@ const Login = () => {
 
     try {
       const result = await login(email, password, tenant);
-      
+
       if (result.success) {
         setOpenSnackbar(true);
-        
-        // Redireccionar según el rol después de un pequeño delay
+
         setTimeout(() => {
           const role = result.user.rol;
           switch (role) {
@@ -133,33 +128,34 @@ const Login = () => {
 
   const handleDemoLogin = (role) => {
     const demos = {
-      supera: { email: "superadmin@vugaa.com", tenant: "caaarem", label: "Super Admin" },
-      admin: { email: "admin@caaarem.com", tenant: "caaarem", label: "Admin" },
-      comite: { email: "comite@caaarem.com", tenant: "caaarem", label: "Comité" },
-      asociacion: { email: "asociacion@caaarem.com", tenant: "caaarem", label: "Asociación" },
-      agente: { email: "agente@caaarem.com", tenant: "caaarem", label: "Agente" }
+      // ✅ Corregido: superadmin usa instancia MADRE
+      supera:     { email: "superadmin@vugaa.com",      tenant: "MADRE",    label: "Super Admin" },
+      admin:      { email: "admin@caaarem.com",          tenant: "caaarem",  label: "Admin" },
+      comite:     { email: "comite@caaarem.com",         tenant: "caaarem",  label: "Comité" },
+      asociacion: { email: "asociacion@caaarem.com",     tenant: "caaarem",  label: "Asociación" },
+      agente:     { email: "agente@caaarem.com",         tenant: "caaarem",  label: "Agente" },
     };
-    
+
     if (demos[role]) {
       setEmail(demos[role].email);
-      setTenant(demos[role].tenant);
+      setTenant(demos[role].tenant); // ✅ Ahora el selector también cambia al tenant correcto
       setPassword("123456");
     }
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: '100vh',
-      display: 'flex', 
-      alignItems: 'center', 
+      display: 'flex',
+      alignItems: 'center',
       justifyContent: 'center',
       background: "linear-gradient(135deg, #ffffff 0%, #133B6B 50%, #1E4A7A 100%)",
       py: { xs: 2, sm: 4 }
     }}>
       <Container maxWidth="sm" sx={{ my: { xs: 2, sm: 4 } }}>
-        <Paper 
-          elevation={6} 
-          sx={{ 
+        <Paper
+          elevation={6}
+          sx={{
             borderRadius: 4,
             overflow: 'hidden',
             backdropFilter: "blur(10px)",
@@ -167,10 +163,10 @@ const Login = () => {
             position: 'relative'
           }}
         >
-          {/* Header con gradiente institucional, logo y título */}
-          <Box sx={{ 
-            bgcolor: '#133B6B', 
-            p: { xs: 3, sm: 4 }, 
+          {/* Header */}
+          <Box sx={{
+            bgcolor: '#133B6B',
+            p: { xs: 3, sm: 4 },
             textAlign: 'center',
             background: 'linear-gradient(135deg, #0D2A4D 0%, #133B6B 100%)',
             display: 'flex',
@@ -180,15 +176,7 @@ const Login = () => {
             minHeight: { xs: 280, sm: 320 },
             position: 'relative'
           }}>
-            {/* Botón de regresar */}
-            <Box
-              sx={{
-                position: "absolute",
-                top: 16,
-                left: 16,
-                zIndex: 20
-              }}
-            >
+            <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 20 }}>
               <Button
                 component={Link}
                 to="/inicio"
@@ -230,11 +218,11 @@ const Login = () => {
                 boxShadow: "0 15px 35px rgba(0,0,0,0.4)",
               }}
             />
-            
-            <Typography 
-              variant="h4" 
-              sx={{ 
-                color: 'white', 
+
+            <Typography
+              variant="h4"
+              sx={{
+                color: 'white',
                 fontWeight: 700,
                 letterSpacing: 2,
                 textTransform: 'uppercase',
@@ -271,31 +259,18 @@ const Login = () => {
                       </InputAdornment>
                     }
                     sx={{
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#00C2D1",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#00C2D1",
-                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#00C2D1" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#00C2D1" },
                     }}
                   >
                     {tenantOptions.map((option) => (
-                      <MenuItem 
-                        key={option.value} 
+                      <MenuItem
+                        key={option.value}
                         value={option.value}
-                        sx={{
-                          '&:hover': {
-                            bgcolor: `${option.color}10`
-                          }
-                        }}
+                        sx={{ '&:hover': { bgcolor: `${option.color}10` } }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ 
-                            width: 12, 
-                            height: 12, 
-                            borderRadius: '50%', 
-                            bgcolor: option.color 
-                          }} />
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: option.color }} />
                           {option.label}
                         </Box>
                       </MenuItem>
@@ -322,16 +297,10 @@ const Login = () => {
                   }}
                   sx={{
                     "& .MuiOutlinedInput-root": {
-                      "&:hover fieldset": {
-                        borderColor: "#00C2D1",
-                      },
-                      "&.Mui-focused fieldset": {
-                        borderColor: "#00C2D1",
-                      },
+                      "&:hover fieldset": { borderColor: "#00C2D1" },
+                      "&.Mui-focused fieldset": { borderColor: "#00C2D1" },
                     },
-                    "& .MuiInputLabel-root.Mui-focused": {
-                      color: "#00C2D1",
-                    },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "#00C2D1" },
                   }}
                 />
 
@@ -353,10 +322,7 @@ const Login = () => {
                     ),
                     endAdornment: (
                       <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowPassword(!showPassword)}
-                          edge="end"
-                        >
+                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
                           {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                         </IconButton>
                       </InputAdornment>
@@ -364,16 +330,10 @@ const Login = () => {
                   }}
                   sx={{
                     "& .MuiOutlinedInput-root": {
-                      "&:hover fieldset": {
-                        borderColor: "#00C2D1",
-                      },
-                      "&.Mui-focused fieldset": {
-                        borderColor: "#00C2D1",
-                      },
+                      "&:hover fieldset": { borderColor: "#00C2D1" },
+                      "&.Mui-focused fieldset": { borderColor: "#00C2D1" },
                     },
-                    "& .MuiInputLabel-root.Mui-focused": {
-                      color: "#00C2D1",
-                    },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "#00C2D1" },
                   }}
                 />
 
@@ -415,11 +375,7 @@ const Login = () => {
 
             {/* Demo Login Buttons */}
             <Box>
-              <Typography
-                variant="subtitle2"
-                align="center"
-                sx={{ color: "#64748b", mb: 2 }}
-              >
+              <Typography variant="subtitle2" align="center" sx={{ color: "#64748b", mb: 2 }}>
                 Cuentas de demostración:
               </Typography>
               <Stack
@@ -431,18 +387,18 @@ const Login = () => {
                 sx={{ gap: 1 }}
               >
                 {[
-                  { role: 'supera', label: 'Super' },
-                  { role: 'admin', label: 'Admin' },
-                  { role: 'comite', label: 'Comité' },
+                  { role: 'supera',     label: 'Super' },
+                  { role: 'admin',      label: 'Admin' },
+                  { role: 'comite',     label: 'Comité' },
                   { role: 'asociacion', label: 'Asociación' },
-                  { role: 'agente', label: 'Agente' }
+                  { role: 'agente',     label: 'Agente' },
                 ].map((item) => (
                   <Button
                     key={item.role}
                     variant="outlined"
                     size="small"
                     onClick={() => handleDemoLogin(item.role)}
-                    sx={{ 
+                    sx={{
                       textTransform: 'capitalize',
                       borderColor: '#133B6B',
                       color: '#133B6B',
@@ -461,7 +417,6 @@ const Login = () => {
           </Box>
         </Paper>
 
-        {/* Snackbar de éxito */}
         <Snackbar
           open={openSnackbar}
           autoHideDuration={3000}
