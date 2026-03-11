@@ -13,7 +13,6 @@ import AddCertificationModal from '../../../components/subirCertificacion/AddCer
 import { getMiExpediente } from '../../../services/expediente';
 import { getTodosApartados } from '../../../services/apartado';
 import { getProgramasPorApartadoActivos } from '../../../services/programas';
-
 import {
   Box,
   Grid,
@@ -203,48 +202,11 @@ const EditCertificationModal = ({
 // ========== COMPONENTE PRINCIPAL ==========
 const Certifications = () => {
   const { user } = useAuth(); 
-   const [idExpediente, setIdExpediente] = useState(null);
- useEffect(() => {
-  const cargar = async () => {
-    if (!user?.id) return;
-    try {
-      const exp = await getMiExpediente();
-      setIdExpediente(exp.id);
-    } catch (error) {
-      console.error('Error cargando expediente:', error);
-    }
-  };
-  cargar();
-}, [user?.id]);;// Asumiendo que tienes el usuario en contexto
-const [programasDisponibles, setProgramasDisponibles] = useState([]);
-
-useEffect(() => {
-  const cargarProgramas = async () => {
-    if (!user?.instanciaId) return;
-    try {
-      const todos = await getTodosApartados();
-      const globalesYDeInstancia = todos.filter(
-        a => !a.idInstancia || a.idInstancia === user.instanciaId
-      );
-
-      const programas = [];
-      for (const apartado of globalesYDeInstancia) {
-        try {
-          const progs = await getProgramasPorApartadoActivos(apartado.idApartado);
-          programas.push(...progs);
-        } catch (e) {
-          console.error(`Error cargando programas del apartado ${apartado.idApartado}:`, e);
-        }
-      }
-      // Agregar opción "Otros" al final
-      programas.push({ id: null, nombre: 'Otros' });
-      setProgramasDisponibles(programas);
-    } catch (error) {
-      console.error('Error cargando programas:', error);
-    }
-  };
-  cargarProgramas();
-}, [user?.instanciaId]);
+  const [idExpediente, setIdExpediente] = useState(null);
+  const [programasDisponibles, setProgramasDisponibles] = useState([]);
+  const [programasActivos, setProgramasActivos] = useState({});
+  const [apartados, setApartados] = useState([]);
+  const [apartadosActivos, setApartadosActivos] = useState({});
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
