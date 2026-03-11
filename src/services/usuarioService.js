@@ -335,6 +335,21 @@ async obtenerPerfilAgente(usuarioId) {
   }
 }
 
+
+// NUEVO MÉTODO - Solo actualiza perfil, sin crear expediente
+async actualizarPerfilAgente(usuarioId, perfilData) {
+  try {
+    const response = await API.put(
+      `/perfil-agente/${usuarioId}/actualizar`,
+      perfilData
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error en actualizarPerfilAgente:', error);
+    throw error.response?.data || { error: 'Error al actualizar el perfil' };
+  }
+}
+
 }
 
 
