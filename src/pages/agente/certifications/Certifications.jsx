@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { crearCertificacionCompleta } from '../../../services/certificaciones';
+import { 
+  crearCertificacionCompleta, 
+  
+  obtenerArchivoBlobCertificacion,
+  descargarArchivoCertificacion,
+  
+} from '../../../services/certificaciones';
 import { useAuth } from "../../../context/AuthContext";
 import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
+import { getMiExpediente } from '../../../services/expediente';
 // Agrega al import del service
 import { getCertificacionesPorExpediente, eliminarCertificacionCompleta ,editarCertificacionCompleta   } from '../../../services/certificaciones';
 import {
@@ -203,7 +210,20 @@ const EditCertificationModal = ({
 );
 
 const Certifications = () => {
-  const { user } = useAuth(); // Asumiendo que tienes el usuario en contexto
+  const { user } = useAuth(); 
+   const [idExpediente, setIdExpediente] = useState(null);
+ useEffect(() => {
+  const cargar = async () => {
+    if (!user?.id) return;
+    try {
+      const exp = await getMiExpediente();
+      setIdExpediente(exp.id);
+    } catch (error) {
+      console.error('Error cargando expediente:', error);
+    }
+  };
+  cargar();
+}, [user?.id]);;// Asumiendo que tienes el usuario en contexto
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -289,10 +309,11 @@ const Certifications = () => {
   // Datos de certificaciones - SOLO LAS DOS SOLICITADAS
  const [certifications, setCertifications] = useState([]);
 
- const idExpediente = 1; // ← ficticio por ahora
+
 
 useEffect(() => {
   const cargarCertificaciones = async () => {
+    if (!idExpediente) return;
     try {
       const data = await getCertificacionesPorExpediente(idExpediente);
       const mapped = data.map(cert => ({
@@ -331,7 +352,7 @@ useEffect(() => {
   };
 
   cargarCertificaciones();
-}, []);
+}, [idExpediente]);
 
   // Función para simular carga de archivo
   const simulateUpload = () => {
@@ -475,7 +496,7 @@ useEffect(() => {
     
     // PASO 2: Obtener IDs del contexto de autenticación
     const idInstancia = user?.instanciaId; // Ajusta según tu contexto
-    const idExpediente = 1; // Ajusta según tu contexto
+     
     const idPrograma = PROGRAMAS[nuevaCertificacion.subseccion] || PROGRAMAS.otros;
 
     // PASO 3: Llamar al servicio que crea la certificación completa

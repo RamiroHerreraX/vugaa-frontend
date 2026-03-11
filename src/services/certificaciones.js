@@ -37,6 +37,35 @@ export const editarCertificacionCompleta = async (data) => {
   return response.data;
 };
 
+
+
+export const obtenerArchivoBlobCertificacion = async (idCertExp) => {
+  const response = await API.get(
+    `certificaciones/${idCertExp}/archivo`,
+    { responseType: 'blob' }
+  );
+  return response.data;
+};
+
+export const descargarArchivoCertificacion = async (idCertExp, nombreArchivo) => {
+  const response = await API.get(
+    `certificaciones/${idCertExp}/archivo`,
+    { responseType: 'blob' }
+  );
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', nombreArchivo);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 export const eliminarCertificacionCompleta = async (idCertExp, idCertificacion) => {
-  await API.post(`${ENDPOINT}/completa/eliminar`, { idCertExp, idCertificacion });
+  const response = await API.post(`/certificaciones/completa/eliminar`, {
+    idCertExp,
+    idCertificacion
+  });
+  return response.data;
 };

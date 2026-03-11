@@ -7,7 +7,13 @@ import { getDocumentosPorApartado } from '../../../services/documentoExpediente'
 import { getMiExpediente } from '../../../services/expediente';
 import { getProgramasPorApartado } from '../../../services/programas';
 import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
-import { crearCertificacionCompleta } from '../../../services/certificaciones';
+import {
+  crearCertificacionCompleta,
+  getCertificacionesPorExpediente,
+  obtenerArchivoBlobCertificacion,
+  descargarArchivoCertificacion,
+  eliminarCertificacionCompleta
+} from '../../../services/certificaciones';
 
 import {
   Box,
@@ -37,7 +43,9 @@ import {
   MenuItem,
   Alert,
   Snackbar,
-  Tooltip
+  Tooltip,
+  Fade,
+  Zoom
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -68,7 +76,8 @@ import {
   Stop as StopIcon,
   Replay as ReplayIcon,
   Close as CloseIcon,
-  Folder as FolderIcon
+  Folder as FolderIcon,
+  AttachFile as AttachFileIcon
 } from '@mui/icons-material';
 
 const colors = {
@@ -97,6 +106,47 @@ const colors = {
     secondary: '#3A6EA5',
     light: '#6C5CE7'
   }
+};
+
+// ============================================================
+// COMPONENTE DE PROGRESO DE SUBIDA
+// ============================================================
+const UploadProgress = ({ progress, fileName, onComplete }) => {
+  useEffect(() => {
+    if (progress >= 100 && onComplete) {
+      const timer = setTimeout(onComplete, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [progress, onComplete]);
+
+  return (
+    <Fade in={progress > 0 && progress < 100}>
+      <Box sx={{ width: '100%', mt: 1, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <CloudUploadIcon sx={{ color: colors.primary.main, fontSize: '1rem' }} />
+          <Typography variant="caption" sx={{ color: colors.text.secondary, flex: 1 }}>
+            Subiendo: {fileName}
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 'bold', color: colors.primary.main }}>
+            {Math.round(progress)}%
+          </Typography>
+        </Box>
+        <LinearProgress
+          variant="determinate"
+          value={progress}
+          sx={{
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: '#e0e0e0',
+            '& .MuiLinearProgress-bar': {
+              backgroundColor: colors.primary.main,
+              transition: 'transform 0.2s linear'
+            }
+          }}
+        />
+      </Box>
+    </Fade>
+  );
 };
 
 // ============================================================
@@ -468,88 +518,109 @@ const Expediente = () => {
   const { user } = useAuth();
 
   // Estados nuevos:
-const [certModalOpen, setCertModalOpen] = useState(false);
-const [progSeleccionado, setProgSeleccionado] = useState(null);
-const [saving, setSaving] = useState(false);
-const [uploading, setUploading] = useState(false);
-const [uploadProgress, setUploadProgress] = useState(0);
-const [nuevaCertificacion, setNuevaCertificacion] = useState({
-  subseccion: '', tipoDocumento: '', institucion: '',
-  fecha: new Date().toISOString().split('T')[0],
-  horas: '', archivo: null, nombreArchivo: ''
-});
+  const [certModalOpen, setCertModalOpen] = useState(false);
+  const [progSeleccionado, setProgSeleccionado] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [nuevaCertificacion, setNuevaCertificacion] = useState({
+    subseccion: '', tipoDocumento: '', institucion: '',
+    fecha: new Date().toISOString().split('T')[0],
+    horas: '', archivo: null, nombreArchivo: ''
+  });
 
-// Handlers nuevos:
-const handleNuevaCertificacionChange = (campo) => (event) => {
-  setNuevaCertificacion(prev => ({ ...prev, [campo]: event.target.value }));
-};
+  // Estados para documentos subidos en programas
+  const [documentosProgramas, setDocumentosProgramas] = useState({});
 
-const handleCertFileChange = (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-  if (file.size > 10 * 1024 * 1024) {
-    setSnackbar({ open: true, message: 'El archivo no puede ser mayor a 10MB', severity: 'error' });
-    return;
-  }
-  const tiposPermitidos = ['application/pdf', 'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg', 'image/png'];
-  if (!tiposPermitidos.includes(file.type)) {
-    setSnackbar({ open: true, message: 'Formato no permitido. Use PDF, DOC, DOCX, JPG o PNG', severity: 'error' });
-    return;
-  }
-  setNuevaCertificacion(prev => ({ ...prev, archivo: file, nombreArchivo: file.name }));
-  // Simular progreso
-  setUploading(true);
-  setUploadProgress(0);
-  const interval = setInterval(() => {
-    setUploadProgress(prev => {
-      if (prev >= 100) { clearInterval(interval); setUploading(false); return 100; }
-      return prev + 10;
-    });
-  }, 300);
-};
+  // Handlers nuevos:
+  const handleNuevaCertificacionChange = (campo) => (event) => {
+    setNuevaCertificacion(prev => ({ ...prev, [campo]: event.target.value }));
+  };
 
-const handleGuardarCertDesdePrograma = async () => {
-  if (!nuevaCertificacion.tipoDocumento || !nuevaCertificacion.institucion ||
-      !nuevaCertificacion.horas || !nuevaCertificacion.archivo) {
-    setSnackbar({ open: true, message: 'Complete todos los campos requeridos', severity: 'warning' });
-    return;
-  }
-  setSaving(true);
-  try {
-    await crearCertificacionCompleta(
-      {
-        nombre:        nuevaCertificacion.tipoDocumento,
-        institucion:   nuevaCertificacion.institucion,
-        horas:         parseInt(nuevaCertificacion.horas),
-        fecha:         nuevaCertificacion.fecha,
-        nombreArchivo: nuevaCertificacion.nombreArchivo,
-        descripcion:   '',
-      },
-      user?.instanciaId,
-      expediente?.id,
-      progSeleccionado?.id,
-      nuevaCertificacion.archivo
-    );
-    setSnackbar({ open: true, message: 'Certificación agregada correctamente', severity: 'success' });
-    setCertModalOpen(false);
-    setProgSeleccionado(null);
-    setNuevaCertificacion({
-      subseccion: '', tipoDocumento: '', institucion: '',
-      fecha: new Date().toISOString().split('T')[0],
-      horas: '', archivo: null, nombreArchivo: ''
-    });
-  } catch (error) {
-    setSnackbar({
-      open: true,
-      message: error.response?.data?.message || 'Error al guardar la certificación',
-      severity: 'error'
-    });
-  } finally {
-    setSaving(false);
-  }
-};
+  const handleCertFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setSnackbar({ open: true, message: 'El archivo no puede ser mayor a 10MB', severity: 'error' });
+      return;
+    }
+    const tiposPermitidos = ['application/pdf', 'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg', 'image/png'];
+    if (!tiposPermitidos.includes(file.type)) {
+      setSnackbar({ open: true, message: 'Formato no permitido. Use PDF, DOC, DOCX, JPG o PNG', severity: 'error' });
+      return;
+    }
+    setNuevaCertificacion(prev => ({ ...prev, archivo: file, nombreArchivo: file.name }));
+    // Simular progreso
+    setUploading(true);
+    setUploadProgress(0);
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) { clearInterval(interval); setUploading(false); return 100; }
+        return prev + 10;
+      });
+    }, 300);
+  };
+
+  const handleGuardarCertDesdePrograma = async () => {
+    if (!nuevaCertificacion.tipoDocumento || !nuevaCertificacion.institucion ||
+        !nuevaCertificacion.horas || !nuevaCertificacion.archivo) {
+      setSnackbar({ open: true, message: 'Complete todos los campos requeridos', severity: 'warning' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const nuevoDoc = await crearCertificacionCompleta(
+        {
+          nombre:        nuevaCertificacion.tipoDocumento,
+          institucion:   nuevaCertificacion.institucion,
+          horas:         parseInt(nuevaCertificacion.horas),
+          fecha:         nuevaCertificacion.fecha,
+          nombreArchivo: nuevaCertificacion.nombreArchivo,
+          descripcion:   '',
+        },
+        user?.instanciaId,
+        expediente?.id,
+        progSeleccionado?.id,
+        nuevaCertificacion.archivo
+      );
+      
+      // Guardar el documento en el estado de documentosProgramas
+      if (progSeleccionado) {
+        setDocumentosProgramas(prev => ({
+          ...prev,
+          [progSeleccionado.id]: {
+             id: nuevoDoc.idCertExp,
+    idCertificacion: nuevoDoc.idCertificacion,
+    nombreArchivo: nuevoDoc.nombreArchivo || nuevaCertificacion.nombreArchivo,
+    nombre: nuevoDoc.nombreCertificacion || nuevaCertificacion.tipoDocumento,
+    institucion: nuevoDoc.institucion || nuevaCertificacion.institucion,
+    horas: nuevoDoc.horasAcreditadas || parseInt(nuevaCertificacion.horas),
+    fecha: nuevoDoc.fechaEmision || nuevaCertificacion.fecha,
+    idDocumentoSubido: nuevoDoc.mongoDocumentoId,
+          }
+        }));
+      }
+      
+      setSnackbar({ open: true, message: 'Certificación agregada correctamente', severity: 'success' });
+      setCertModalOpen(false);
+      setProgSeleccionado(null);
+      setNuevaCertificacion({
+        subseccion: '', tipoDocumento: '', institucion: '',
+        fecha: new Date().toISOString().split('T')[0],
+        horas: '', archivo: null, nombreArchivo: ''
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Error al guardar la certificación',
+        severity: 'error'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ── Estados principales ──────────────────────────────────
   const [expediente, setExpediente] = useState(null);
@@ -564,13 +635,13 @@ const handleGuardarCertDesdePrograma = async () => {
   const [pruebaVida, setPruebaVida] = useState({ videoArchivo: null, fechaGrabacion: null, estado: 'pendiente' });
 
   const handleClosePreview = () => {
-  if (previewDialog.objectUrl) URL.revokeObjectURL(previewDialog.objectUrl);
-  setPreviewDialog({ open: false, documento: null, nombre: '', tipo: '', seccion: '', loading: false, objectUrl: null });
-};
+    if (previewDialog.objectUrl) URL.revokeObjectURL(previewDialog.objectUrl);
+    setPreviewDialog({ open: false, documento: null, nombre: '', tipo: '', seccion: '', loading: false, objectUrl: null });
+  };
 
   const handleVideoCaptured = (videoFile) => {
     setPruebaVida({
-      videoFile: videoFile,
+      videoArchivo: videoFile,
       fechaGrabacion: new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       estado: 'completado'
     });
@@ -606,12 +677,13 @@ const handleGuardarCertDesdePrograma = async () => {
   const [validacionDialog, setValidacionDialog] = useState({ open: false, apartado: '', titulo: '', fecha: '' });
 
   const [uploadDialog, setUploadDialog] = useState({
-  open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '', idDocumentoPlantilla: null
-});
+    open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '', idDocumentoPlantilla: null,
+    uploading: false, progress: 0
+  });
 
   const [estadosValidacion, setEstadosValidacion] = useState({});
 
-  const [previewDialog, setPreviewDialog] = useState({ open: false, documento: null, nombre: '', tipo: '', seccion: '' });
+  const [previewDialog, setPreviewDialog] = useState({ open: false, documento: null, nombre: '', tipo: '', seccion: '', loading: false, objectUrl: null });
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false, seccion: '', subseccion: '', documentoId: null, tipo: '',
@@ -683,28 +755,53 @@ const handleGuardarCertDesdePrograma = async () => {
         setApartadosDinamicos(apartadosTransformados);
 
         // Cargar documentos ya subidos por el agente para cada apartado
-       if (expediente?.id) {
-  const subidosPorApartado = {};
-  await Promise.all(
-    globales.map(async (apartado) => {
-      try {
-        const docs = await getDocumentosSubidosPorApartado(expediente.id, apartado.idApartado);
-        if (docs?.length > 0) {
-          // Indexar por idDocumentoPlantilla
-          subidosPorApartado[apartado.idApartado] = {};
-          docs.forEach(doc => {
-            if (doc.idDocumentoPlantilla) {
-              subidosPorApartado[apartado.idApartado][doc.idDocumentoPlantilla] = doc;
-            }
-          });
-        }
-      } catch (error) {
-        console.error(`Error cargando docs subidos del apartado ${apartado.idApartado}:`, error);
+        if (expediente?.id) {
+          const subidosPorApartado = {};
+          await Promise.all(
+            globales.map(async (apartado) => {
+              try {
+                const docs = await getDocumentosSubidosPorApartado(expediente.id, apartado.idApartado);
+                console.log('docs subidos:', docs);
+                if (docs?.length > 0) {
+                  // Indexar por idDocumentoPlantilla
+                  subidosPorApartado[apartado.idApartado] = {};
+                  docs.forEach(doc => {
+                    if (doc.idDocumentoPlantilla) {
+                      subidosPorApartado[apartado.idApartado][doc.idDocumentoPlantilla] = doc;
+                    }
+                  });
+                }
+              } catch (error) {
+                console.error(`Error cargando docs subidos del apartado ${apartado.idApartado}:`, error);
+              }
+            })
+          );
+          setArchivosSubidos(subidosPorApartado);
+            try {
+    const certs = await getCertificacionesPorExpediente(expediente.id);
+    console.log('📦 RESPUESTA COMPLETA del backend:', JSON.stringify(certs, null, 2));
+     
+    const docsPrograma = {};
+    certs.forEach(cert => {
+      console.log('cert:', cert.idCertExp, 'idPrograma:', cert.idPrograma);
+      if (cert.idPrograma) {
+        docsPrograma[cert.idPrograma] = {
+          id: cert.idCertExp,
+          idCertificacion: cert.idCertificacion,
+          nombreArchivo: cert.nombreArchivo || cert.nombreCertificacion || 'documento',
+          nombre: cert.nombreCertificacion,
+          institucion: cert.institucion,
+          horas: cert.horasAcreditadas,
+          fecha: cert.fechaEmision,
+          idDocumentoSubido: cert.mongoDocumentoId,
+        };
       }
-    })
-  );
-  setArchivosSubidos(subidosPorApartado);
-}
+    });
+    setDocumentosProgramas(docsPrograma);
+  } catch (error) {
+    console.error('Error cargando certs de programas:', error);
+  }
+        }
       } catch (error) {
         console.error('Error cargando apartados:', error);
         setSnackbar({ open: true, message: 'Error al cargar los apartados', severity: 'error' });
@@ -807,57 +904,58 @@ const handleGuardarCertDesdePrograma = async () => {
   };
 
   const detectarTipoArchivo = (nombreArchivo) => {
-  const ext = nombreArchivo?.split('.').pop()?.toLowerCase();
-  if (ext === 'pdf') return 'pdf';
-  if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) return 'image';
-  if (['docx', 'xlsx', 'pptx'].includes(ext)) return 'office';
-  if (['txt', 'csv'].includes(ext)) return 'text';
-  if (ext === 'mp4') return 'video';
-  if (ext === 'mp3') return 'audio';
-  return 'unknown';
-};
+    const ext = nombreArchivo?.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return 'pdf';
+    if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) return 'image';
+    if (['docx', 'xlsx', 'pptx'].includes(ext)) return 'office';
+    if (['txt', 'csv'].includes(ext)) return 'text';
+    if (ext === 'mp4') return 'video';
+    if (ext === 'mp3') return 'audio';
+    return 'unknown';
+  };
 
-const handleVerDocumento = async (documento, seccion) => {
-  const nombre = documento.nombreOriginal || documento.nombreArchivo || documento.documento || 'documento';
+  const handleVerDocumento = async (documento, seccion) => {
+    const nombre = documento.nombreOriginal || documento.nombreArchivo || documento.documento || 'documento';
 
-  // Documentos locales (certificados/cumplimiento) — sin backend
-  if (!documento.idDocumentoSubido) {
-    setPreviewDialog({ open: true, documento: null, nombre, tipo: detectarTipoArchivo(nombre), seccion, loading: false, objectUrl: null });
-    return;
-  }
-
-  // Documentos desde MongoDB — abre modal con loading
-  setPreviewDialog({ open: true, documento: null, nombre, tipo: detectarTipoArchivo(nombre), seccion, loading: true, objectUrl: null });
-
-  try {
-    const blob = await obtenerArchivoBlob(documento.idDocumentoSubido);
-    const objectUrl = URL.createObjectURL(blob);
-    setPreviewDialog(prev => ({ ...prev, loading: false, objectUrl }));
-  } catch (error) {
-    console.error('Error al cargar vista previa:', error);
-    setSnackbar({ open: true, message: 'No se pudo cargar la vista previa', severity: 'error' });
-    setPreviewDialog(prev => ({ ...prev, loading: false }));
-  }
-};
-
-const handleDescargarDocumento = async (documento) => {
-  // Si tiene idDocumentoSubido es un doc subido por el agente → descarga real desde Mongo
-  if (documento.idDocumentoSubido) {
-    try {
-      setSnackbar({ open: true, message: 'Descargando archivo...', severity: 'info' });
-      await descargarArchivo(documento.idDocumentoSubido, documento.nombreOriginal);
-      setSnackbar({ open: true, message: 'Archivo descargado correctamente', severity: 'success' });
-    } catch (error) {
-      console.error('Error al descargar:', error);
-      setSnackbar({ open: true, message: 'Error al descargar el archivo', severity: 'error' });
+    // Documentos locales (certificados/cumplimiento) — sin backend
+    if (!documento.idDocumentoSubido) {
+      setPreviewDialog({ open: true, documento: null, nombre, tipo: detectarTipoArchivo(nombre), seccion, loading: false, objectUrl: null });
+      return;
     }
-    return;
-  }
 
-  // Documentos locales (certificados, cumplimiento) → comportamiento anterior
-  setSnackbar({ open: true, message: `Descargando ${documento.nombreArchivo || documento.nombreOriginal}...`, severity: 'info' });
-  setTimeout(() => setSnackbar({ open: true, message: 'Documento descargado correctamente', severity: 'success' }), 1000);
-};
+    // Documentos desde MongoDB — abre modal con loading
+    setPreviewDialog({ open: true, documento: null, nombre, tipo: detectarTipoArchivo(nombre), seccion, loading: true, objectUrl: null });
+
+    try {
+      const blob = await obtenerArchivoBlob(documento.idDocumentoSubido);
+      const objectUrl = URL.createObjectURL(blob);
+      setPreviewDialog(prev => ({ ...prev, loading: false, objectUrl }));
+    } catch (error) {
+      console.error('Error al cargar vista previa:', error);
+      setSnackbar({ open: true, message: 'No se pudo cargar la vista previa', severity: 'error' });
+      setPreviewDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleDescargarDocumento = async (documento) => {
+    // Si tiene idDocumentoSubido es un doc subido por el agente → descarga real desde Mongo
+    if (documento.idDocumentoSubido) {
+      try {
+        setSnackbar({ open: true, message: 'Descargando archivo...', severity: 'info' });
+        await descargarArchivo(documento.idDocumentoSubido, documento.nombreOriginal);
+        setSnackbar({ open: true, message: 'Archivo descargado correctamente', severity: 'success' });
+      } catch (error) {
+        console.error('Error al descargar:', error);
+        setSnackbar({ open: true, message: 'Error al descargar el archivo', severity: 'error' });
+      }
+      return;
+    }
+
+    // Documentos locales (certificados, cumplimiento) → comportamiento anterior
+    setSnackbar({ open: true, message: `Descargando ${documento.nombreArchivo || documento.nombreOriginal}...`, severity: 'info' });
+    setTimeout(() => setSnackbar({ open: true, message: 'Documento descargado correctamente', severity: 'success' }), 1000);
+  };
+  
   const handleEliminarDocumento = (seccion, documentoId, documento, itemName, horas = 0, index = null) => {
     setDeleteDialog({ open: true, seccion, documentoId, tipo: 'documento', nombre: documento.nombreArchivo || documento.documento || documento.nombre, horas, itemName, itemIndex: index });
   };
@@ -877,8 +975,23 @@ const handleDescargarDocumento = async (documento) => {
     });
   };
 
+  // Eliminar documento de programa
+ const handleEliminarDocumentoPrograma = (programaId, documento) => {
+  setDeleteDialog({
+    open: true,
+    seccion: 'programa',                    // ← debe ser literal 'programa'
+    subseccion: documento.idCertificacion,  // ← el idCertificacion va aquí
+    documentoId: documento.id,              // ← idCertExp
+    tipo: 'programa',
+    nombre: documento.nombreArchivo || documento.nombre,
+    horas: 0,
+    itemName: '',
+    itemIndex: programaId                   // ← para borrar del estado después
+  });
+};
+
   const handleConfirmarEliminacion = async () => {
-    const { seccion, documentoId, horas, itemName, itemIndex } = deleteDialog;
+    const { seccion, documentoId, horas, itemName, itemIndex, subseccion } = deleteDialog;
 
     if (seccion === 'formacionEtica') {
       setCertificadosData(prev => {
@@ -899,19 +1012,37 @@ const handleDescargarDocumento = async (documento) => {
       try {
         await eliminarDocumentoSubido(documentoId);
         const idApartado = itemIndex;
-        const idPlantilla = deleteDialog.subseccion;
+        const idPlantilla = subseccion;
         setArchivosSubidos(prev => {
-  const apartadoDocs = { ...(prev[idApartado] || {}) };
-  delete apartadoDocs[idPlantilla];
-  return { ...prev, [idApartado]: apartadoDocs };
-});
+          const apartadoDocs = { ...(prev[idApartado] || {}) };
+          delete apartadoDocs[idPlantilla];
+          return { ...prev, [idApartado]: apartadoDocs };
+        });
       } catch (error) {
         console.error('Error al eliminar documento:', error);
         setSnackbar({ open: true, message: 'Error al eliminar el documento', severity: 'error' });
         setDeleteDialog({ open: false, seccion: '', subseccion: '', documentoId: null, tipo: '', nombre: '', horas: 0, itemName: '', itemIndex: null });
         return;
       }
-    }
+    } else if (seccion === 'programa') {
+      try {
+    await eliminarCertificacionCompleta(documentoId, subseccion);
+    const programaId = itemIndex;
+    setDocumentosProgramas(prev => {
+      const newDocs = { ...prev };
+      delete newDocs[programaId];
+      return newDocs;
+    });
+  } catch (error) {
+    console.error('Error al eliminar certificación:', error);
+    setSnackbar({ open: true, message: 'Error al eliminar la certificación', severity: 'error' });
+    setDeleteDialog({ open: false, seccion: '', subseccion: '', documentoId: null, tipo: '', nombre: '', horas: 0, itemName: '', itemIndex: null });
+    return;
+  }
+}
+
+
+
 
     setSnackbar({ open: true, message: 'Documento eliminado correctamente', severity: 'success' });
     setDeleteDialog({ open: false, seccion: '', subseccion: '', documentoId: null, tipo: '', nombre: '', horas: 0, itemName: '', itemIndex: null });
@@ -921,16 +1052,18 @@ const handleDescargarDocumento = async (documento) => {
   const handleDescripcionChange = (tipo, valor) => setCumplimientoData({ ...cumplimientoData, [tipo]: { ...cumplimientoData[tipo], descripcion: valor } });
   const handleVigenciaChange = (tipo, valor) => setCumplimientoData({ ...cumplimientoData, [tipo]: { ...cumplimientoData[tipo], vigencia: valor } });
 
- const handleOpenUploadDialog = (tipo, titulo, idDocumentoPlantilla = null) => {
-  setUploadDialog({ 
-    open: true, 
-    tipo, 
-    titulo, 
-    archivo: null, 
-    nombreArchivo: '',
-    idDocumentoPlantilla  // ← nuevo campo
-  });
-};
+  const handleOpenUploadDialog = (tipo, titulo, idDocumentoPlantilla = null) => {
+    setUploadDialog({ 
+      open: true, 
+      tipo, 
+      titulo, 
+      archivo: null, 
+      nombreArchivo: '',
+      idDocumentoPlantilla,
+      uploading: false,
+      progress: 0
+    });
+  };
 
   const handleCumplimientoFileSelect = (event) => {
     const file = event.target.files[0];
@@ -944,6 +1077,20 @@ const handleDescargarDocumento = async (documento) => {
   const handleGuardarDocumentoCumplimiento = async () => {
     if (!uploadDialog.archivo) return;
 
+    // Mostrar progreso de subida
+    setUploadDialog(prev => ({ ...prev, uploading: true, progress: 0 }));
+    
+    // Simular progreso (en producción, esto vendría del servicio real)
+    const progressInterval = setInterval(() => {
+      setUploadDialog(prev => {
+        if (prev.progress >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return { ...prev, progress: prev.progress + 10 };
+      });
+    }, 200);
+
     // ── Apartado dinámico ──────────────────────────────────
     if (uploadDialog.tipo?.startsWith('apartado_')) {
       const idApartado = parseInt(uploadDialog.tipo.replace('apartado_', ''));
@@ -954,35 +1101,64 @@ const handleDescargarDocumento = async (documento) => {
           idApartado: idApartado,
           idDocumentoPlantilla: uploadDialog.idDocumentoPlantilla,
           nombreOriginal: uploadDialog.archivo.name,
-          
-          
           requiereValidacion: true,
           usuarioCarga: user.id,
         };
+        
+        // Completar progreso
+        clearInterval(progressInterval);
+        setUploadDialog(prev => ({ ...prev, progress: 100 }));
+        
         const documentoGuardado = await subirDocumento(payload, uploadDialog.archivo);
-        setArchivosSubidos(prev => ({
-  ...prev,
-  [idApartado]: {
-    ...(prev[idApartado] || {}),
-    [uploadDialog.idDocumentoPlantilla]: documentoGuardado  // ← indexado por plantilla
-  }
-}));
-        setSnackbar({ open: true, message: `Documento "${uploadDialog.archivo.name}" subido correctamente`, severity: 'success' });
+        
+        setTimeout(() => {
+          setArchivosSubidos(prev => ({
+            ...prev,
+            [idApartado]: {
+              ...(prev[idApartado] || {}),
+              [uploadDialog.idDocumentoPlantilla]: documentoGuardado
+            }
+          }));
+          setSnackbar({ open: true, message: `Documento "${uploadDialog.archivo.name}" subido correctamente`, severity: 'success' });
+          setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '', uploading: false, progress: 0 });
+        }, 500);
       } catch (error) {
+        clearInterval(progressInterval);
         console.error('Error al subir documento:', error);
         setSnackbar({ open: true, message: 'Error al subir el documento', severity: 'error' });
+        setUploadDialog(prev => ({ ...prev, uploading: false, progress: 0 }));
       }
-      setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '' });
       return;
     }
 
     // ── Cumplimiento organizacional ────────────────────────
     const tipo = uploadDialog.tipo;
-    const nuevoDocumento = { id: Date.now(), nombreArchivo: uploadDialog.nombreArchivo, archivo: uploadDialog.archivo, fechaSubida: new Date().toLocaleDateString('es-MX') };
-    setCumplimientoData(prev => ({ ...prev, [tipo]: { ...prev[tipo], documento: nuevoDocumento.archivo, estado: 'pendiente', fechaRevision: nuevoDocumento.fechaSubida, nombreDocumento: nuevoDocumento.nombreArchivo } }));
-    reiniciarEstadoValidacion('cumplimiento_organizacional');
-    setSnackbar({ open: true, message: `Documento "${uploadDialog.nombreArchivo}" subido correctamente`, severity: 'success' });
-    setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '' });
+    const nuevoDocumento = { 
+      id: Date.now(), 
+      nombreArchivo: uploadDialog.nombreArchivo, 
+      archivo: uploadDialog.archivo, 
+      fechaSubida: new Date().toLocaleDateString('es-MX') 
+    };
+    
+    // Completar progreso
+    clearInterval(progressInterval);
+    setUploadDialog(prev => ({ ...prev, progress: 100 }));
+    
+    setTimeout(() => {
+      setCumplimientoData(prev => ({ 
+        ...prev, 
+        [tipo]: { 
+          ...prev[tipo], 
+          documento: nuevoDocumento.archivo, 
+          estado: 'pendiente', 
+          fechaRevision: nuevoDocumento.fechaSubida, 
+          nombreDocumento: nuevoDocumento.nombreArchivo 
+        } 
+      }));
+      reiniciarEstadoValidacion('cumplimiento_organizacional');
+      setSnackbar({ open: true, message: `Documento "${uploadDialog.nombreArchivo}" subido correctamente`, severity: 'success' });
+      setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '', uploading: false, progress: 0 });
+    }, 500);
   };
 
   const handleVerDocumentoCumplimiento = (tipo) => {
@@ -1012,321 +1188,389 @@ const handleDescargarDocumento = async (documento) => {
   // ============================================================
   // RENDER APARTADO DINÁMICO
   // ============================================================
-  const renderApartadoDinamico = (apartado) => {
-    return (
-      <Accordion
-        key={apartado.id}
-        expanded={expanded === apartado.id}
-        onChange={handleAccordionChange(apartado.id)}
-        sx={{ mb: 2, border: '2px solid', borderColor: apartado.obligatorio ? colors.status.warning : colors.primary.light, borderRadius: '8px !important', '&:before': { display: 'none' } }}
-      >
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', backgroundColor: apartado.esGlobal ? '#f3e5f5' : '#e3f2fd', color: apartado.esGlobal ? colors.accents.purple : colors.primary.main }}>
-              {getIconForApartado(apartado.icono)}
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography sx={{ fontWeight: '700', color: colors.text.primary }}>{apartado.nombre}</Typography>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                {apartado.descripcion && <Typography variant="caption" sx={{ color: colors.text.secondary }}>{apartado.descripcion}</Typography>}
-                {apartado.esGlobal && <Chip label="Global" size="small" sx={{ height: '18px', fontSize: '0.6rem', backgroundColor: colors.accents.purple, color: 'white' }} />}
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {apartado.obligatorio && <Chip label="Obligatorio" size="small" color="error" sx={{ height: '20px', fontSize: '0.65rem' }} />}
-              <Chip
-                label={`${(Object.keys(archivosSubidos[apartado.idApartado] || {}).length)} subidos`}
-                size="small"
-                color={Object.keys(archivosSubidos[apartado.idApartado] || {}).length > 0 ? "success" : "default"}
-                sx={{ height: '24px' }}
-              />
+  // ============================================================
+// RENDER APARTADO DINÁMICO (solo la sección de programas corregida)
+// ============================================================
+const renderApartadoDinamico = (apartado) => {
+  return (
+    <Accordion
+      key={apartado.id}
+      expanded={expanded === apartado.id}
+      onChange={handleAccordionChange(apartado.id)}
+      sx={{ mb: 2, border: '2px solid', borderColor: apartado.obligatorio ? colors.status.warning : colors.primary.light, borderRadius: '8px !important', '&:before': { display: 'none' } }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', backgroundColor: apartado.esGlobal ? '#f3e5f5' : '#e3f2fd', color: apartado.esGlobal ? colors.accents.purple : colors.primary.main }}>
+            {getIconForApartado(apartado.icono)}
+          </Box>
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography sx={{ fontWeight: '700', color: colors.text.primary }}>{apartado.nombre}</Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              {apartado.descripcion && <Typography variant="caption" sx={{ color: colors.text.secondary }}>{apartado.descripcion}</Typography>}
+              {apartado.esGlobal && <Chip label="Global" size="small" sx={{ height: '18px', fontSize: '0.6rem', backgroundColor: colors.accents.purple, color: 'white' }} />}
             </Box>
           </Box>
-        </AccordionSummary>
-
-        <AccordionDetails sx={{ pt: 2, pb: 3 }}>
-
-          {/* ── Plantillas de documentos configurados ── */}
-          {apartado.documentos?.length > 0 ? (
-  <List sx={{ p: 0, mb: 2 }}>
-    {apartado.documentos.map((doc) => {
-      const docSubido = archivosSubidos[apartado.idApartado]?.[doc.idDocumento];
-
-      return (
-        <ListItem
-          key={doc.idDocumento}
-          sx={{
-            p: 2, mb: 1.5, borderRadius: 2,
-            backgroundColor: '#fff',
-            border: `1px solid ${docSubido ? colors.status.success + '40' : colors.primary.main + '20'}`,
-            borderLeft: `4px solid ${docSubido ? colors.status.success : colors.primary.main}`,
-            alignItems: 'flex-start',
-            flexDirection: 'column',  // ← columna para mostrar info + acciones abajo
-          }}
-        >
-          {/* Nombre del documento plantilla */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', mb: docSubido ? 1.5 : 0 }}>
-            <Box sx={{
-              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-              backgroundColor: docSubido ? '#e8f5e9' : `${colors.primary.main}10`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: docSubido ? colors.status.success : colors.primary.main
-            }}>
-              {docSubido ? <CheckCircleIcon fontSize="small" /> : <DescriptionIcon fontSize="small" />}
-            </Box>
-
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: '700', color: colors.text.primary }}>
-                {doc.nombreArchivo}
-              </Typography>
-              {doc.descripcion && (
-                <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-                  {doc.descripcion}
-                </Typography>
-              )}
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              {doc.formatoEsperado && (
-                <Chip label={doc.formatoEsperado} size="small" sx={{ height: '20px', fontSize: '0.65rem', backgroundColor: `${colors.primary.main}15`, color: colors.primary.main }} />
-              )}
-              {doc.obligatorio && (
-                <Chip label="Obligatorio" size="small" color="error" sx={{ height: '20px', fontSize: '0.65rem' }} />
-              )}
-            </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {apartado.obligatorio && <Chip label="Obligatorio" size="small" color="error" sx={{ height: '20px', fontSize: '0.65rem' }} />}
+            <Chip
+              label={`${Object.keys(archivosSubidos[apartado.idApartado] || {}).length} subidos`}
+              size="small"
+              color={Object.keys(archivosSubidos[apartado.idApartado] || {}).length > 0 ? "success" : "default"}
+              sx={{ height: '24px' }}
+            />
           </Box>
+        </Box>
+      </AccordionSummary>
 
-          {/* Archivo subido o botón de subir */}
-          {docSubido ? (
-            <Box sx={{
-              display: 'flex', alignItems: 'center', gap: 1,
-              width: '100%', pl: 5,  // alineado con el texto
-              p: 1.5, borderRadius: 1,
-              backgroundColor: '#f1f8f1',
-              border: `1px solid ${colors.status.success}30`
-            }}>
-              <FilePresentIcon sx={{ color: colors.status.success, fontSize: '1rem' }} />
-              <Typography variant="caption" sx={{ fontWeight: '600', color: colors.text.primary, flex: 1 }}>
-                {docSubido.nombreOriginal}
-              </Typography>
-              <Chip
-                label={docSubido.estadoValidacion || 'PENDIENTE'}
-                size="small"
-                color="warning"
-                sx={{ height: '18px', fontSize: '0.6rem' }}
-              />
-              <Stack direction="row" spacing={0.5}>
-                <Tooltip title="Ver" arrow>
-                  <IconButton size="small" onClick={() => handleVerDocumento(docSubido, apartado.nombre)}
-                    sx={{ color: colors.primary.main, backgroundColor: `${colors.primary.main}15` }}>
-                    <VisibilityIcon sx={{ fontSize: '0.9rem' }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Descargar" arrow>
-                  <IconButton size="small" onClick={() => handleDescargarDocumento(docSubido)}
-                    sx={{ color: colors.status.success, backgroundColor: '#e8f5e9' }}>
-                    <DownloadIcon sx={{ fontSize: '0.9rem' }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Eliminar" arrow>
-                  <IconButton size="small" onClick={() => handleEliminarDocumentoSubido(docSubido, apartado.idApartado)}
-                    sx={{ color: colors.status.error, backgroundColor: '#ffebee' }}>
-                    <DeleteIcon sx={{ fontSize: '0.9rem' }} />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
-            </Box>
-          ) : (
-            <Box sx={{ pl: 5, width: '100%' }}>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<CloudUploadIcon />}
-                onClick={() => handleOpenUploadDialog(
-                  apartado.id,
-                  doc.nombreArchivo,
-                  doc.idDocumento  // ← pasamos el idDocumentoPlantilla
-                )}
-                sx={{ textTransform: 'none', fontSize: '0.8rem', color: colors.primary.main, borderColor: colors.primary.main }}
-              >
-                Subir {doc.nombreArchivo}
-              </Button>
-            </Box>
-          )}
-        </ListItem>
-      );
-    })}
-  </List>
-) : (
-  <Alert severity="info" sx={{ mb: 2 }}>No hay documentos configurados en este apartado</Alert>
-)}
+      <AccordionDetails sx={{ pt: 2, pb: 3 }}>
 
-          {/* ── Documentos subidos por el agente ── */}
-          {archivosSubidos[apartado.idApartado]?.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" sx={{ color: colors.text.secondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
-                Documentos subidos por ti
-              </Typography>
-              <List sx={{ p: 0 }}>
-                {archivosSubidos[apartado.idApartado].map((doc) => (
-                  <ListItem
-                    key={doc.idDocumentoSubido}
-                    sx={{ p: 2, mb: 1.5, borderRadius: 2, backgroundColor: '#fff', border: `1px solid ${colors.status.success}30`, borderLeft: `4px solid ${colors.status.success}`, alignItems: 'flex-start', transition: 'all 0.2s', '&:hover': { boxShadow: 2, transform: 'translateX(2px)' } }}
-                    secondaryAction={
-                      <Stack direction="row" spacing={1}>
-                        <Tooltip title="Ver documento" arrow>
-                          <IconButton size="small" onClick={() => handleVerDocumento(doc, apartado.nombre)} sx={{ color: colors.primary.main, backgroundColor: `${colors.primary.main}15`, '&:hover': { backgroundColor: `${colors.primary.main}25` } }}>
-                            <VisibilityIcon fontSize="small" />
+        {/* ── Plantillas de documentos configurados ── */}
+        {apartado.documentos?.length > 0 ? (
+          <List sx={{ p: 0, mb: 2 }}>
+            {apartado.documentos.map((doc) => {
+              const docSubido = archivosSubidos[apartado.idApartado]?.[doc.idDocumento];
+
+              return (
+                <ListItem
+                  key={doc.idDocumento}
+                  sx={{
+                    p: 2, mb: 1.5, borderRadius: 2,
+                    backgroundColor: '#fff',
+                    border: `1px solid ${docSubido ? colors.status.success + '40' : colors.primary.main + '20'}`,
+                    borderLeft: `4px solid ${docSubido ? colors.status.success : colors.primary.main}`,
+                    alignItems: 'flex-start',
+                    flexDirection: 'column',
+                  }}
+                >
+                  {/* Nombre del documento plantilla */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', mb: docSubido ? 1.5 : 0 }}>
+                    <Box sx={{
+                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                      backgroundColor: docSubido ? '#e8f5e9' : `${colors.primary.main}10`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: docSubido ? colors.status.success : colors.primary.main
+                    }}>
+                      {docSubido ? <CheckCircleIcon fontSize="small" /> : <DescriptionIcon fontSize="small" />}
+                    </Box>
+
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: '700', color: colors.text.primary }}>
+                        {doc.nombreArchivo}
+                      </Typography>
+                      {doc.descripcion && (
+                        <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+                          {doc.descripcion}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      {doc.formatoEsperado && (
+                        <Chip label={doc.formatoEsperado} size="small" sx={{ height: '20px', fontSize: '0.65rem', backgroundColor: `${colors.primary.main}15`, color: colors.primary.main }} />
+                      )}
+                      {doc.obligatorio && (
+                        <Chip label="Obligatorio" size="small" color="error" sx={{ height: '20px', fontSize: '0.65rem' }} />
+                      )}
+                    </Box>
+                  </Box>
+
+                  {/* Archivo subido o botón de subir */}
+                  {docSubido ? (
+                    <Box sx={{
+                      display: 'flex', alignItems: 'center', gap: 1,
+                      width: '100%', pl: 5,
+                      p: 1.5, borderRadius: 1,
+                      backgroundColor: '#f1f8f1',
+                      border: `1px solid ${colors.status.success}30`
+                    }}>
+                      <FilePresentIcon sx={{ color: colors.status.success, fontSize: '1rem' }} />
+                      <Typography variant="caption" sx={{ fontWeight: '600', color: colors.text.primary, flex: 1 }}>
+                        {docSubido.nombreOriginal}
+                      </Typography>
+                      <Chip
+                        label={docSubido.estadoValidacion || 'PENDIENTE'}
+                        size="small"
+                        color="warning"
+                        sx={{ height: '18px', fontSize: '0.6rem' }}
+                      />
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Ver" arrow>
+                          <IconButton size="small" onClick={() => handleVerDocumento(docSubido, apartado.nombre)}
+                            sx={{ color: colors.primary.main, backgroundColor: `${colors.primary.main}15` }}>
+                            <VisibilityIcon sx={{ fontSize: '0.9rem' }} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Descargar" arrow>
-                          <IconButton size="small" onClick={() => handleDescargarDocumento(doc)} sx={{ color: colors.status.success, backgroundColor: '#e8f5e9', '&:hover': { backgroundColor: '#c8e6c9' } }}>
-                            <DownloadIcon fontSize="small" />
+                          <IconButton size="small" onClick={() => handleDescargarDocumento(docSubido)}
+                            sx={{ color: colors.status.success, backgroundColor: '#e8f5e9' }}>
+                            <DownloadIcon sx={{ fontSize: '0.9rem' }} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Eliminar" arrow>
-                          <IconButton size="small" onClick={() => handleEliminarDocumentoSubido(doc, apartado.idApartado)} sx={{ color: colors.status.error, backgroundColor: '#ffebee', '&:hover': { backgroundColor: '#ffcdd2' } }}>
-                            <DeleteIcon fontSize="small" />
+                          <IconButton size="small" onClick={() => handleEliminarDocumentoSubido(docSubido, apartado.idApartado)}
+                            sx={{ color: colors.status.error, backgroundColor: '#ffebee' }}>
+                            <DeleteIcon sx={{ fontSize: '0.9rem' }} />
                           </IconButton>
                         </Tooltip>
                       </Stack>
-                    }
-                  >
-                    <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
-                      <Box sx={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.status.success }}>
-                        <CheckCircleIcon fontSize="small" />
-                      </Box>
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontWeight: '700', color: colors.text.primary }}>{doc.nombreOriginal}</Typography>
-                          <Chip label={doc.estadoValidacion || 'PENDIENTE'} size="small" color="warning" sx={{ height: '20px', fontSize: '0.65rem', fontWeight: '600' }} />
-                        </Box>
-                      }
-                      secondary={
-                        <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-                          Subido: {doc.fechaCarga ? new Date(doc.fechaCarga).toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX')}
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
+                    </Box>
+                  ) : (
+                    <Box sx={{ pl: 5, width: '100%' }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<CloudUploadIcon />}
+                        onClick={() => handleOpenUploadDialog(
+                          `apartado_${apartado.idApartado}`,
+                          doc.nombreArchivo,
+                          doc.idDocumento
+                        )}
+                        sx={{ textTransform: 'none', fontSize: '0.8rem', color: colors.primary.main, borderColor: colors.primary.main }}
+                      >
+                        Subir {doc.nombreArchivo}
+                      </Button>
+                    </Box>
+                  )}
+                </ListItem>
+              );
+            })}
+          </List>
+        ) : (
+          // No mostrar mensaje de "No hay documentos configurados" inicialmente
+          null
+        )}
 
-          {/* ── Sin documentos aún ── */}
-          {!archivosSubidos[apartado.idApartado]?.length && apartado.documentos?.length === 0 && (
-            <Alert severity="info" sx={{ mb: 2 }}>No hay documentos configurados en este apartado</Alert>
-          )}
-
-          {/* ── Programas del apartado ── */}
-{/* ── Programas del apartado ── */}
-{apartado.programas?.length > 0 && (
-  <Box sx={{ mb: 2 }}>
-    <Typography variant="caption" sx={{ 
-      color: colors.text.secondary, fontWeight: '600', 
-      textTransform: 'uppercase', letterSpacing: 0.5, 
-      display: 'block', mb: 1 
-    }}>
-      Programas requeridos
-    </Typography>
-    <List sx={{ p: 0 }}>
-      {apartado.programas.map((prog) => (
-        <ListItem
-          key={prog.id}
-          sx={{
-            p: 2, 
-            mb: 1, 
-            borderRadius: 2,
-            backgroundColor: '#fff',
-            border: `1px solid ${colors.accents.purple}20`,
-            borderLeft: `4px solid ${colors.accents.purple}`,
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 36 }}>
-            <Box sx={{ 
-              width: 28, 
-              height: 28, 
-              borderRadius: '50%',
-              backgroundColor: `${colors.accents.purple}15`,
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              color: colors.accents.purple
+        {/* ── Programas del apartado con más datos ── */}
+        {apartado.programas?.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="caption" sx={{ 
+              color: colors.text.secondary, fontWeight: '600', 
+              textTransform: 'uppercase', letterSpacing: 0.5, 
+              display: 'block', mb: 1 
             }}>
-              <SchoolIcon sx={{ fontSize: '0.9rem' }} />
-            </Box>
-          </ListItemIcon>
-          
-          <ListItemText
-            primary={
-              <Typography variant="body2" sx={{ fontWeight: '700', color: colors.text.primary }}>
-                {prog.nombre}
-              </Typography>
-            }
-            secondary={
-              prog.descripcion && (
-                <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-                  {prog.descripcion}
-                  {prog.horasRequeridas ? ` • ${prog.horasRequeridas} hrs requeridas` : ''}
-                </Typography>
-              )
-            }
-          />
-          
-          {prog.horasRequeridas && (
-            <Chip 
-              label={`${prog.horasRequeridas} hrs`} 
-              size="small" 
-              sx={{ 
-                height: '20px', 
-                fontSize: '0.65rem', 
-                backgroundColor: `${colors.accents.purple}15`, 
-                color: colors.accents.purple,
-                mr: 1
-              }} 
-            />
-          )}
-          
-          {/* Botón Subir - AHORA DENTRO DEL ListItem */}
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem' }} />}
-            onClick={() => { 
-              setProgSeleccionado(prog); 
-              setCertModalOpen(true); 
-            }}
-            sx={{
-              textTransform: 'none', 
-              fontSize: '0.75rem',
-              bgcolor: colors.accents.purple,
-              '&:hover': { bgcolor: '#5a4bd1' },
-              height: '28px', 
-              px: 1.5, 
-              flexShrink: 0
-            }}
-          >
-            Subir
-          </Button>
-        </ListItem>
-      ))}
-    </List>
-  </Box>
-)}
+              Programas requeridos
+            </Typography>
+            <List sx={{ p: 0 }}>
+              {apartado.programas.map((prog) => {
+                const docPrograma = documentosProgramas[prog.id];
+                
+                return (
+                  <Box key={prog.id}>
+                    <ListItem
+                      sx={{
+                        p: 2, 
+                        mb: 1, 
+                        borderRadius: 2,
+                        backgroundColor: '#fff',
+                        border: `1px solid ${docPrograma ? colors.status.success + '40' : colors.accents.purple + '20'}`,
+                        borderLeft: `4px solid ${docPrograma ? colors.status.success : colors.accents.purple}`,
+                        flexDirection: 'column',
+                        alignItems: 'flex-start'
+                      }}
+                    >
+                      {/* Información del programa */}
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, width: '100%' }}>
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <Box sx={{ 
+                            width: 28, 
+                            height: 28, 
+                            borderRadius: '50%',
+                            backgroundColor: docPrograma ? '#e8f5e9' : `${colors.accents.purple}15`,
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            color: docPrograma ? colors.status.success : colors.accents.purple
+                          }}>
+                            <SchoolIcon sx={{ fontSize: '0.9rem' }} />
+                          </Box>
+                        </ListItemIcon>
+                        
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: '700', color: colors.text.primary }}>
+                            {prog.nombre}
+                          </Typography>
+                          {prog.descripcion && (
+                            <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block' }}>
+                              {prog.descripcion}
+                            </Typography>
+                          )}
+                          <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                            {prog.horasRequeridas && (
+                              <Chip 
+                                label={`${prog.horasRequeridas} hrs requeridas`} 
+                                size="small" 
+                                sx={{ 
+                                  height: '20px', 
+                                  fontSize: '0.65rem', 
+                                  backgroundColor: `${colors.accents.purple}15`, 
+                                  color: colors.accents.purple
+                                }} 
+                              />
+                            )}
+                            {prog.modalidad && (
+                              <Chip 
+                                label={prog.modalidad} 
+                                size="small" 
+                                sx={{ 
+                                  height: '20px', 
+                                  fontSize: '0.65rem', 
+                                  backgroundColor: '#f5f5f5', 
+                                  color: colors.text.secondary
+                                }} 
+                              />
+                            )}
+                            {prog.duracion && (
+                              <Chip 
+                                label={prog.duracion} 
+                                size="small" 
+                                sx={{ 
+                                  height: '20px', 
+                                  fontSize: '0.65rem', 
+                                  backgroundColor: '#f5f5f5', 
+                                  color: colors.text.secondary
+                                }} 
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                        
+                        {!docPrograma && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem' }} />}
+                            onClick={() => { 
+                              setProgSeleccionado(prog); 
+                              setCertModalOpen(true); 
+                            }}
+                            sx={{
+                              textTransform: 'none', 
+                              fontSize: '0.75rem',
+                              bgcolor: colors.accents.purple,
+                              '&:hover': { bgcolor: '#5a4bd1' },
+                              height: '28px', 
+                              px: 1.5, 
+                              flexShrink: 0
+                            }}
+                          >
+                            Subir
+                          </Button>
+                        )}
+                      </Box>
 
-          {/* ── Botón subir ── */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1, borderTop: `1px solid ${colors.primary.main}10` }}>
-            <Button variant="outlined" startIcon={<CloudUploadIcon />} onClick={() => handleOpenUploadDialog(apartado.id, apartado.nombre)} sx={{ textTransform: 'none', color: colors.primary.main, borderColor: colors.primary.main, '&:hover': { backgroundColor: `${colors.primary.main}08` } }}>
-              Subir Documento
-            </Button>
+                      {/* Documento subido (si existe) - con correcciones */}
+                      {docPrograma && (
+                        <Box sx={{
+                          display: 'flex', alignItems: 'center', gap: 1,
+                          width: '100%', pl: 5, mt: 1.5,
+                          p: 1.5, borderRadius: 1,
+                          backgroundColor: '#f1f8f1',
+                          border: `1px solid ${colors.status.success}30`
+                        }}>
+                          <FilePresentIcon sx={{ color: colors.status.success, fontSize: '1rem' }} />
+                          <Typography variant="caption" sx={{ fontWeight: '600', color: colors.text.primary, flex: 1 }}>
+                            {docPrograma.nombreArchivo}
+                          </Typography>
+                          <Chip
+                            label="COMPLETADO"
+                            size="small"
+                            color="success"
+                            sx={{ height: '18px', fontSize: '0.6rem' }}
+                          />
+                          <Stack direction="row" spacing={0.5}>
+                            {/* Botón VER corregido - usa docPrograma.id (idCertExp) */}
+                            <Tooltip title="Ver" arrow>
+  <IconButton size="small"
+    onClick={() => {
+      // LOGS DE VERIFICACIÓN
+      console.log('🔍 VALORES ACTUALES:');
+      console.log('🔍 docPrograma.id (idCertExp):', docPrograma.id, 'Tipo:', typeof docPrograma.id);
+      console.log('🔍 docPrograma.idDocumentoSubido (MongoDB):', docPrograma.idDocumentoSubido, 'Tipo:', typeof docPrograma.idDocumentoSubido);
+      console.log('🔍 URL que se generará:', `/certificaciones/${docPrograma.id}/archivo`);
+      
+      setPreviewDialog({
+        open: true, 
+        documento: null,
+        nombre: docPrograma.nombreArchivo,
+        tipo: detectarTipoArchivo(docPrograma.nombreArchivo),
+        seccion: prog.nombre, 
+        loading: true, 
+        objectUrl: null
+      });
+      
+      // ✅ USAR SIEMPRE docPrograma.id (que es idCertExp = 2)
+      obtenerArchivoBlobCertificacion(docPrograma.id)
+        .then(blob => {
+          console.log('✅ ÉXITO - Archivo obtenido con ID:', docPrograma.id);
+          const objectUrl = URL.createObjectURL(blob);
+          setPreviewDialog(prev => ({ ...prev, loading: false, objectUrl }));
+        })
+        .catch(error => {
+          console.error('❌ ERROR - Falló con ID:', docPrograma.id);
+          console.error('❌ Error completo:', error);
+          console.error('❌ Response status:', error.response?.status);
+          console.error('❌ Response data:', error.response?.data);
+          
+          setSnackbar({ 
+            open: true, 
+            message: `Error ${error.response?.status}: No se pudo cargar el archivo`, 
+            severity: 'error' 
+          });
+          setPreviewDialog(prev => ({ ...prev, loading: false }));
+        });
+    }}
+    sx={{ color: colors.primary.main, backgroundColor: `${colors.primary.main}15` }}>
+    <VisibilityIcon sx={{ fontSize: '0.9rem' }} />
+  </IconButton>
+</Tooltip>
+                            
+                            {/* Botón DESCARGAR corregido - usa docPrograma.id (idCertExp) */}
+                            <Tooltip title="Descargar" arrow>
+                              <IconButton size="small"
+                                onClick={() => {
+                                  // ✅ CORRECCIÓN: Usar docPrograma.id (idCertExp)
+                                  descargarArchivoCertificacion(docPrograma.id, docPrograma.nombreArchivo)
+                                    .catch(error => {
+                                      console.error('Error al descargar:', error);
+                                      setSnackbar({ 
+                                        open: true, 
+                                        message: 'Error al descargar el archivo', 
+                                        severity: 'error' 
+                                      });
+                                    });
+                                }}
+                                sx={{ color: colors.status.success, backgroundColor: '#e8f5e9' }}>
+                                <DownloadIcon sx={{ fontSize: '0.9rem' }} />
+                              </IconButton>
+                            </Tooltip>
+                            
+                            {/* Botón ELIMINAR corregido - pasa los IDs correctos */}
+                            <Tooltip title="Eliminar" arrow>
+                              <IconButton size="small" 
+                                onClick={() => handleEliminarDocumentoPrograma(prog.id, {
+                                  ...docPrograma,
+                                  idCertExp: docPrograma.id,
+                                  idCertificacion: docPrograma.idCertificacion
+                                })}
+                                sx={{ color: colors.status.error, backgroundColor: '#ffebee' }}>
+                                <DeleteIcon sx={{ fontSize: '0.9rem' }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </Box>
+                      )}
+                    </ListItem>
+                  </Box>
+                );
+              })}
+            </List>
           </Box>
-        </AccordionDetails>
-      </Accordion>
-    );
-  };
+        )}
+      </AccordionDetails>
+    </Accordion>
+  );
+};
 
   // ============================================================
   // RENDER CERTIFICADOS
@@ -1817,8 +2061,8 @@ const handleDescargarDocumento = async (documento) => {
         </DialogActions>
       </Dialog>
 
-      {/* Upload dialog (apartados dinámicos + cumplimiento) */}
-      <Dialog open={uploadDialog.open} onClose={() => setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '' })} maxWidth="sm" fullWidth>
+      {/* Upload dialog (apartados dinámicos + cumplimiento) con progreso mejorado */}
+      <Dialog open={uploadDialog.open} onClose={() => setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '', uploading: false, progress: 0 })} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.main}20`, pb: 2, display: 'flex', alignItems: 'center', gap: 1, color: colors.primary.dark, fontWeight: 'bold' }}>
           <CloudUploadIcon sx={{ color: colors.primary.main }} />
           Subir Documento: {uploadDialog.titulo}
@@ -1835,13 +2079,15 @@ const handleDescargarDocumento = async (documento) => {
             <Grid item xs={12}>
               <Typography variant="subtitle2" sx={{ color: colors.text.primary, mb: 1, fontWeight: '600' }}>Archivo <span style={{ color: colors.status.error }}>*</span></Typography>
               <Paper variant="outlined" sx={{ p: 3, border: `2px dashed ${uploadDialog.archivo ? colors.status.success : colors.primary.main}40`, borderRadius: 2, cursor: 'pointer', textAlign: 'center', '&:hover': { borderColor: colors.primary.main, backgroundColor: '#f8f9fa' } }}
-                onClick={() => document.getElementById('cumplimiento-file-upload').click()}>
-                <input id="cumplimiento-file-upload" type="file" style={{ display: 'none' }} accept=".pdf,.doc,.docx" onChange={handleCumplimientoFileSelect} />
+                onClick={() => !uploadDialog.uploading && document.getElementById('cumplimiento-file-upload').click()}>
+                <input id="cumplimiento-file-upload" type="file" style={{ display: 'none' }} accept=".pdf,.doc,.docx" onChange={handleCumplimientoFileSelect} disabled={uploadDialog.uploading} />
                 {uploadDialog.archivo ? (
                   <>
                     <CheckCircleIcon sx={{ color: colors.status.success, fontSize: 40, mb: 1 }} />
                     <Typography variant="body1" sx={{ color: colors.text.primary, fontWeight: '500' }}>{uploadDialog.nombreArchivo}</Typography>
-                    <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setUploadDialog({ ...uploadDialog, archivo: null, nombreArchivo: '' }); }} sx={{ mt: 1, color: colors.status.error, borderColor: colors.status.error }}>Quitar archivo</Button>
+                    {!uploadDialog.uploading && (
+                      <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setUploadDialog({ ...uploadDialog, archivo: null, nombreArchivo: '' }); }} sx={{ mt: 1, color: colors.status.error, borderColor: colors.status.error }}>Quitar archivo</Button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -1851,12 +2097,40 @@ const handleDescargarDocumento = async (documento) => {
                   </>
                 )}
               </Paper>
+              
+              {/* Barra de progreso mejorada */}
+              {uploadDialog.uploading && (
+                <UploadProgress 
+                  progress={uploadDialog.progress} 
+                  fileName={uploadDialog.nombreArchivo}
+                  onComplete={() => {}}
+                />
+              )}
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${colors.primary.main}20` }}>
-          <Button onClick={() => setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '' })} variant="outlined" sx={{ textTransform: 'none', color: colors.primary.main, borderColor: colors.primary.main }}>Cancelar</Button>
-          <Button onClick={handleGuardarDocumentoCumplimiento} variant="contained" disabled={!uploadDialog.archivo} sx={{ textTransform: 'none', bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark }, '&.Mui-disabled': { bgcolor: '#e0e0e0' } }}>Subir Documento</Button>
+          <Button 
+            onClick={() => setUploadDialog({ open: false, tipo: '', titulo: '', archivo: null, nombreArchivo: '', uploading: false, progress: 0 })} 
+            variant="outlined" 
+            disabled={uploadDialog.uploading}
+            sx={{ textTransform: 'none', color: colors.primary.main, borderColor: colors.primary.main }}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleGuardarDocumentoCumplimiento} 
+            variant="contained" 
+            disabled={!uploadDialog.archivo || uploadDialog.uploading}
+            sx={{ 
+              textTransform: 'none', 
+              bgcolor: colors.primary.main, 
+              '&:hover': { bgcolor: colors.primary.dark }, 
+              '&.Mui-disabled': { bgcolor: '#e0e0e0' } 
+            }}
+          >
+            {uploadDialog.uploading ? 'Subiendo...' : 'Subir Documento'}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1887,121 +2161,121 @@ const handleDescargarDocumento = async (documento) => {
       </Dialog>
 
       {/* Vista previa */}
-<Dialog
-  open={previewDialog.open}
-  onClose={handleClosePreview}
-  maxWidth="lg"
-  fullWidth
-  PaperProps={{ sx: { height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column' } }}
->
-  <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.main}20`, py: 1.5, flexShrink: 0 }}>
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <DescriptionIcon sx={{ color: colors.primary.main }} />
-        <Typography variant="h6" sx={{ color: colors.primary.dark, fontWeight: '600', fontSize: '1rem' }}>
-          {previewDialog.nombre}
-        </Typography>
-      </Box>
-      <IconButton size="small" onClick={handleClosePreview}>
-        <CloseIcon />
-      </IconButton>
-    </Box>
-  </DialogTitle>
-
-  <DialogContent sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-
-    {/* Loading */}
-    {previewDialog.loading && (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 2 }}>
-        <LinearProgress sx={{ width: '200px' }} />
-        <Typography variant="body2" sx={{ color: colors.text.secondary }}>Cargando vista previa...</Typography>
-      </Box>
-    )}
-
-    {/* Sin archivo (documentos locales) */}
-    {!previewDialog.loading && !previewDialog.objectUrl && (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 2, p: 3 }}>
-        <FilePresentIcon sx={{ fontSize: 80, color: colors.primary.main }} />
-        <Typography variant="h6" sx={{ color: colors.text.primary }}>{previewDialog.nombre}</Typography>
-        <Alert severity="info" sx={{ maxWidth: '400px' }}>
-          <Typography variant="body2">Vista previa no disponible para este documento.</Typography>
-        </Alert>
-      </Box>
-    )}
-
-    {/* PDF */}
-    {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'pdf' && (
-      <iframe src={previewDialog.objectUrl} style={{ width: '100%', flex: 1, border: 'none', minHeight: 0 }} title={previewDialog.nombre} />
-    )}
-
-    {/* Imagen */}
-    {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'image' && (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, p: 2, backgroundColor: '#f0f0f0', overflow: 'auto' }}>
-        <img src={previewDialog.objectUrl} alt={previewDialog.nombre} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
-      </Box>
-    )}
-
-    {/* Office (DOCX, XLSX, PPTX) — Google Docs Viewer */}
-    {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'office' && (
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3, gap: 2 }}>
-        <FilePresentIcon sx={{ fontSize: 60, color: colors.primary.main }} />
-        <Typography variant="body1" sx={{ color: colors.text.primary }}>{previewDialog.nombre}</Typography>
-        <Alert severity="info" sx={{ maxWidth: '400px' }}>
-          <Typography variant="body2">
-            Los archivos Office no se pueden previsualizar directamente. Usa el botón <strong>Descargar</strong> para abrirlo.
-          </Typography>
-        </Alert>
-      </Box>
-    )}
-
-    {/* TXT / CSV */}
-    {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'text' && (
-      <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
-        <TextPreview objectUrl={previewDialog.objectUrl} />
-      </Box>
-    )}
-
-    {/* Video MP4 */}
-    {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'video' && (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, backgroundColor: '#000' }}>
-        <video src={previewDialog.objectUrl} controls style={{ maxWidth: '100%', maxHeight: '100%' }} />
-      </Box>
-    )}
-
-    {/* Audio MP3 */}
-    {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'audio' && (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, p: 4 }}>
-        <Box sx={{ textAlign: 'center' }}>
-          <FilePresentIcon sx={{ fontSize: 80, color: colors.primary.main, mb: 2 }} />
-          <Typography variant="body1" sx={{ mb: 3, color: colors.text.primary }}>{previewDialog.nombre}</Typography>
-          <audio src={previewDialog.objectUrl} controls style={{ width: '100%', minWidth: '300px' }} />
-        </Box>
-      </Box>
-    )}
-
-  </DialogContent>
-
-  <DialogActions sx={{ px: 3, py: 1.5, borderTop: `1px solid ${colors.primary.main}20`, flexShrink: 0 }}>
-    <Button onClick={handleClosePreview} variant="outlined" sx={{ textTransform: 'none', color: colors.primary.main, borderColor: colors.primary.main }}>
-      Cerrar
-    </Button>
-    {previewDialog.objectUrl && (
-      <Button
-        variant="contained"
-        startIcon={<DownloadIcon />}
-        onClick={() => {
-          const a = document.createElement('a');
-          a.href = previewDialog.objectUrl;
-          a.download = previewDialog.nombre;
-          a.click();
-        }}
-        sx={{ textTransform: 'none', bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
+      <Dialog
+        open={previewDialog.open}
+        onClose={handleClosePreview}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column' } }}
       >
-        Descargar
-      </Button>
-    )}
-  </DialogActions>
-</Dialog>
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors.primary.main}20`, py: 1.5, flexShrink: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <DescriptionIcon sx={{ color: colors.primary.main }} />
+              <Typography variant="h6" sx={{ color: colors.primary.dark, fontWeight: '600', fontSize: '1rem' }}>
+                {previewDialog.nombre}
+              </Typography>
+            </Box>
+            <IconButton size="small" onClick={handleClosePreview}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+
+          {/* Loading */}
+          {previewDialog.loading && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 2 }}>
+              <LinearProgress sx={{ width: '200px' }} />
+              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Cargando vista previa...</Typography>
+            </Box>
+          )}
+
+          {/* Sin archivo (documentos locales) */}
+          {!previewDialog.loading && !previewDialog.objectUrl && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 2, p: 3 }}>
+              <FilePresentIcon sx={{ fontSize: 80, color: colors.primary.main }} />
+              <Typography variant="h6" sx={{ color: colors.text.primary }}>{previewDialog.nombre}</Typography>
+              <Alert severity="info" sx={{ maxWidth: '400px' }}>
+                <Typography variant="body2">Vista previa no disponible para este documento.</Typography>
+              </Alert>
+            </Box>
+          )}
+
+          {/* PDF */}
+          {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'pdf' && (
+            <iframe src={previewDialog.objectUrl} style={{ width: '100%', flex: 1, border: 'none', minHeight: 0 }} title={previewDialog.nombre} />
+          )}
+
+          {/* Imagen */}
+          {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'image' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, p: 2, backgroundColor: '#f0f0f0', overflow: 'auto' }}>
+              <img src={previewDialog.objectUrl} alt={previewDialog.nombre} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
+            </Box>
+          )}
+
+          {/* Office (DOCX, XLSX, PPTX) — Google Docs Viewer */}
+          {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'office' && (
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3, gap: 2 }}>
+              <FilePresentIcon sx={{ fontSize: 60, color: colors.primary.main }} />
+              <Typography variant="body1" sx={{ color: colors.text.primary }}>{previewDialog.nombre}</Typography>
+              <Alert severity="info" sx={{ maxWidth: '400px' }}>
+                <Typography variant="body2">
+                  Los archivos Office no se pueden previsualizar directamente. Usa el botón <strong>Descargar</strong> para abrirlo.
+                </Typography>
+              </Alert>
+            </Box>
+          )}
+
+          {/* TXT / CSV */}
+          {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'text' && (
+            <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+              <TextPreview objectUrl={previewDialog.objectUrl} />
+            </Box>
+          )}
+
+          {/* Video MP4 */}
+          {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'video' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, backgroundColor: '#000' }}>
+              <video src={previewDialog.objectUrl} controls style={{ maxWidth: '100%', maxHeight: '100%' }} />
+            </Box>
+          )}
+
+          {/* Audio MP3 */}
+          {!previewDialog.loading && previewDialog.objectUrl && previewDialog.tipo === 'audio' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, p: 4 }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <FilePresentIcon sx={{ fontSize: 80, color: colors.primary.main, mb: 2 }} />
+                <Typography variant="body1" sx={{ mb: 3, color: colors.text.primary }}>{previewDialog.nombre}</Typography>
+                <audio src={previewDialog.objectUrl} controls style={{ width: '100%', minWidth: '300px' }} />
+              </Box>
+            </Box>
+          )}
+
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 1.5, borderTop: `1px solid ${colors.primary.main}20`, flexShrink: 0 }}>
+          <Button onClick={handleClosePreview} variant="outlined" sx={{ textTransform: 'none', color: colors.primary.main, borderColor: colors.primary.main }}>
+            Cerrar
+          </Button>
+          {previewDialog.objectUrl && (
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = previewDialog.objectUrl;
+                a.download = previewDialog.nombre;
+                a.click();
+              }}
+              sx={{ textTransform: 'none', bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
+            >
+              Descargar
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* Confirmar eliminación */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, seccion: '', subseccion: '', documentoId: null, tipo: '', nombre: '', horas: 0, itemName: '', itemIndex: null })} maxWidth="sm" fullWidth>
@@ -2023,28 +2297,29 @@ const handleDescargarDocumento = async (documento) => {
           <Button onClick={handleConfirmarEliminacion} variant="contained" color="error" startIcon={<DeleteIcon />} sx={{ textTransform: 'none' }}>Eliminar</Button>
         </DialogActions>
       </Dialog>
-    <AddCertificationModal
-  open={certModalOpen}
-  onClose={() => {
-    if (saving) return;  // ← cambiado de savingCert a saving
-    setCertModalOpen(false);
-    setProgSeleccionado(null);
-    setNuevaCertificacion({
-      subseccion: '', tipoDocumento: '', institucion: '',
-      fecha: new Date().toISOString().split('T')[0],
-      horas: '', archivo: null, nombreArchivo: ''
-    });
-  }}
-  onSave={handleGuardarCertDesdePrograma}
-  nuevaCertificacion={nuevaCertificacion}
-  onFieldChange={handleNuevaCertificacionChange}
-  onFileChange={handleCertFileChange}
-  onRemoveFile={() => setNuevaCertificacion(prev => ({ ...prev, archivo: null, nombreArchivo: '' }))}
-  uploading={uploading}  // ← cambiado de uploadingCert a uploading
-  uploadProgress={uploadProgress}  // ← cambiado de uploadProgressCert a uploadProgress
-  saving={saving}  // ← cambiado de savingCert a saving
-  subseccionFija={progSeleccionado?.nombre}
-/>
+
+      <AddCertificationModal
+        open={certModalOpen}
+        onClose={() => {
+          if (saving) return;
+          setCertModalOpen(false);
+          setProgSeleccionado(null);
+          setNuevaCertificacion({
+            subseccion: '', tipoDocumento: '', institucion: '',
+            fecha: new Date().toISOString().split('T')[0],
+            horas: '', archivo: null, nombreArchivo: ''
+          });
+        }}
+        onSave={handleGuardarCertDesdePrograma}
+        nuevaCertificacion={nuevaCertificacion}
+        onFieldChange={handleNuevaCertificacionChange}
+        onFileChange={handleCertFileChange}
+        onRemoveFile={() => setNuevaCertificacion(prev => ({ ...prev, archivo: null, nombreArchivo: '' }))}
+        uploading={uploading}
+        uploadProgress={uploadProgress}
+        saving={saving}
+        subseccionFija={progSeleccionado?.nombre}
+      />
 
       {/* Snackbar */}
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
