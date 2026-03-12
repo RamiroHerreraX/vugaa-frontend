@@ -38,6 +38,10 @@ import {
   LocationOn as LocationIcon,
   Email as EmailIcon,
   CheckCircle as CheckCircleIcon,
+    Group as GroupIcon,
+  Security as SecurityIcon,
+  ArrowForward as ArrowForwardIcon,
+  Cancel as CancelIcon,
 } from "@mui/icons-material";
 
 import { useAuth } from "../../../context/AuthContext";
@@ -103,8 +107,16 @@ const STEPS = [
         placeholder: "Calle, número, colonia, código postal, ciudad, estado" },
     ],
   },
-  {
+ {
     id: 3,
+    key: "asociacion",
+    label: "Asociación",
+    icon: GroupIcon,
+    description: "Autorización a tu asociación gremial",
+    fields: [],
+  },
+  {
+    id: 4,
     key: "seguridad",
     label: "Seguridad",
     icon: LockIcon,
@@ -126,10 +138,14 @@ const CompleteProfile = () => {
     identidad: false,
     contacto: false,
     domicilios: false,
+    asociacion: false,
     seguridad: false,
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [passwordChanged, setPasswordChanged] = useState(false);
+  // Estado permiso asociación
+  const [permisoAsociacion, setPermisoAsociacion] = useState(null); // null = sin decidir
+  const [savingPermiso, setSavingPermiso] = useState(false);
 
   // Datos del formulario
   const [formData, setFormData] = useState({
@@ -195,6 +211,19 @@ const CompleteProfile = () => {
 
     cargarPerfil();
   }, [user]);
+
+  useEffect(() => {
+    const cargarPermiso = async () => {
+      if (!user?.id) return;
+      try {
+        const permiso = await usuarioService.obtenerPermisoAsociacion(user.id);
+        setPermisoAsociacion(permiso);
+      } catch {
+        setPermisoAsociacion(false);
+      }
+    };
+    cargarPermiso();
+  }, [user?.id]);
 
   // Calcular fortaleza de contraseña
   useEffect(() => {
@@ -347,9 +376,33 @@ const CompleteProfile = () => {
     }
   };
 
+  const handleGuardarPermisoAsociacion = async (decision) => {
+    setSavingPermiso(true);
+    try {
+      await usuarioService.actualizarPermisoAsociacion(user.id, decision);
+      setPermisoAsociacion(decision);
+      setCompletedSections(prev => ({ ...prev, asociacion: true }));
+      setSnackbar({
+        open: true,
+        message: decision
+          ? 'Autorización otorgada correctamente'
+          : 'Autorización denegada correctamente',
+        severity: 'success'
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.error || 'Error al guardar la decisión',
+        severity: 'error'
+      });
+    } finally {
+      setSavingPermiso(false);
+    }
+  };
+
   const handleCompleteProfile = async () => {
     // Validar última sección si no es la de seguridad
-    if (activeStep !== 3 && !validateCurrentSection()) return;
+    if (activeStep !== 3 && activeStep !== 4 && !validateCurrentSection()) return;
 
     // Marcar sección actual como completada
     const sectionKey = STEPS[activeStep].key;
@@ -362,12 +415,12 @@ const CompleteProfile = () => {
         message: "Debes cambiar tu contraseña por seguridad antes de completar el perfil",
         severity: "warning"
       });
-      setActiveStep(3);
+      setActiveStep(4);
       return;
     }
 
     // Validar que todas las secciones requeridas estén completas
-    const requiredSections = ["identidad", "contacto", "seguridad"];
+    const requiredSections = ["identidad", "contacto", "asociacion", "seguridad"];
     const allRequiredComplete = requiredSections.every(
       section => completedSections[section] || section === sectionKey || 
                 (section === "seguridad" && passwordChanged)
@@ -644,6 +697,124 @@ const CompleteProfile = () => {
     </Box>
   );
 
+  const renderAsociacionSection = () => (
+    <Box>
+      <Alert severity="info" sx={{ mb: 3 }}>
+        <AlertTitle>Autorización para tu Asociación Gremial</AlertTitle>
+        Decide si deseas permitir que tu asociación gestione documentación
+        en tu expediente. Puedes cambiar esta decisión en cualquier momento.
+      </Alert>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        {/* SI AUTORIZAS */}
+        <Paper elevation={3} sx={{
+          flex: 1, borderRadius: 2, overflow: 'hidden',
+          border: `2px solid ${permisoAsociacion === true ? palette.success : palette.border}`,
+          transition: 'border-color 0.2s'
+        }}>
+          <Box sx={{ bgcolor: palette.success, p: 2, textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+              ✓ SI AUTORIZO
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold"
+              sx={{ color: palette.success, mb: 1.5 }}>
+              Tu asociación PODRÁ:
+            </Typography>
+            {[
+              'Cargar evidencias institucionales (constancias, certificados)',
+              'Subir documentación de cursos y capacitaciones',
+              'Enviar documentación de pertenencia a la asociación',
+              'Visualizar información general de agentes asociados',
+              'Centralizar documentación común a varios agentes',
+            ].map((item, i) => (
+              <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                <CheckCircleIcon sx={{ color: palette.success, mr: 1, mt: 0.2, fontSize: 16 }} />
+                <Typography variant="body2">{item}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+
+        {/* NO AUTORIZAS */}
+        <Paper elevation={3} sx={{
+          flex: 1, borderRadius: 2, overflow: 'hidden',
+          border: `2px solid ${permisoAsociacion === false ? palette.error : palette.border}`,
+          transition: 'border-color 0.2s'
+        }}>
+          <Box sx={{ bgcolor: palette.error, p: 2, textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+              ✕ NO AUTORIZO
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold"
+              sx={{ color: palette.error, mb: 1.5 }}>
+              Tu asociación NO PODRÁ:
+            </Typography>
+            {[
+              'No puede validar certificaciones individuales',
+              'No puede modificar expedientes personales',
+              'No sustituye la responsabilidad individual del agente',
+              'Acceso limitado a información específica',
+              'No puede tomar decisiones en nombre del agente',
+            ].map((item, i) => (
+              <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                <CancelIcon sx={{ color: palette.error, mr: 1, mt: 0.2, fontSize: 16 }} />
+                <Typography variant="body2">{item}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      </Box>
+
+      <Paper elevation={0} sx={{
+        p: 2, mb: 3, bgcolor: '#e8f4fd',
+        border: '1px solid #90caf9', borderRadius: 1
+      }}>
+        <Typography variant="body2" sx={{ color: palette.text }}>
+          Independientemente de tu decisión, <strong>eres el único responsable</strong> del
+          cumplimiento de tus obligaciones como agente aduanal. Esta autorización
+          puede modificarse en cualquier momento desde tu perfil.
+        </Typography>
+      </Paper>
+
+      {/* Botones de decisión */}
+      {!completedSections.asociacion ? (
+        <Stack direction="row" spacing={2} justifyContent="center">
+          <Button
+            variant="contained"
+            size="large"
+            disabled={savingPermiso}
+            onClick={() => handleGuardarPermisoAsociacion(false)}
+            startIcon={savingPermiso ? <CircularProgress size={18} /> : null}
+            sx={{ px: 4, bgcolor: palette.error, '&:hover': { bgcolor: '#b91c1c' } }}
+          >
+            No Autorizar
+          </Button>
+          <Button
+            variant="contained"
+            size="large"
+            disabled={savingPermiso}
+            onClick={() => handleGuardarPermisoAsociacion(true)}
+            startIcon={savingPermiso ? <CircularProgress size={18} /> : null}
+            sx={{ px: 4, bgcolor: palette.success, '&:hover': { bgcolor: '#00857a' } }}
+          >
+            Autorizar
+          </Button>
+        </Stack>
+      ) : (
+        <Alert severity="success">
+          <AlertTitle>¡Decisión guardada!</AlertTitle>
+          {permisoAsociacion
+            ? 'Has autorizado a tu asociación. Puedes continuar.'
+            : 'Has denegado el permiso a tu asociación. Puedes continuar.'}
+        </Alert>
+      )}
+    </Box>
+  );
+
   // Calcular progreso
   const completedCount = Object.values(completedSections).filter(Boolean).length + (passwordChanged ? 1 : 0);
   const totalSteps = STEPS.length;
@@ -708,7 +879,7 @@ const CompleteProfile = () => {
       <Box sx={{ maxWidth: 1300, mx: "auto", p: { xs: 2, sm: 3, md: 4 } }}>
         <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }} icon={<WarningIcon />}>
           <AlertTitle>Completa tu información</AlertTitle>
-          {activeStep === 3 
+          {activeStep === 4 
             ? "Paso OBLIGATORIO: Debes cambiar tu contraseña por seguridad."
             : `Paso ${activeStep + 1} de ${totalSteps}: ${STEPS[activeStep].label}`}
           {" "}Los campos marcados con <strong>*</strong> son obligatorios.
@@ -716,8 +887,10 @@ const CompleteProfile = () => {
 
         <Paper sx={{ borderRadius: 3, overflow: "hidden", border: `1px solid ${palette.border}` }}>
           <Box sx={{ p: 4 }}>
-            {/* Sección de seguridad (paso 3) */}
+            {/* Sección de asociación (paso 3) */}
             {activeStep === 3 ? (
+              renderAsociacionSection()
+            ) : activeStep === 4 ? (
               renderSecuritySection()
             ) : (
               <>

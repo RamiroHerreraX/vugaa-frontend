@@ -8,6 +8,7 @@ import {
   eliminarCertificacionCompleta,
   editarCertificacionCompleta
 } from '../../../services/certificaciones';
+import usuarioService from '../../../services/usuarioService';
 import { useAuth } from "../../../context/AuthContext";
 import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
 import { getMiExpediente } from '../../../services/expediente';
@@ -261,29 +262,9 @@ const Certifications = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
 
-  // Datos de autorización de la asociación
-  const associationDetails = {
-    name: 'Asociación de Agentes Aduanales del Estado',
-    role: 'Rol auxiliar - Entidad Asociativa',
-    permissions: [
-      'Cargar evidencias institucionales (constancias, certificados)',
-      'Subir documentación de cursos y capacitaciones',
-      'Enviar documentación de pertenencia a la asociación',
-      'Visualizar información general de agentes asociados',
-      'Centralizar documentación común a varios agentes'
-    ],
-    restrictions: [
-      'No puede validar certificaciones individuales',
-      'No puede modificar expedientes personales',
-      'No sustituye la responsabilidad individual del agente',
-      'Acceso limitado a información específica',
-      'No puede tomar decisiones en nombre del agente'
-    ]
-  };
 
-  // Estado para el diálogo de asociación
-  const [associationDialog, setAssociationDialog] = useState(true);
-  const [associationConsent, setAssociationConsent] = useState(null);
+
+  
 
   // Datos de certificaciones
   const [certifications, setCertifications] = useState([]);
@@ -743,10 +724,7 @@ const Certifications = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const handleAssociationConsent = (consent) => {
-    setAssociationConsent(consent);
-    setAssociationDialog(false);
-  };
+
 
   const simulateUpload = () => {
     setUploading(true);
@@ -871,203 +849,7 @@ const Certifications = () => {
     );
   };
 
-  const AssociationDialog = () => (
-    <Dialog 
-      open={associationDialog} 
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: { 
-          borderRadius: 2,
-          maxHeight: '90vh'
-        }
-      }}
-    >
-      <DialogTitle sx={{ 
-        bgcolor: colors.primary.dark, 
-        color: 'white',
-        py: 2
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <SecurityIcon sx={{ fontSize: 28 }} />
-          <Box>
-            <Typography variant="h6" fontWeight="bold">
-              Autorización para Asociación de Agentes Aduanales
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
-              Decisión importante para la gestión de tus certificaciones
-            </Typography>
-          </Box>
-        </Box>
-      </DialogTitle>
-      
-      <DialogContent dividers sx={{ py: 3, px: 3 }}>
-        <Alert severity="info" sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <GroupIcon />
-            <Typography variant="subtitle2" fontWeight="bold">
-              {associationDetails.name}
-            </Typography>
-          </Box>
-          <Typography variant="body2">
-            Esta asociación funciona como entidad auxiliar dentro del sistema, permitiendo centralizar información común y documentación compartida, sin sustituir tu responsabilidad individual.
-          </Typography>
-        </Alert>
-
-        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Paper 
-              elevation={3}
-              sx={{ 
-                border: `2px solid ${colors.status.success}`,
-                borderRadius: 2,
-                overflow: 'hidden',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
-              <Box sx={{ bgcolor: colors.status.success, p: 2, textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <CheckIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  SI ACEPTAS LA AUTORIZACIÓN
-                </Typography>
-              </Box>
-              <Box sx={{ p: 2, flex: 1 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.status.success, mb: 1.5, display: 'flex', alignItems: 'center' }}>
-                  <ArrowForwardIcon sx={{ mr: 1, fontSize: 18 }} />
-                  Tu asociación PODRÁ:
-                </Typography>
-                <Box sx={{ pl: 1 }}>
-                  {associationDetails.permissions.map((permission, index) => (
-                    <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
-                      <CheckCircleIcon sx={{ color: colors.status.success, mr: 1.5, mt: 0.2, fontSize: 16 }} />
-                      <Typography variant="body2" color={colors.text.primary}>
-                        {permission}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-                <Alert severity="success" sx={{ mt: 2 }}>
-                  <Typography variant="body2" fontWeight="bold">
-                    Ventaja clave: Reduce carga administrativa y centraliza evidencias comunes
-                  </Typography>
-                </Alert>
-              </Box>
-            </Paper>
-          </Box>
-
-          <Box sx={{ flex: 1 }}>
-            <Paper 
-              elevation={3}
-              sx={{ 
-                border: `2px solid ${colors.status.error}`,
-                borderRadius: 2,
-                overflow: 'hidden',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
-              <Box sx={{ bgcolor: colors.status.error, p: 2, textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                  <CloseIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  SI RECHAZAS LA AUTORIZACIÓN
-                </Typography>
-              </Box>
-              <Box sx={{ p: 2, flex: 1 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.status.error, mb: 1.5, display: 'flex', alignItems: 'center' }}>
-                  <ArrowForwardIcon sx={{ mr: 1, fontSize: 18 }} />
-                  Tu asociación NO PODRÁ:
-                </Typography>
-                <Box sx={{ pl: 1 }}>
-                  {associationDetails.restrictions.map((restriction, index) => (
-                    <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
-                      <CancelIcon sx={{ color: colors.status.error, mr: 1.5, mt: 0.2, fontSize: 16 }} />
-                      <Typography variant="body2" color={colors.text.primary}>
-                        {restriction}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  <Typography variant="body2" fontWeight="bold">
-                    Consideración clave: Gestión completamente individual de toda la documentación
-                  </Typography>
-                </Alert>
-              </Box>
-            </Paper>
-          </Box>
-        </Box>
-
-        <Paper elevation={0} sx={{ p: 2, bgcolor: '#e8f4fd', border: '1px solid #90caf9', borderRadius: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-            <InfoIcon sx={{ color: colors.primary.main }} />
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: colors.primary.main, fontWeight: 'bold', mb: 0.5 }}>
-                Nota importante sobre responsabilidades
-              </Typography>
-              <Typography variant="body2" color={colors.text.secondary}>
-                Independientemente de tu decisión, <strong>eres el único responsable</strong> del cumplimiento de tus obligaciones como agente aduanal.
-                La asociación funciona como entidad auxiliar y <strong>NO sustituye tu responsabilidad individual</strong>.
-                Esta autorización puede ser modificada en cualquier momento desde la sección de configuración de tu cuenta.
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
-      </DialogContent>
-
-      <DialogActions sx={{ 
-        justifyContent: 'space-between', 
-        p: 2.5,
-        bgcolor: '#f8f9fa',
-        borderTop: `1px solid ${colors.primary.main}20`
-      }}>
-        <Button 
-          onClick={() => handleAssociationConsent(false)}
-          variant="contained"
-          startIcon={<CloseIcon />}
-          sx={{ 
-            px: 3,
-            fontWeight: 'bold',
-            minWidth: 140,
-            bgcolor: colors.status.error,
-            '&:hover': { bgcolor: colors.primary.dark }
-          }}
-        >
-          No Autorizar
-        </Button>
-        
-        <Button 
-          onClick={() => setAssociationDialog(false)}
-          variant="outlined"
-          sx={{ 
-            px: 3,
-            fontWeight: 'bold',
-            color: colors.primary.main,
-            borderColor: colors.primary.main
-          }}
-        >
-          Decidir después
-        </Button>
-        
-        <Button 
-          onClick={() => handleAssociationConsent(true)}
-          variant="contained"
-          startIcon={<CheckIcon />}
-          sx={{ 
-            px: 3,
-            fontWeight: 'bold',
-            minWidth: 140,
-            bgcolor: colors.status.success,
-            '&:hover': { bgcolor: colors.primary.dark }
-          }}
-        >
-          Autorizar
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
+  
 
   const PreviewModal = () => {
     if (!previewDialog.open) return null;
@@ -1339,12 +1121,178 @@ const Certifications = () => {
     </Dialog>
   );
 
+
+ const PermisoAsociacionPanel = () => {
+    const [permiso, setPermiso] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [toggling, setToggling] = useState(false);
+
+    useEffect(() => {
+      const cargar = async () => {
+        if (!user?.id) return;
+        try {
+          const p = await usuarioService.obtenerPermisoAsociacion(user.id);
+          setPermiso(p);
+        } catch {
+          setPermiso(false);
+        } finally {
+          setLoading(false);
+        }
+      };
+      cargar();
+    }, []);
+
+    const handleToggle = async () => {
+      setToggling(true);
+      try {
+        await usuarioService.actualizarPermisoAsociacion(user.id, !permiso);
+        setPermiso(prev => !prev);
+        setSnackbar({
+          open: true,
+          message: !permiso ? 'Autorización a la asociación activada' : 'Autorización a la asociación desactivada',
+          severity: 'success'
+        });
+      } catch {
+        setSnackbar({ open: true, message: 'Error al actualizar el permiso', severity: 'error' });
+      } finally {
+        setToggling(false);
+      }
+    };
+
+    if (loading) return (
+      <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 2, border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <CircularProgress size={20} />
+        <Typography variant="body2" color="text.secondary">Cargando autorización...</Typography>
+      </Paper>
+    );
+
+    const isAutorizado = permiso === true;
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+          border: `1.5px solid ${isAutorizado ? '#00A8A8' : '#F59E0B'}`,
+          overflow: 'hidden',
+          background: isAutorizado
+            ? 'linear-gradient(135deg, #f0fdfa 0%, #e0f7f7 100%)'
+            : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 1.5 }}>
+          
+          {/* Lado izquierdo: ícono + info */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              width: 44, height: 44, borderRadius: '50%',
+              bgcolor: isAutorizado ? '#00A8A820' : '#F59E0B20',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              {isAutorizado
+                ? <VerifiedUserIcon sx={{ color: '#00A8A8', fontSize: 24 }} />
+                : <WarningAmberIcon sx={{ color: '#F59E0B', fontSize: 24 }} />
+              }
+            </Box>
+
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="subtitle2" fontWeight="700" sx={{
+                  color: isAutorizado ? '#00A8A8' : '#B45309'
+                }}>
+                  Autorización a la Asociación Gremial
+                </Typography>
+                <Chip
+                  label={isAutorizado ? 'ACTIVA' : 'INACTIVA'}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    bgcolor: isAutorizado ? '#00A8A8' : '#F59E0B',
+                    color: 'white',
+                    '& .MuiChip-label': { px: 1 }
+                  }}
+                />
+              </Box>
+              <Typography variant="caption" sx={{ color: isAutorizado ? '#0D9488' : '#92400E' }}>
+                {isAutorizado
+                  ? 'Tu asociación puede gestionar documentación en tu expediente'
+                  : 'Tu asociación no tiene acceso a tu expediente actualmente'}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Lado derecho: permisos resumidos + botón */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            
+            {/* Mini-lista de permisos clave */}
+            <Box sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', gap: 0.3 }}>
+              {[
+                'Subir constancias y certificados',
+                'Centralizar documentación común',
+                'Enviar documentación institucional',
+              ].map((item, i) => (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {isAutorizado
+                    ? <CheckCircleIcon sx={{ fontSize: 12, color: '#00A8A8' }} />
+                    : <CancelIcon sx={{ fontSize: 12, color: '#F59E0B' }} />
+                  }
+                  <Typography variant="caption" sx={{
+                    color: isAutorizado ? '#0D9488' : '#92400E',
+                    opacity: isAutorizado ? 1 : 0.7,
+                    textDecoration: isAutorizado ? 'none' : 'line-through'
+                  }}>
+                    {item}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+
+            {/* Botón toggle */}
+            <Button
+              variant={isAutorizado ? 'outlined' : 'contained'}
+              size="small"
+              disabled={toggling}
+              onClick={handleToggle}
+              startIcon={toggling
+                ? <CircularProgress size={14} />
+                : isAutorizado ? <CancelIcon /> : <CheckCircleIcon />
+              }
+              sx={{
+                textTransform: 'none',
+                fontWeight: 'bold',
+                borderRadius: 2,
+                px: 2,
+                whiteSpace: 'nowrap',
+                ...(isAutorizado ? {
+                  color: '#DC2626',
+                  borderColor: '#DC2626',
+                  '&:hover': { bgcolor: '#FEF2F2', borderColor: '#B91C1C' }
+                } : {
+                  bgcolor: '#00A8A8',
+                  color: 'white',
+                  '&:hover': { bgcolor: '#008f8f' }
+                })
+              }}
+            >
+              {toggling ? 'Guardando...' : isAutorizado ? 'Revocar acceso' : 'Autorizar acceso'}
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
+    );
+  };
   // ========== RENDER ==========
   return (
     <Box sx={{ width: '100%', p: 3 }}>
-      <AssociationDialog />
+     
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb:  2}}>
         <Box>
           <Typography variant="h4" sx={{ color: colors.primary.dark, fontWeight: 'bold', mb: 1 }}>
             Mis Certificaciones
@@ -1355,16 +1303,7 @@ const Certifications = () => {
         </Box>
         
         <Stack direction="row" spacing={2}>
-          {associationConsent !== null && (
-            <Chip
-              icon={associationConsent ? <VerifiedUserIcon /> : <WarningAmberIcon />}
-              label={`Autorización: ${associationConsent ? 'ACTIVA' : 'INACTIVA'}`}
-              color={associationConsent ? "success" : "warning"}
-              size="small"
-              variant="outlined"
-              sx={{ mr: 2 }}
-            />
-          )}
+        
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -1378,7 +1317,7 @@ const Certifications = () => {
           </Button>
         </Stack>
       </Box>
-
+            <PermisoAsociacionPanel />
       <Box sx={{ display: 'flex', gap: 2, mb: 4, alignItems: 'stretch' }}>
         <Box sx={{ display: 'flex', gap: 2, flex: 1 }}>
           {[
