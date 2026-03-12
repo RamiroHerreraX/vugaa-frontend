@@ -350,6 +350,33 @@ async actualizarPerfilAgente(usuarioId, perfilData) {
   }
 }
 
+
+// ========== PERMISO ASOCIACIÓN ==========
+
+  async obtenerPermisoAsociacion(usuarioId) {
+    try {
+      const response = await API.get(`/usuarios/${usuarioId}/permiso-asociacion`);
+      return response.data.permisoAsociacion;
+    } catch (error) {
+      console.error('Error en obtenerPermisoAsociacion:', error);
+      // Si falla la consulta, asumimos false para mostrar el modal
+      return false;
+    }
+  }
+
+  async actualizarPermisoAsociacion(usuarioId, permiso) {
+    try {
+      const response = await API.patch(
+        `/usuarios/${usuarioId}/permiso-asociacion`,
+        { permisoAsociacion: permiso }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error en actualizarPermisoAsociacion:', error);
+      throw error.response?.data || { error: 'Error al actualizar el permiso de asociación' };
+    }
+  }
+
 }
 
 
