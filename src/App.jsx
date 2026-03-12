@@ -48,6 +48,16 @@ import AdminAuditLog from "./pages/admin/AdminAuditLog";
 
 // Páginas de Comité
 import CommitteeDashboard from "./pages/committee/CommitteeDashboard";
+import AuditCommittee from "./pages/committee/AuditCommittee";
+import CommitteeReview from "./pages/committee/CommitteeReview";
+import CertificationReview from "./pages/committee/CertificationReview";
+import DocumentReview from "./pages/committee/DocumentReview";
+import CommitteeAlerts from "./pages/committee/CommitteeAlerts";
+import CommitteeProfile from "./pages/committee/CommitteeProfile";
+import CommitteeAssignments from "./pages/committee/CommitteeAssignments";
+import CollegiateVoting from "./pages/committee/CollegiateVoting";
+import CommitteeRepository from "./pages/committee/CommitteeRepository";
+import CommitteeMinutes from "./pages/committee/CommitteeMinutes";
 
 
 // Páginas de Usuario agente
@@ -176,7 +186,7 @@ function App() {
             />
            
 
-            {/* Rutas protegidas - Comité */}
+           {/* Rutas protegidas - Comité */}
             <Route
               path="/committee"
               element={
@@ -188,7 +198,17 @@ function App() {
               
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<CommitteeDashboard />} />
-            </Route>
+              <Route path="review" element={<CommitteeReview />} />
+  <Route path="review/:id" element={<CertificationReview />} />
+  <Route path="document/:certId/:docId" element={<DocumentReview />} />
+  <Route path="alerts" element={<CommitteeAlerts />} />
+  <Route path="assignments" element={<CommitteeAssignments />} />
+  <Route path="voting" element={<CollegiateVoting />} />
+  <Route path="repository" element={<CommitteeRepository />} />
+  <Route path="minutes" element={<CommitteeMinutes />} />
+  <Route path="profile" element={<CommitteeProfile />} />
+  <Route path="audit" element={<AuditCommittee />} />
+</Route>
 
             {/* Rutas protegidas - Asociación */}
             <Route
