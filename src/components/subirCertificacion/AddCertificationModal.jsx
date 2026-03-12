@@ -77,6 +77,8 @@ const AddCertificationModal = ({
     saving,
     subseccionFija = null,
     programasDisponibles = [],
+    titulo = 'Agregar Nueva Certificación',      // <-- nueva prop
+    labelBotonGuardar = 'Agregar Certificación',
 }) => {
 
     const handleClose = () => {
@@ -112,7 +114,7 @@ const AddCertificationModal = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <AddIcon />
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                        Agregar Nueva Certificación
+                         {titulo}
                     </Typography>
                 </Box>
                 <IconButton onClick={handleClose} size="small" sx={{ color: 'white' }} disabled={saving}>
@@ -368,7 +370,7 @@ const AddCertificationModal = ({
                         '&.Mui-disabled': { bgcolor: '#e0e0e0' }
                     }}
                 >
-                    {saving ? 'Guardando...' : 'Agregar Certificación'}
+                    {saving ? 'Guardando...' : labelBotonGuardar}
                 </Button>
             </DialogActions>
         </Dialog>
