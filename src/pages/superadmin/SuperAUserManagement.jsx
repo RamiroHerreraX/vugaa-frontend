@@ -93,12 +93,14 @@ const getRoleColor = (rolNombre) => {
 };
 
 // Modal para cambiar instancia
+// Modal para cambiar instancia
 const ChangeInstanciaModal = ({
   open,
   onClose,
   user,
   onSave,
   availableInstancias,
+  currentUserInstanciaId, // 👈 Nueva prop: ID de la instancia del usuario logueado
 }) => {
   const [selectedInstancia, setSelectedInstancia] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,6 +110,13 @@ const ChangeInstanciaModal = ({
       setSelectedInstancia(user.instanciaId?.toString() || "");
     }
   }, [user]);
+
+  // Filtrar instancias para NO mostrar la del usuario logueado
+  const filteredInstancias = useMemo(() => {
+    return availableInstancias.filter(
+      (instancia) => instancia.id !== currentUserInstanciaId,
+    );
+  }, [availableInstancias, currentUserInstanciaId]);
 
   const handleSave = async () => {
     if (!selectedInstancia) {
@@ -143,16 +152,23 @@ const ChangeInstanciaModal = ({
         >
           Usuario: {user.nombre}
         </Typography>
+        <Typography
+          variant="caption"
+          sx={{ color: colors.text.secondary, display: "block", mt: 1 }}
+        >
+          Instancia actual: {user.instanciaNombre || "No asignada"}
+        </Typography>
       </DialogTitle>
+      <br />
       <DialogContent sx={{ pt: 3 }}>
         <FormControl fullWidth size="small">
-          <InputLabel>Seleccionar Instancia</InputLabel>
+          <InputLabel>Seleccionar Nueva Instancia</InputLabel>
           <Select
             value={selectedInstancia}
-            label="Seleccionar Instancia"
+            label="Seleccionar Nueva Instancia"
             onChange={(e) => setSelectedInstancia(e.target.value)}
           >
-            {availableInstancias.map((instancia) => (
+            {filteredInstancias.map((instancia) => (
               <MenuItem
                 key={instancia.id || instancia.id_instancia}
                 value={
@@ -163,6 +179,14 @@ const ChangeInstanciaModal = ({
               </MenuItem>
             ))}
           </Select>
+          {filteredInstancias.length === 0 && (
+            <Typography
+              variant="caption"
+              sx={{ color: colors.status.error, mt: 1, display: "block" }}
+            >
+              No hay otras instancias disponibles para asignar
+            </Typography>
+          )}
         </FormControl>
       </DialogContent>
       <DialogActions
@@ -178,7 +202,9 @@ const ChangeInstanciaModal = ({
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={!selectedInstancia || loading}
+          disabled={
+            !selectedInstancia || loading || filteredInstancias.length === 0
+          }
           sx={{
             bgcolor: colors.primary.main,
             "&:hover": { bgcolor: colors.primary.dark },
@@ -968,6 +994,7 @@ const UserManagement = () => {
       />
 
       {/* Modal para cambiar instancia */}
+      {/* Modal para cambiar instancia */}
       <ChangeInstanciaModal
         open={openChangeInstanciaModal}
         onClose={() => {
@@ -977,8 +1004,8 @@ const UserManagement = () => {
         user={selectedUserForInstancia}
         onSave={handleSaveInstancia}
         availableInstancias={instanciasList}
+        currentUserInstanciaId={user?.instanciaId} // 👈 Pasamos el ID de la instancia del usuario logueado
       />
-
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}

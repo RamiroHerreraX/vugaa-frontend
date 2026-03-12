@@ -28,8 +28,8 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { getTodosApartados } from '../../services/apartado';
 import { getProgramasPorApartadoActivos } from '../../services/programas';
-import { crearCertificacionCompleta } from '../../services/certificaciones';
-import { getMiExpediente } from '../../services/expediente';
+import { crearCertificacionAgenteAduanal } from '../../services/certificaciones';
+import { getExpedienteByUsuarioId } from '../../services/expediente';
 
 const colors = {
     primary: { dark: '#0D2A4D', main: '#133B6B', light: '#3A6EA5' },
@@ -64,9 +64,29 @@ const AddCertificationModal = ({
     onClose,
     onSaved,
     selectedUser,
+    selectedUsers = [],  
     subseccionFija = null,
 }) => {
     const { user: authUser } = useAuth();
+
+    // 📝 LOG: Verificar el usuario seleccionado cuando se abre el modal
+    useEffect(() => {
+        if (open) {
+            console.log('========== MODAL DE CERTIFICACIÓN ABIERTO ==========');
+            console.log('📋 Usuario seleccionado para certificación:', selectedUser);
+            console.log('   - ID:', selectedUser?.id);
+            console.log('   - Nombre:', selectedUser?.nombre);
+            console.log('   - Email:', selectedUser?.email);
+            console.log('   - Instancia ID:', selectedUser?.instanciaId);
+            console.log('   - Estado:', selectedUser?.estado);
+            console.log('👤 Usuario autenticado (logueado):', authUser);
+            console.log('   - ID:', authUser?.id);
+            console.log('   - Nombre:', authUser?.nombre);
+            console.log('   - Email:', authUser?.email);
+            console.log('   - Instancia ID:', authUser?.instanciaId);
+            console.log('==================================================');
+        }
+    }, [open, selectedUser, authUser]);
 
     const [form, setForm] = useState(emptyForm);
     const [programasDisponibles, setProgramasDisponibles] = useState([]);
@@ -93,7 +113,7 @@ const AddCertificationModal = ({
         if (!open || subseccionFija) return;
 
         const cargarProgramas = async () => {
-            // Usa instanciaId del usuario asociado si está disponible, sino del usuario logueado
+            // Usa instanciaId del usuario seleccionado, si no está disponible usa la del usuario logueado
             const instanciaId = selectedUser?.instanciaId || authUser?.instanciaId;
             if (!instanciaId) return;
 
@@ -178,35 +198,43 @@ const AddCertificationModal = ({
     };
 
     // ── Guardar ──────────────────────────────────────────────────────
-    const handleSave = async () => {
-        if (!selectedUser?.id) {
-            setError('No se encontró el usuario seleccionado');
-            return;
-        }
+const handleSave = async () => {
+    // Determinar si es masivo o individual
+    const usuariosAGuardar = selectedUsers.length > 0 ? selectedUsers : [selectedUser];
+    
+    if (!usuariosAGuardar.length || !usuariosAGuardar[0]?.id) {
+        setError('No se encontró el usuario seleccionado');
+        return;
+    }
 
-        setSaving(true);
-        setError('');
+    setSaving(true);
+    setError('');
+    
+    const resultados = [];
+    const errores = [];
 
+    // Procesar SECUENCIALMENTE (no en paralelo) para evitar timeout
+    for (const usuario of usuariosAGuardar) {
         try {
-            // 1. Obtener el expediente del usuario asociado
-            const expediente = await getMiExpediente(selectedUser.id);
+            console.log(`🚀 Guardando certificación para: ${usuario.nombre} (ID: ${usuario.id})`);
+            
+            const expediente = await getExpedienteByUsuarioId(usuario.id);
             const idExpediente = expediente?.id;
-
             if (!idExpediente) {
-                setError('No se encontró el expediente del usuario');
-                return;
+                errores.push(`Sin expediente: ${usuario.nombre}`);
+                continue;
             }
 
-            // 2. Determinar idPrograma
             const idPrograma = form.subseccion && form.subseccion !== 'otros'
-                ? form.subseccion   // ya es el id numérico del programa
-                : null;
+                ? form.subseccion : null;
+            const idInstancia = usuario?.instanciaId;
+            
+            if (!idInstancia) {
+                errores.push(`Sin instancia: ${usuario.nombre}`);
+                continue;
+            }
 
-            // 3. Instancia del usuario asociado
-            const idInstancia = selectedUser?.instanciaId || authUser?.instanciaId;
-
-            // 4. Llamar al servicio real
-            const certCreada = await crearCertificacionCompleta(
+            const certCreada = await crearCertificacionAgenteAduanal(
                 {
                     nombre: form.tipoDocumento,
                     institucion: form.institucion,
@@ -221,7 +249,6 @@ const AddCertificationModal = ({
                 form.archivo
             );
 
-            // 5. Construir objeto local para actualizar la tabla sin recargar
             const nuevaCertLocal = {
                 id: certCreada?.idCertExp || Date.now(),
                 idCertificacion: certCreada?.idCertificacion,
@@ -229,14 +256,12 @@ const AddCertificationModal = ({
                 number: `CERT-${certCreada?.idCertExp || Date.now()}`,
                 issueDate: new Date(form.fecha).toLocaleDateString('es-MX'),
                 issueDateRaw: form.fecha,
-                expirationDate: certCreada?.fechaExpiracion || '—',
                 status: 'En revisión',
                 progress: 30,
                 documents: 1,
                 lastUpdate: new Date().toLocaleDateString('es-MX'),
                 subseccion: certCreada?.nombrePrograma ||
-                    programasDisponibles.find(p => p.id === form.subseccion)?.nombre ||
-                    'Otros',
+                    programasDisponibles.find(p => p.id === form.subseccion)?.nombre || 'Otros',
                 horas: parseInt(form.horas),
                 tipo: form.tipoDocumento,
                 autoridad: form.institucion,
@@ -252,16 +277,28 @@ const AddCertificationModal = ({
                 }]
             };
 
-            if (onSaved) onSaved(nuevaCertLocal);
-            onClose();
+            resultados.push({ usuario, cert: nuevaCertLocal });
+            console.log(`✅ OK: ${usuario.nombre}`);
 
         } catch (err) {
-            console.error('Error al guardar certificación:', err);
-            setError(err?.response?.data?.message || 'Error al guardar la certificación');
-        } finally {
-            setSaving(false);
+            console.error(`❌ Error para ${usuario.nombre}:`, err.message);
+            errores.push(`${usuario.nombre}: ${err?.response?.data?.message || err.message}`);
         }
-    };
+    }
+
+    // Notificar resultados
+    if (resultados.length > 0 && onSaved) {
+        onSaved(resultados); // ← Ahora pasa ARRAY de {usuario, cert}
+    }
+
+    if (errores.length > 0) {
+        setError(`Errores en: ${errores.join(' | ')}`);
+        if (resultados.length === 0) { setSaving(false); return; }
+    }
+
+    setSaving(false);
+    if (errores.length === 0) onClose();
+};
 
     const canSave =
         !saving &&
@@ -297,7 +334,7 @@ const AddCertificationModal = ({
                         </Typography>
                         {selectedUser?.nombre && (
                             <Typography variant="caption" sx={{ opacity: 0.85 }}>
-                                Para: {selectedUser.nombre}
+                                Para: {selectedUser.nombre} (ID: {selectedUser.id})
                             </Typography>
                         )}
                     </Box>

@@ -69,3 +69,31 @@ export const eliminarCertificacionCompleta = async (idCertExp, idCertificacion) 
   });
   return response.data;
 };
+
+export const crearCertificacionAgenteAduanal = async (
+  formData, idInstancia, idExpediente, idPrograma, archivo
+) => {
+  const dto = {
+    idInstancia,
+    idPrograma,
+    idExpediente,
+    nombre:        formData.nombre,
+    institucion:   formData.institucion,
+    horas:         parseInt(formData.horas),
+    fechaEmision:  formData.fecha,
+    nombreArchivo: formData.nombreArchivo,
+    descripcion:   formData.descripcion ?? '',
+  };
+
+  const form = new FormData();
+  form.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
+  form.append('archivo', archivo);
+
+  const response = await API.post(
+    `${ENDPOINT}/asociacion/crearCertificacionAgenteAduanal`, 
+    form
+    // ❌ Sin headers — Axios genera el boundary automáticamente
+  );
+
+  return response.data;
+};
