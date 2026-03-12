@@ -12,6 +12,8 @@ import {
   CircularProgress,
   Alert,
   MenuItem,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import { crearPrograma, crearProgramaGlobal } from "../../services/programas";
@@ -41,6 +43,7 @@ const CreateProgramaDialogAdmin = ({
     horasRequeridas: "",
     tipo: "VIDEO",
     configuracionJson: "",
+    requiereValidacion: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -54,6 +57,7 @@ const CreateProgramaDialogAdmin = ({
         horasRequeridas: "",
         tipo: "VIDEO",
         configuracionJson: "",
+        requiereValidacion: false,
       });
       setError(null);
     }
@@ -101,6 +105,7 @@ const CreateProgramaDialogAdmin = ({
         configuracionJson: programa.configuracionJson.trim() || null,
         idInstancia: idInstanciaToUse,
         idApartado: apartadoId || null,
+        requiereValidacion: programa.requiereValidacion,
       };
 
       const response = esGlobal
@@ -225,6 +230,19 @@ const CreateProgramaDialogAdmin = ({
             placeholder='Ejemplo: {"duracionMaxima": 30}'
             disabled={loading}
             helperText="Campo opcional para configuración adicional en formato JSON"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={programa.requiereValidacion}
+                onChange={(e) =>
+                  setPrograma({ ...programa, requiereValidacion: e.target.checked })
+                }
+                disabled={loading}
+              />
+            }
+            label="Requiere Validación por Comité"
           />
         </Stack>
       </DialogContent>
