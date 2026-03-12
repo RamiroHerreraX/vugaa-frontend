@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -25,7 +25,9 @@ import {
   Fab,
   Tabs,
   Tab,
-  Tooltip
+  Tooltip,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -37,11 +39,15 @@ import {
   Download as DownloadIcon,
   Visibility as VisibilityIcon,
   CheckCircle as CheckCircleIcon,
-  Refresh as RefreshIcon,
   ChevronRight as ChevronRightIcon,
   Timer as TimerIcon,
   FilterList as FilterIcon
 } from '@mui/icons-material';
+
+// Importar el modal de perfil incompleto
+import PerfilIncompletoModal from '../../components/common/PerfilIncompletoModal';
+// Importar el contexto de autenticación
+import { useAuth } from '../../context/AuthContext';
 
 // Paleta corporativa
 const colors = {
@@ -73,8 +79,21 @@ const colors = {
 };
 
 const AdminDashboard = () => {
+  const { user, updateUser } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [panelTab, setPanelTab] = useState(0);
+  // El modal se abre basado en si el perfil está completo o no
+  const [perfilModalOpen, setPerfilModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Efecto para controlar el modal basado en el estado real del usuario
+  useEffect(() => {
+    if (user) {
+      setLoading(false);
+      // Si el usuario existe y NO tiene el perfil completo, mostrar el modal
+      setPerfilModalOpen(!user.perfilCompleto);
+    }
+  }, [user]);
 
   const systemStats = [
     { title: 'Usuarios Activos', value: '156', change: '+12%', icon: <PeopleIcon />, color: colors.primary.main, trend: 'up', detail: 'De 180 totales' },
@@ -153,12 +172,78 @@ const AdminDashboard = () => {
     setDrawerOpen(!drawerOpen);
   };
 
+  // Manejadores para el modal de perfil
+  const handleClosePerfilModal = () => {
+    setPerfilModalOpen(false);
+    // Opcional: recargar los datos del usuario para confirmar que el perfil está completo
+    if (updateUser) {
+    }
+  };
+
+  // Si está cargando, mostrar un indicador
+  if (loading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        backgroundColor: '#f5f7fa'
+      }}>
+        <CircularProgress sx={{ color: colors.primary.main }} />
+        <Typography sx={{ ml: 2, color: colors.primary.dark }}>
+          Cargando dashboard...
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{
       p: 2.5,
       backgroundColor: '#f5f7fa',
       minHeight: '100vh'
     }}>
+      {/* Alerta de perfil incompleto (solo si el perfil NO está completo) */}
+      {user && !user.perfilCompleto && !perfilModalOpen && (
+        <Alert 
+          severity="warning" 
+          sx={{ 
+            mb: 3,
+            borderRadius: 2,
+            '& .MuiAlert-message': {
+              width: '100%'
+            }
+          }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small"
+              onClick={() => setPerfilModalOpen(true)}
+              sx={{ 
+                color: colors.primary.main,
+                '&:hover': { bgcolor: 'rgba(19, 59, 107, 0.1)' }
+              }}
+            >
+              Completar ahora
+            </Button>
+          }
+        >
+          <Typography variant="body2">
+            <strong>Tu perfil está incompleto.</strong> Completa tu información para acceder a todas las funcionalidades.
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Modal de perfil incompleto - solo visible si el perfil NO está completo */}
+      {user && !user.perfilCompleto && (
+        <PerfilIncompletoModal 
+          open={perfilModalOpen} 
+          onClose={handleClosePerfilModal}
+          user={user} // Usar el usuario real del contexto
+        />
+      )}
+
       {/* Header compacto con acciones rápidas integradas */}
       <Box sx={{
         mb: 3,
@@ -173,7 +258,7 @@ const AdminDashboard = () => {
             Panel Administrativo
           </Typography>
           <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-            Resumen del sistema SICAG - Estado actual y control
+            Bienvenido, {user.nombre || 'Administrador'} • Resumen del sistema SICAG
           </Typography>
         </Box>
       </Box>
@@ -181,27 +266,27 @@ const AdminDashboard = () => {
       {/* Layout principal: KPI Cards - 4 CARDS OCUPANDO TODO EL RENGLÓN */}
       <Box sx={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)', // 4 columnas de igual ancho
+        gridTemplateColumns: 'repeat(4, 1fr)',
         gap: 2,
         mb: 3,
         width: '100%',
         '@media (max-width: 1200px)': {
-          gridTemplateColumns: 'repeat(2, 1fr)', // 2 columnas en pantallas medianas
+          gridTemplateColumns: 'repeat(2, 1fr)',
         },
         '@media (max-width: 600px)': {
-          gridTemplateColumns: '1fr', // 1 columna en móviles
+          gridTemplateColumns: '1fr',
         }
       }}>
         {systemStats.map((stat, index) => (
           <Card key={index} sx={{
             borderLeft: `4px solid ${stat.color}`,
-            height: 120, // MISMA ALTURA EXACTA que las 5 cards del otro código
+            height: 120,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden' // Para asegurar que nada se desborde
+            overflow: 'hidden'
           }}>
             <CardContent sx={{
-              p: 1.5, // Padding reducido para usar mejor el espacio
+              p: 1.5,
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
@@ -302,7 +387,7 @@ const AdminDashboard = () => {
         ))}
       </Box>
 
-      {/* Dashboard del Comité y Cumplimiento por Región - CON MISMA ALTURA */}
+      {/* Dashboard del Comité y Cumplimiento por Región */}
       <Box sx={{ 
         display: 'flex',
         gap: 2,
@@ -314,7 +399,7 @@ const AdminDashboard = () => {
       }}>
         {/* Dashboard del Comité - 70% */}
         <Box sx={{ 
-          flex: 7, // 70% del espacio
+          flex: 7,
           minHeight: '100%',
           '@media (max-width: 1200px)': {
             flex: '1 1 100%',
@@ -480,7 +565,7 @@ const AdminDashboard = () => {
 
         {/* Cumplimiento por Región - 30% */}
         <Box sx={{ 
-          flex: 3, // 30% del espacio
+          flex: 3,
           minHeight: '100%',
           '@media (max-width: 1200px)': {
             flex: '1 1 100%',
@@ -589,7 +674,7 @@ const AdminDashboard = () => {
         </Box>
       </Box>
 
-      {/* Panel flotante (Drawer) CON ALERTAS */}
+      {/* Panel flotante (Drawer) */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -780,7 +865,7 @@ const AdminDashboard = () => {
             )}
 
             {panelTab === 2 && (
-              /* Alertas del Sistema - MOVIDAS AL PANEL */
+              /* Alertas del Sistema */
               <Box sx={{ flex: 1, overflowY: 'auto' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography variant="subtitle2" sx={{ color: colors.primary.dark, fontWeight: 'bold' }}>
@@ -804,28 +889,23 @@ const AdminDashboard = () => {
                   {alerts.map((alert) => {
                     let borderColor;
                     let iconColor;
-                    let badgeColor;
                     let hoverColor;
 
                     if (alert.type === 'warning') {
                       borderColor = colors.accents.blue;
                       iconColor = colors.accents.blue;
-                      badgeColor = 'warning';
                       hoverColor = colors.accents.blue;
                     } else if (alert.type === 'error') {
                       borderColor = colors.primary.dark;
                       iconColor = colors.primary.dark;
-                      badgeColor = 'error';
                       hoverColor = colors.primary.dark;
                     } else if (alert.type === 'info') {
                       borderColor = colors.primary.main;
                       iconColor = colors.primary.main;
-                      badgeColor = 'info';
                       hoverColor = colors.primary.light;
                     } else {
                       borderColor = colors.secondary.main;
                       iconColor = colors.secondary.main;
-                      badgeColor = 'success';
                       hoverColor = colors.secondary.light;
                     }
 

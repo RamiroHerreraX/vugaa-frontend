@@ -647,7 +647,9 @@ const AdminLayout = () => {
           </Box>
         </Box>
         
-        <MenuItem 
+        <MenuItem
+          component={Link}
+          to="/admin/profile" 
           onClick={handleProfileMenuClose}
           sx={{ py: 1.5, px: 2 }}
         >

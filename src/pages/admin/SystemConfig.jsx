@@ -35,14 +35,13 @@ import {
     InputLabel,
     MenuItem,
     CircularProgress,
-    Snackbar
+    Snackbar,
+    LinearProgress,
+    Pagination
 } from '@mui/material';
 import {
     Security as SecurityIcon,
     CheckCircle as CheckCircleIcon,
-    Warning as WarningIcon,
-    Error as ErrorIcon,
-    Lock as LockIcon,
     Edit as EditIcon,
     Block as BlockIcon,
     Add as AddIcon,
@@ -60,8 +59,8 @@ import {
     LocationOn as LocationOnIcon,
     PersonAdd as PersonAddIcon,
     Group as GroupIcon,
-    Assignment as AssignmentIcon,
-    Visibility as VisibilityIcon
+    Visibility as VisibilityIcon,
+    Badge as BadgeIcon,
 } from '@mui/icons-material';
 
 import { useAuth } from './../../context/AuthContext';
@@ -80,6 +79,7 @@ import rolService from '../../services/rol';
 import asociacionService from '../../services/asociacion';
 import regionesService from '../../services/regiones';
 import nivelReconocimientoService from '../../services/nivelreconocimiento';
+import usuarioService from '../../services/usuarioService';
 
 // Paleta corporativa
 const colors = {
@@ -89,6 +89,18 @@ const colors = {
     status: { success: '#00A8A8', warning: '#00C2D1', error: '#0099FF', info: '#3A6EA5' },
     text: { primary: '#0D2A4D', secondary: '#3A6EA5', light: '#6C5CE7' },
     semaforo: { rojo: '#D32F2F', amarillo: '#FFC107', verde: '#388E3C' }
+};
+
+// Función para obtener color del rol
+const getRoleColor = (rolNombre) => {
+    if (!rolNombre) return colors.text.secondary;
+    switch (rolNombre?.toLowerCase()) {
+        case 'presidente': return colors.accents.purple;
+        case 'secretario tecnico': return colors.primary.dark;
+        case 'vocal a': return colors.primary.main;
+        case 'vocal b': return colors.accents.blue;
+        default: return colors.accents.blue;
+    }
 };
 
 // ─── Snackbar helper ────────────────────────────────────────────────────────
@@ -108,6 +120,15 @@ const SystemConfig = () => {
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [selectedAgent, setSelectedAgent] = useState(null);
     const [selectedEvaluator, setSelectedEvaluator] = useState('');
+
+    // ── Estado Comité ─────────────────────────────────────────────────────
+    const [miembrosComite, setMiembrosComite] = useState([]);
+    const [loadingComite, setLoadingComite] = useState(false);
+    const [errorComite, setErrorComite] = useState(null);
+    const [comiteFilter, setComiteFilter] = useState('todos');
+    const [searchComite, setSearchComite] = useState('');
+    const [pageComite, setPageComite] = useState(1);
+    const rowsPerPageComite = 10;
 
     // ── Estado Roles ──────────────────────────────────────────────────────
     const [roles, setRoles] = useState([]);
@@ -194,7 +215,63 @@ const SystemConfig = () => {
         fetchRegionesList();
         fetchRegiones();
         fetchNiveles();
+        if (user?.instanciaId) {
+            fetchMiembrosComite();
+        }
     }, [user?.instanciaId]);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // COMITÉ
+    // ══════════════════════════════════════════════════════════════════════
+    const fetchMiembrosComite = async () => {
+        if (!user?.instanciaId) {
+            console.warn('No hay instancia ID disponible');
+            return;
+        }
+
+        setLoadingComite(true);
+        setErrorComite(null);
+        try {
+            const data = await usuarioService.findUsuariosComiteByInstancia(user.instanciaId);
+            const miembrosArray = Array.isArray(data) ? data : [];
+            setMiembrosComite(miembrosArray);
+            notify(`${miembrosArray.length} miembros del comité cargados`, 'success');
+        } catch (error) {
+            const errorMessage = error?.error || error?.message || 'No se pudieron cargar los miembros del comité';
+            setErrorComite(errorMessage);
+            notify(errorMessage, 'error');
+        } finally {
+            setLoadingComite(false);
+        }
+    };
+
+    const filteredMiembrosComite = miembrosComite
+        .filter(miembro => {
+            const matchSearch = 
+                miembro.nombre?.toLowerCase().includes(searchComite.toLowerCase()) ||
+                miembro.email?.toLowerCase().includes(searchComite.toLowerCase()) ||
+                miembro.rolEspecifico?.toLowerCase().includes(searchComite.toLowerCase());
+            
+            const matchFilter = comiteFilter === 'todos' ? true : 
+                               comiteFilter === 'activos' ? miembro.estado === 'ACTIVO' : 
+                               miembro.estado === 'INACTIVO';
+            
+            return matchSearch && matchFilter;
+        })
+        .sort((a, b) => {
+            const orden = ['Presidente', 'Secretario Tecnico', 'Vocal A', 'Vocal B'];
+            const indexA = orden.indexOf(a.rolEspecifico);
+            const indexB = orden.indexOf(b.rolEspecifico);
+            if (indexA === -1 && indexB === -1) return 0;
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
+
+    const paginatedMiembrosComite = filteredMiembrosComite.slice(
+        (pageComite - 1) * rowsPerPageComite,
+        pageComite * rowsPerPageComite
+    );
 
     // ══════════════════════════════════════════════════════════════════════
     // ROLES
@@ -504,7 +581,6 @@ const SystemConfig = () => {
         setLoadingNiveles(true);
         setErrorNiveles(null);
         try {
-            // Traer por instancia del usuario logueado
             const data = await nivelReconocimientoService.findByInstancia(user?.instanciaId);
             const nivelesArray = Array.isArray(data) ? data : [];
             setNiveles(nivelesArray.sort((a, b) => (a.nivel ?? 0) - (b.nivel ?? 0)));
@@ -531,7 +607,7 @@ const SystemConfig = () => {
         try {
             const payload = {
                 ...nivelData,
-                idInstancia: user?.instanciaId  // siempre viene del usuario logueado
+                idInstancia: user?.instanciaId
             };
             const newNivel = await nivelReconocimientoService.create(payload);
             setNiveles(prev => [...prev, newNivel].sort((a, b) => (a.nivel ?? 0) - (b.nivel ?? 0)));
@@ -555,7 +631,7 @@ const SystemConfig = () => {
         try {
             const payload = {
                 ...nivelData,
-                idInstancia: user?.instanciaId  // siempre viene del usuario logueado
+                idInstancia: user?.instanciaId
             };
             const updated = await nivelReconocimientoService.update(id, payload);
             setNiveles(prev => prev.map(n => n.idNivel === id ? updated : n).sort((a, b) => (a.nivel ?? 0) - (b.nivel ?? 0)));
@@ -648,10 +724,10 @@ const SystemConfig = () => {
                 ];
             case 2:
                 return [
-                    { titulo: 'Miembros Comité', valor: 0, color: colors.primary.main, icono: <GroupIcon />, subtitulo: 'Total miembros' },
-                    { titulo: 'Activos', valor: 0, color: colors.secondary.main, icono: <CheckCircleIcon />, subtitulo: 'En función' },
-                    { titulo: 'Pendientes', valor: 0, color: colors.semaforo.amarillo, icono: <PendingActionsIcon />, subtitulo: 'Por confirmar' },
-                    { titulo: 'Evaluaciones', valor: 0, color: colors.accents.purple, icono: <AssignmentIndIcon />, subtitulo: 'Asignadas' }
+                    { titulo: 'Miembros Comité', valor: miembrosComite.length, color: colors.primary.main, icono: <GroupIcon />, subtitulo: 'Total miembros' },
+                    { titulo: 'Activos', valor: miembrosComite.filter(m => m.estado === 'ACTIVO').length, color: colors.secondary.main, icono: <CheckCircleIcon />, subtitulo: 'En función' },
+                    { titulo: 'Inactivos', valor: miembrosComite.filter(m => m.estado === 'INACTIVO').length, color: colors.semaforo.amarillo, icono: <PendingActionsIcon />, subtitulo: 'No activos' },
+                    { titulo: 'Cargos', valor: [...new Set(miembrosComite.map(m => m.rolEspecifico).filter(Boolean))].length, color: colors.accents.purple, icono: <BadgeIcon />, subtitulo: 'Cargos distintos' }
                 ];
             case 3: {
                 const asociacionesActivas = asociaciones.filter(a => a.activa).length;
@@ -663,14 +739,7 @@ const SystemConfig = () => {
                     { titulo: 'Regiones con Asoc.', valor: regionesConAsoc, color: colors.accents.blue, icono: <LocationOnIcon />, subtitulo: 'Regiones representadas' }
                 ];
             }
-            case 4:
-                return [
-                    { titulo: 'Agentes Pendientes', valor: 0, color: colors.primary.main, icono: <PendingActionsIcon />, subtitulo: 'Esperando validación' },
-                    { titulo: 'Por Revisar', valor: 0, color: colors.semaforo.amarillo, icono: <AssignmentIcon />, subtitulo: 'Documentos pendientes' },
-                    { titulo: 'Urgentes', valor: 0, color: colors.semaforo.rojo, icono: <WarningIcon />, subtitulo: 'Alta prioridad' },
-                    { titulo: 'Asignados', valor: 0, color: colors.secondary.main, icono: <AssignmentIndIcon />, subtitulo: 'Evaluadores asignados' }
-                ];
-            case 5: {
+            case 4: {
                 const nivelesActivos = niveles.filter(n => n.activo).length;
                 return [
                     { titulo: 'Total Niveles', valor: niveles.length, color: colors.primary.main, icono: <EmojiEventsIcon />, subtitulo: 'Niveles registrados' },
@@ -688,7 +757,6 @@ const SystemConfig = () => {
         { label: 'Regiones', icon: <PublicIcon /> },
         { label: 'Comité', icon: <SecurityIcon /> },
         { label: 'Asociaciones', icon: <BusinessIcon /> },
-        { label: 'Agentes Pendientes', icon: <PendingActionsIcon /> },
         { label: 'Niveles Reconocimiento', icon: <EmojiEventsIcon /> }
     ];
 
@@ -815,22 +883,20 @@ const SystemConfig = () => {
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '30%' }}>Nombre del Rol</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '35%' }}>Nombre del Rol</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '50%' }}>Descripción</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '15%' }} align="center">Estatus</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {loadingRoles ? (
-                                                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}><CircularProgress size={30} sx={{ color: colors.primary.main }} /></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 3 }}><CircularProgress size={30} sx={{ color: colors.primary.main }} /></TableCell></TableRow>
                                             ) : errorRoles ? (
-                                                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorRoles}</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorRoles}</Typography></TableCell></TableRow>
                                             ) : filteredRoles.length === 0 ? (
-                                                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron roles</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={3} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron roles</Typography></TableCell></TableRow>
                                             ) : filteredRoles.map(rol => (
                                                 <TableRow key={rol.id} hover sx={{ '&:hover': { bgcolor: '#f8f9fa' }, opacity: !rol.activo ? 0.7 : 1, backgroundColor: !rol.activo ? '#fff5f5' : 'inherit' }}>
-                                                    <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{rol.id}</Typography></TableCell>
                                                     <TableCell><Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{rol.nombre}</Typography></TableCell>
                                                     <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{rol.descripcion || 'Sin descripción'}</Typography></TableCell>
                                                     <TableCell align="center"><Chip label={rol.activo ? 'ACTIVO' : 'INACTIVO'} size="small" sx={{ bgcolor: rol.activo ? colors.secondary.main : colors.primary.dark, color: 'white', fontWeight: 600, minWidth: 80 }} /></TableCell>
@@ -878,8 +944,7 @@ const SystemConfig = () => {
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '25%' }}>Nombre</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '30%' }}>Nombre</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>País</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Estado/Provincia</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '12%' }} align="center">Estatus</TableCell>
@@ -888,14 +953,13 @@ const SystemConfig = () => {
                                         </TableHead>
                                         <TableBody>
                                             {loadingRegiones ? (
-                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><CircularProgress size={30} sx={{ color: colors.primary.main }} /></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><CircularProgress size={30} sx={{ color: colors.primary.main }} /></TableCell></TableRow>
                                             ) : errorRegiones ? (
-                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorRegiones}</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorRegiones}</Typography></TableCell></TableRow>
                                             ) : filteredRegiones.length === 0 ? (
-                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron regiones</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron regiones</Typography></TableCell></TableRow>
                                             ) : filteredRegiones.map(region => (
                                                 <TableRow key={region.idRegion} hover sx={{ '&:hover': { bgcolor: '#f8f9fa' }, opacity: !region.activa ? 0.7 : 1, backgroundColor: !region.activa ? '#fff5f5' : 'inherit' }}>
-                                                    <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{region.idRegion}</Typography></TableCell>
                                                     <TableCell><Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{region.nombre}</Typography></TableCell>
                                                     <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{region.pais || 'No especificado'}</Typography></TableCell>
                                                     <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{region.estado || 'No especificado'}</Typography></TableCell>
@@ -922,11 +986,219 @@ const SystemConfig = () => {
                             </Box>
                         )}
 
-                        {/* TAB 2: Comité */}
+                        {/* TAB 2: Comité - MODIFICADO CON ESTILO DE TABLA DE USUARIOS */}
                         {activeTab === 2 && (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>Módulo de Comité</Typography>
-                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>Contenido en desarrollo</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {/* Barra de controles */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        {['todos', 'activos', 'inactivos'].map(f => (
+                                            <Chip key={f} label={f.charAt(0).toUpperCase() + f.slice(1)}
+                                                variant={comiteFilter === f ? 'filled' : 'outlined'}
+                                                onClick={() => {
+                                                    setComiteFilter(f);
+                                                    setPageComite(1);
+                                                }} 
+                                                clickable size="small"
+                                                sx={comiteFilter === f
+                                                    ? { bgcolor: f === 'activos' ? colors.secondary.main : f === 'inactivos' ? colors.primary.dark : colors.primary.main, color: 'white', cursor: 'pointer' }
+                                                    : { borderColor: f === 'activos' ? colors.secondary.main : f === 'inactivos' ? colors.primary.dark : colors.primary.main, color: f === 'activos' ? colors.secondary.main : f === 'inactivos' ? colors.primary.dark : colors.primary.main, cursor: 'pointer' }}
+                                            />
+                                        ))}
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+                                            Mostrando {filteredMiembrosComite.length} miembros
+                                        </Typography>
+                                        <Button 
+                                            variant="contained" 
+                                            startIcon={<SecurityIcon />} 
+                                            onClick={fetchMiembrosComite} 
+                                            size="small" 
+                                            sx={{ bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark } }}
+                                            disabled={loadingComite}
+                                        >
+                                            {loadingComite ? <CircularProgress size={20} color="inherit" /> : 'Actualizar'}
+                                        </Button>
+                                    </Box>
+                                </Box>
+
+                                {/* Buscador */}
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8f9fa' }}>
+                                    <TextField
+                                        fullWidth size="small"
+                                        placeholder="Buscar por nombre, email o cargo..."
+                                        value={searchComite}
+                                        onChange={(e) => {
+                                            setSearchComite(e.target.value);
+                                            setPageComite(1);
+                                        }}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <SearchIcon fontSize="small" sx={{ color: colors.primary.main }} />
+                                                </InputAdornment>
+                                            ),
+                                            endAdornment: searchComite && (
+                                                <InputAdornment position="end">
+                                                    <IconButton size="small" onClick={() => setSearchComite('')}>
+                                                        <CloseIcon fontSize="small" sx={{ color: colors.text.secondary }} />
+                                                    </IconButton>
+                                                </InputAdornment>
+                                            )
+                                        }}
+                                    />
+                                </Paper>
+
+                                {/* Tabla con estilo de UserManagement */}
+                                <TableContainer sx={{ border: `1px solid ${colors.primary.light}20`, borderRadius: 1 }}>
+                                    <Table stickyHeader size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '35%' }}>Miembro</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Cargo</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '20%' }}>Estado</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '25%' }} align="center">Acciones</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {loadingComite ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                                        <LinearProgress />
+                                                        <Typography sx={{ mt: 2, color: colors.text.secondary }}>Cargando miembros del comité...</Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : errorComite ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                                        <Alert severity="error" sx={{ display: 'inline-flex' }}>
+                                                            {errorComite}
+                                                        </Alert>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : paginatedMiembrosComite.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                                        <Typography sx={{ color: colors.text.secondary }}>
+                                                            {searchComite 
+                                                                ? 'No se encontraron miembros del comité con ese criterio' 
+                                                                : 'No hay miembros del comité registrados en esta instancia'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                paginatedMiembrosComite.map(miembro => (
+                                                    <TableRow 
+                                                        key={miembro.id} 
+                                                        hover
+                                                        sx={{ 
+                                                            '&:hover': { bgcolor: '#f8f9fa' }, 
+                                                            opacity: miembro.estado === 'INACTIVO' ? 0.7 : 1,
+                                                            backgroundColor: miembro.estado === 'INACTIVO' ? '#fff5f5' : 'inherit'
+                                                        }}
+                                                    >
+                                                        <TableCell>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                                <Avatar sx={{
+                                                                    width: 36, height: 36,
+                                                                    bgcolor: getRoleColor(miembro.rolEspecifico),
+                                                                    fontSize: '0.9rem', fontWeight: 'bold'
+                                                                }}>
+                                                                    {miembro.nombre?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'MC'}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>
+                                                                        {miembro.nombre}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'block' }}>
+                                                                        {miembro.email}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+                                                        </TableCell>
+
+                                                        <TableCell>
+                                                            {miembro.rolEspecifico ? (
+                                                                <Chip 
+                                                                    label={miembro.rolEspecifico} 
+                                                                    size="small" 
+                                                                    sx={{
+                                                                        bgcolor: `${getRoleColor(miembro.rolEspecifico)}15`,
+                                                                        color: getRoleColor(miembro.rolEspecifico),
+                                                                        fontWeight: 600,
+                                                                        border: `1px solid ${getRoleColor(miembro.rolEspecifico)}30`
+                                                                    }} 
+                                                                />
+                                                            ) : (
+                                                                <Typography variant="body2" sx={{ color: colors.text.secondary, fontStyle: 'italic' }}>—</Typography>
+                                                            )}
+                                                        </TableCell>
+
+                                                        <TableCell>
+                                                            <Chip 
+                                                                label={miembro.estado || 'DESCONOCIDO'} 
+                                                                size="small" 
+                                                                sx={{
+                                                                    bgcolor: miembro.estado === 'ACTIVO' ? colors.secondary.main : colors.primary.light,
+                                                                    color: 'white', 
+                                                                    fontSize: '0.75rem',
+                                                                    fontWeight: 600,
+                                                                    minWidth: 80
+                                                                }} 
+                                                            />
+                                                        </TableCell>
+
+                                                        <TableCell align="center">
+                                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                                <Tooltip title="Ver perfil">
+                                                                    <IconButton size="small" sx={{ color: colors.primary.main }}>
+                                                                        <VisibilityIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                                <Tooltip title="Editar información">
+                                                                    <IconButton size="small" sx={{ color: colors.accents.blue }}>
+                                                                        <EditIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </Stack>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+
+                                {/* Paginación */}
+                                {filteredMiembrosComite.length > 0 && (
+                                    <Box sx={{ 
+                                        p: 2, 
+                                        borderTop: '1px solid #e0e0e0', 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        bgcolor: 'white'
+                                    }}>
+                                        <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+                                            Mostrando {filteredMiembrosComite.length > 0 
+                                                ? ((pageComite - 1) * rowsPerPageComite) + 1 
+                                                : 0} - {Math.min(pageComite * rowsPerPageComite, filteredMiembrosComite.length)} de {filteredMiembrosComite.length} miembros
+                                        </Typography>
+                                        <Pagination
+                                            count={Math.ceil(filteredMiembrosComite.length / rowsPerPageComite)}
+                                            page={pageComite}
+                                            onChange={(e, v) => setPageComite(v)}
+                                            size="small"
+                                            sx={{
+                                                '& .MuiPaginationItem-root': {
+                                                    color: colors.primary.main,
+                                                    '&.Mui-selected': { backgroundColor: colors.primary.main, color: 'white' }
+                                                }
+                                            }}
+                                        />
+                                    </Box>
+                                )}
                             </Box>
                         )}
 
@@ -966,25 +1238,23 @@ const SystemConfig = () => {
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '22%' }}>Asociación</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }}>Código</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '14%' }}>Región</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '17%' }}>Representante Legal</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">Estatus</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '22%' }} align="center">Acciones</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '27%' }} align="center">Acciones</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {loadingAsociaciones ? (
-                                                <TableRow><TableCell colSpan={7} align="center" sx={{ py: 3 }}><CircularProgress size={30} sx={{ color: colors.primary.main }} /></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><CircularProgress size={30} sx={{ color: colors.primary.main }} /></TableCell></TableRow>
                                             ) : errorAsociaciones ? (
-                                                <TableRow><TableCell colSpan={7} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorAsociaciones}</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorAsociaciones}</Typography></TableCell></TableRow>
                                             ) : filteredAsociaciones.length === 0 ? (
-                                                <TableRow><TableCell colSpan={7} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron asociaciones</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron asociaciones</Typography></TableCell></TableRow>
                                             ) : filteredAsociaciones.map(asoc => (
                                                 <TableRow key={asoc.idAsociacion} hover sx={{ '&:hover': { bgcolor: '#f8f9fa' }, opacity: !asoc.activa ? 0.7 : 1, backgroundColor: !asoc.activa ? '#fff5f5' : 'inherit' }}>
-                                                    <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{asoc.idAsociacion}</Typography></TableCell>
                                                     <TableCell><Typography variant="body2" sx={{ fontWeight: 'bold', color: colors.primary.dark }}>{asoc.nombre}</Typography></TableCell>
                                                     <TableCell>{asoc.codigo ? <Typography variant="body2" sx={{ color: colors.primary.dark }}>{asoc.codigo}</Typography> : <Typography variant="caption" sx={{ color: colors.text.secondary }}>-</Typography>}</TableCell>
                                                     <TableCell>
@@ -1002,6 +1272,16 @@ const SystemConfig = () => {
                                                     <TableCell align="center"><Chip label={asoc.activa ? 'ACTIVA' : 'INACTIVA'} size="small" sx={{ bgcolor: asoc.activa ? colors.secondary.main : colors.primary.dark, color: 'white', fontWeight: 600, minWidth: 80 }} /></TableCell>
                                                     <TableCell align="center">
                                                         <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                            <Tooltip title="Gestionar usuarios">
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    sx={{ color: colors.accents.blue }} 
+                                                                    onClick={() => handleOpenUsuariosAsociacionDialog(asoc)}
+                                                                    disabled={!asoc.activa}
+                                                                >
+                                                                    <GroupIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
                                                             <Tooltip title={asoc.activa ? 'Desactivar' : 'Activar'}>
                                                                 <IconButton size="small" sx={{ color: asoc.activa ? colors.semaforo.rojo : colors.secondary.main }} onClick={() => handleToggleAsociacionStatus(asoc.idAsociacion)} disabled={togglingAsociacion === asoc.idAsociacion}>
                                                                     {togglingAsociacion === asoc.idAsociacion ? <CircularProgress size={16} /> : asoc.activa ? <BlockIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
@@ -1017,16 +1297,8 @@ const SystemConfig = () => {
                             </Box>
                         )}
 
-                        {/* TAB 4: Agentes Pendientes */}
+                        {/* TAB 4: Niveles de Reconocimiento */}
                         {activeTab === 4 && (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="h6" sx={{ color: colors.text.secondary }}>Módulo de Agentes Pendientes</Typography>
-                                <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>Contenido en desarrollo</Typography>
-                            </Box>
-                        )}
-
-                        {/* TAB 5: Niveles de Reconocimiento */}
-                        {activeTab === 5 && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 {/* Barra de controles */}
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1067,30 +1339,28 @@ const SystemConfig = () => {
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '5%' }}>ID</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '8%' }} align="center">Nivel</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '27%' }}>Nombre</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '37%' }}>Descripción</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '10%' }} align="center">Estatus</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '13%' }} align="center">Acciones</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', color: colors.primary.dark, width: '18%' }} align="center">Acciones</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {loadingNiveles ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                                         <CircularProgress size={30} sx={{ color: colors.primary.main }} />
                                                         <Typography variant="body2" sx={{ color: colors.text.secondary, mt: 1 }}>Cargando niveles...</Typography>
                                                     </TableCell>
                                                 </TableRow>
                                             ) : errorNiveles ? (
-                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorNiveles}</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.semaforo.rojo }}>{errorNiveles}</Typography></TableCell></TableRow>
                                             ) : filteredNiveles.length === 0 ? (
-                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron niveles de reconocimiento</Typography></TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Typography variant="body2" sx={{ color: colors.text.secondary }}>No se encontraron niveles de reconocimiento</Typography></TableCell></TableRow>
                                             ) : filteredNiveles.map(nivel => (
                                                 <TableRow key={nivel.idNivel} hover
                                                     sx={{ '&:hover': { bgcolor: '#f8f9fa' }, opacity: !nivel.activo ? 0.7 : 1, backgroundColor: !nivel.activo ? '#fff5f5' : 'inherit' }}>
-                                                    <TableCell><Typography variant="body2" sx={{ color: colors.primary.dark }}>{nivel.idNivel}</Typography></TableCell>
                                                     <TableCell align="center">
                                                         <Box sx={{
                                                             width: 32, height: 32, borderRadius: '50%',

@@ -34,7 +34,7 @@ const colors = {
 // Mapeo de rutas por rol
 const RUTAS_PERFIL = {
   supera: '/supera/profileI',
-  admin: '/admin/profile',
+  admin: '/admin/profileI',
   comite: '/committee/profile',
   asociacion: '/association/profileI',
   agente: '/dashboard/completar-perfil',

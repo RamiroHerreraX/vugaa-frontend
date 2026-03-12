@@ -376,6 +376,26 @@ async actualizarPerfilAgente(usuarioId, perfilData) {
       throw error.response?.data || { error: 'Error al actualizar el permiso de asociación' };
     }
   }
+  
+    /**
+   * Obtiene todos los usuarios con rol COMITE de una instancia específica
+   * @param {number} instanciaId - ID de la instancia
+   * @returns {Promise<Array>} Lista de usuarios del comité con sus cargos específicos
+   */
+  async findUsuariosComiteByInstancia(instanciaId) {
+    try {
+      console.log(`Obteniendo miembros del comité para instancia ID: ${instanciaId}`);
+      const response = await API.get(`/usuarios/comite/instancia/${instanciaId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error en findUsuariosComiteByInstancia:", error);
+      throw (
+        error.response?.data || {
+          error: "Error al obtener miembros del comité por instancia",
+        }
+      );
+    }
+  }
 
 }
 

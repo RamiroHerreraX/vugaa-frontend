@@ -37,6 +37,7 @@ import Adminprofile from "./pages/superadmin/Adminprofile";
 import AdminDashboard from "./pages/admin/Dashboard";
 import SystemConfig from "./pages/admin/SystemConfig";
 import AdminProfile from "./pages/admin/AdminProfile";
+import AdminProfileI from "./pages/admin/AdminprofileI";
 import ConfigExpediente from "./pages/admin/ConfigExpediente";
 import ConfigDeclaraciones from "./pages/admin/ConfigDeclaraciones";
 import GeneralAlerts from "./pages/admin/GeneralAlerts";
@@ -164,6 +165,15 @@ function App() {
               <Route path="/admin/auditoria" element={<AdminAuditLog />} />
             
             </Route>
+
+            <Route
+              path="/admin/profileI"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminProfileI />
+                </ProtectedRoute>
+              }
+            />
            
 
             {/* Rutas protegidas - Comité */}
