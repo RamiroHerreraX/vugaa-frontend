@@ -1,6 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { getTodosApartados } from "../../services/apartado";
+import {
+  subirDocumento,
+  getDocumentosSubidosPorApartado,
+  eliminarDocumentoSubido,
+  descargarArchivo,
+  obtenerArchivoBlob,
+} from "../../services/documentoSubido";
+
+import { getDocumentosPorApartadoActivos } from "../../services/documentoExpediente";
+import { getMiExpediente } from "../../services/expediente";
+import { getProgramasPorApartadoActivos } from "../../services/programas";
+
+import AddCertificationModal from "../../components/subirCertificacion/AddCertificationModal";
+import {
+  crearCertificacionCompleta,
+  getCertificacionesPorExpediente,
+  obtenerArchivoBlobCertificacion,
+  descargarArchivoCertificacion,
+  eliminarCertificacionCompleta,
+} from "../../services/certificaciones";
+
+// Modales importados
+import UploadDocumentModal from "../../components/AsociacionExpediente/UploadDocumentModal";
+import PreviewDocumentModal from "../../components/AsociacionExpediente/PreviewDocumentModal";
+import DeleteConfirmModal from "../../components/AsociacionExpediente/DeleteConfirmModal";
+import ValidationSendModal from "../../components/AsociacionExpediente/ValidationSendModal";
+
 import {
   Box,
+  Grid,
   Paper,
   Typography,
   Button,
@@ -8,1280 +39,2303 @@ import {
   CardContent,
   Chip,
   Stack,
-  TextField,
+  Divider,
+  IconButton,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   LinearProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Alert,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel
-} from '@mui/material';
+  Snackbar,
+  Tooltip,
+} from "@mui/material";
 import {
   ExpandMore as ExpandMoreIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
   Visibility as VisibilityIcon,
   Download as DownloadIcon,
-  CloudUpload as CloudUploadIcon,
-  Security as SecurityIcon,
-  Description as DescriptionIcon,
-  Verified as VerifiedIcon,
-  Send as SendIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
-  Gavel as GavelIcon,
-  MeetingRoom as MeetingRoomIcon,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Business as BusinessIcon,
+  Description as DescriptionIcon,
   Person as PersonIcon,
+  Business as BusinessIcon,
   Work as WorkIcon,
-  AccountBalance as AccountBalanceIcon
-} from '@mui/icons-material';
+  Security as SecurityIcon,
+  CloudUpload as CloudUploadIcon,
+  Gavel as GavelIcon,
+  Verified as VerifiedIcon,
+  Send as SendIcon,
+  School as SchoolIcon,
+  Update as UpdateIcon,
+  Info as InfoIcon,
+  FilePresent as FilePresentIcon,
+  Close as CloseIcon,
+  Folder as FolderIcon,
+  Assignment as AssignmentIcon,
+  Assessment as AssessmentIcon,
+  Timeline as TimelineIcon,
+  Shield as ShieldIcon,
+} from "@mui/icons-material";
 
-// Colores institucionales
-const institutionalColors = {
-  primary: '#133B6B',      // Azul oscuro principal
-  secondary: '#1a4c7a',    // Azul medio
-  accent: '#e9e9e9',       // Color para acentos (gris claro)
-  background: '#f4f6f8',   // Fondo claro
-  lightBlue: 'rgba(19, 59, 107, 0.08)',  // Azul transparente para hover
-  darkBlue: '#0D2A4D',     // Azul más oscuro
-  textPrimary: '#2c3e50',  // Texto principal
-  textSecondary: '#7f8c8d', // Texto secundario
-  success: '#1a4c7a',      // Verde para éxito
-  warning: '#1a4c7a',      // Naranja para advertencias
-  error: '#1a4c7a',        // Rojo para errores
-  info: '#1a4c7a',         // Azul para información
-};
-
-// ============================================
-// DATOS SIMULADOS DE BASE DE DATOS
-// ============================================
-
-// Configuración de tipos de campos dinámicos
-const tiposCampos = {
-  texto: 'texto',
-  texto_largo: 'texto_largo',
-  fecha: 'fecha',
-  archivo: 'archivo',
-  numero: 'numero',
-  seleccion: 'seleccion'
-};
-
-// Configuración de tipos de apartados
-const tiposApartados = {
-  documento_simple: 'documento_simple',
-  documento_con_campos: 'documento_con_campos',
-  registro_tabla: 'registro_tabla',
-  sistema_complejo: 'sistema_complejo'
-};
-
-// Iconos para diferentes tipos de apartados
-const iconosApartados = {
-  'documento_simple': DescriptionIcon,
-  'documento_con_campos': BusinessIcon,
-  'registro_tabla': MeetingRoomIcon,
-  'sistema_complejo': SecurityIcon,
-  'antisoborno': GavelIcon,
-  'presidente': PersonIcon,
-  'reuniones': MeetingRoomIcon,
-  'certificacion': VerifiedIcon
-};
-
-// Colores para diferentes tipos de apartados - ACTUALIZADOS CON AZULES INSTITUCIONALES
-const coloresApartados = {
-  'documento_simple': institutionalColors.primary,
-  'documento_con_campos': '#1a4c7a',
-  'registro_tabla': institutionalColors.success,
-  'sistema_complejo': institutionalColors.error,
-  'antisoborno': institutionalColors.warning,
-  'presidente': '#1a4c7a',
-  'reuniones': institutionalColors.info,
-  'certificacion': institutionalColors.success
-};
-
-// ============================================
-// DATOS DE APARTADOS DESDE "BASE DE DATOS"
-// ============================================
-const apartadosDesdeBD = [
-  {
-    id: 'acta_presidente',
-    titulo: 'ACTA CON PRESIDENTE ACTUAL',
-    subtitulo: 'Certificación del presidente actual en funciones',
-    tipo: 'presidente',
-    obligatorio: true,
-    dinamico: true,
-    estado: 'pendiente',
-    documento: null,
-    fechaRevision: null,
-    campos: [
-      {
-        id: 'presidente_actual',
-        label: 'Presidente Actual en Funciones',
-        tipo: tiposCampos.texto,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'fecha_designacion',
-        label: 'Fecha de Designación',
-        tipo: tiposCampos.fecha,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'descripcion',
-        label: 'Descripción del Acta',
-        tipo: tiposCampos.texto_largo,
-        valor: 'Acta oficial que certifica la designación del presidente actual en funciones. Debe incluir firma, sello oficial y fecha de emisión.',
-        requerido: false,
-        filas: 3
-      }
-    ],
-    descripcion: 'Documento dinámico que debe actualizarse cada vez que haya un cambio en la presidencia.'
+const colors = {
+  primary: {
+    dark: "#0D2A4D",
+    main: "#133B6B",
+    light: "#3A6EA5",
   },
-  {
-    id: 'politicas_antisoborno',
-    titulo: 'POLÍTICAS ANTISOBORNO',
-    subtitulo: 'Sistema de prevención de sobornos y corrupción',
-    tipo: 'antisoborno',
-    obligatorio: true,
-    estado: 'pendiente',
-    documento: null,
-    fechaRevision: null,
-    campos: [
-      {
-        id: 'descripcion',
-        label: 'Descripción de las Políticas',
-        tipo: tiposCampos.texto_largo,
-        valor: 'Políticas y procedimientos para prevenir, detectar y responder a actos de soborno y corrupción. Incluye código de conducta, canales de denuncia y medidas disciplinarias.',
-        requerido: true,
-        filas: 4
-      },
-      {
-        id: 'vigencia',
-        label: 'Fecha de Vigencia',
-        tipo: tiposCampos.fecha,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'ultima_capacitacion',
-        label: 'Última Capacitación',
-        tipo: tiposCampos.fecha,
-        valor: '',
-        requerido: false
-      },
-      {
-        id: 'nivel_implementacion',
-        label: 'Nivel de Implementación',
-        tipo: tiposCampos.seleccion,
-        valor: '',
-        requerido: true,
-        opciones: [
-          { valor: 'basico', etiqueta: 'Básico' },
-          { valor: 'intermedio', etiqueta: 'Intermedio' },
-          { valor: 'avanzado', etiqueta: 'Avanzado' },
-          { valor: 'completo', etiqueta: 'Completo' }
-        ]
-      }
-    ],
-    descripcion: 'Sistema integral para prevenir, detectar y responder a actos de soborno, corrupción y conductas antiéticas en la organización.'
+  secondary: {
+    main: "#00A8A8",
+    light: "#00C2D1",
+    lighter: "#35D0FF",
   },
-  {
-    id: 'registro_reuniones',
-    titulo: 'REGISTRO DE REUNIONES Y COASES',
-    subtitulo: 'Actas y acuerdos de reuniones formales',
-    tipo: 'reuniones',
-    obligatorio: true,
-    estado: 'pendiente',
-    documento: null,
-    fechaRevision: null,
-    esTabla: true,
-    datosTabla: [
-      {
-        id: 1,
-        fecha: '2024-01-15',
-        tipo: 'Junta Directiva',
-        asunto: 'Aprobación de presupuesto anual',
-        participantes: '5',
-        acuerdos: '3',
-        documento: 'acta_junta_001.pdf',
-        estado: 'aprobado'
-      },
-      {
-        id: 2,
-        fecha: '2024-02-10',
-        tipo: 'Comité de Ética',
-        asunto: 'Revisión de políticas antisoborno',
-        participantes: '7',
-        acuerdos: '5',
-        documento: 'acta_etica_001.pdf',
-        estado: 'pendiente'
-      }
-    ],
-    descripcion: 'Sistema para el registro formal de reuniones, coases (acuerdos) y actas. Incluye seguimiento de acuerdos y documentación de decisiones.'
+  accents: {
+    blue: "#0099FF",
+    purple: "#6C5CE7",
   },
-  {
-    id: 'certificacion_cumplimiento',
-    titulo: 'CERTIFICACIÓN DE CUMPLIMIENTO',
-    subtitulo: 'Certificación oficial de cumplimiento normativo',
-    tipo: 'certificacion',
-    obligatorio: false,
-    estado: 'pendiente',
-    documento: null,
-    fechaRevision: null,
-    campos: [
-      {
-        id: 'organismo',
-        label: 'Organismo Certificador',
-        tipo: tiposCampos.texto,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'numero_certificado',
-        label: 'Número de Certificado',
-        tipo: tiposCampos.texto,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'fecha_emision',
-        label: 'Fecha de Emisión',
-        tipo: tiposCampos.fecha,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'fecha_vencimiento',
-        label: 'Fecha de Vencimiento',
-        tipo: tiposCampos.fecha,
-        valor: '',
-        requerido: true
-      },
-      {
-        id: 'alcance',
-        label: 'Alcance de la Certificación',
-        tipo: tiposCampos.texto_largo,
-        valor: '',
-        requerido: true,
-        filas: 3
-      }
-    ],
-    descripcion: 'Certificación oficial emitida por organismo autorizado que acredita el cumplimiento de normativas específicas.'
-  }
-];
+  status: {
+    success: "#00A8A8",
+    warning: "#00C2D1",
+    error: "#0099FF",
+    info: "#3A6EA5",
+  },
+  text: {
+    primary: "#0D2A4D",
+    secondary: "#3A6EA5",
+    light: "#6C5CE7",
+  },
+};
 
-// ============================================
-// COMPONENTE PRINCIPAL
-// ============================================
+// ============================================================
+// COMPONENTES AUXILIARES
+// ============================================================
 
+const DocumentoSubidoItem = ({
+  documento,
+  onVer,
+  onDescargar,
+  onEliminar,
+  mostrarFecha = true,
+}) => {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        width: "100%",
+        p: 2,
+        borderRadius: 2,
+        backgroundColor: "#f8f9fa",
+        border: `1px solid ${colors.primary.main}20`,
+        transition: "all 0.2s",
+        "&:hover": {
+          backgroundColor: "#ffffff",
+          boxShadow: `0 4px 12px ${colors.primary.main}20`,
+          borderColor: colors.primary.main,
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          borderRadius: "50%",
+          backgroundColor: `${colors.primary.main}15`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <FilePresentIcon
+          sx={{ color: colors.primary.main, fontSize: "1.2rem" }}
+        />
+      </Box>
+
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: "600", color: colors.text.primary, mb: 0.5 }}
+        >
+          {documento.nombreOriginal || documento.nombreArchivo}
+        </Typography>
+        {mostrarFecha && documento.fechaSubida && (
+          <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+            Subido: {documento.fechaSubida}
+          </Typography>
+        )}
+      </Box>
+
+      <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+        <Tooltip title="Ver documento" arrow>
+          <IconButton
+            size="small"
+            onClick={() => onVer(documento)}
+            sx={{
+              color: colors.primary.main,
+              backgroundColor: `${colors.primary.main}15`,
+              "&:hover": { backgroundColor: `${colors.primary.main}25` },
+            }}
+          >
+            <VisibilityIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Descargar" arrow>
+          <IconButton
+            size="small"
+            onClick={() => onDescargar(documento)}
+            sx={{
+              color: colors.status.success,
+              backgroundColor: "#e8f5e9",
+              "&:hover": { backgroundColor: "#c8e6c9" },
+            }}
+          >
+            <DownloadIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Eliminar" arrow>
+          <IconButton
+            size="small"
+            onClick={() => onEliminar(documento)}
+            sx={{
+              color: colors.status.error,
+              backgroundColor: "#ffebee",
+              "&:hover": { backgroundColor: "#ffcdd2" },
+            }}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </Box>
+  );
+};
+
+const CertificacionProgramaItem = ({
+  documento,
+  programa,
+  onVer,
+  onDescargar,
+  onEliminar,
+  onEnviarValidacion,
+  estadoValidacion,
+}) => {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        width: "100%",
+        p: 2,
+        borderRadius: 2,
+        backgroundColor: "#f8f9fa",
+        border: `1px solid ${colors.accents.purple}20`,
+        transition: "all 0.2s",
+        "&:hover": {
+          backgroundColor: "#ffffff",
+          boxShadow: `0 4px 12px ${colors.accents.purple}20`,
+          borderColor: colors.accents.purple,
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          borderRadius: "50%",
+          backgroundColor: `${colors.accents.purple}15`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <SchoolIcon sx={{ color: colors.accents.purple, fontSize: "1.2rem" }} />
+      </Box>
+
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: "600", color: colors.text.primary, mb: 0.5 }}
+        >
+          {documento.nombreArchivo || documento.nombre}
+        </Typography>
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          {documento.institucion && (
+            <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+              <strong>Institución:</strong> {documento.institucion}
+            </Typography>
+          )}
+          {documento.horas && (
+            <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+              <strong>Horas:</strong> {documento.horas}
+            </Typography>
+          )}
+          {documento.fecha && (
+            <Typography variant="caption" sx={{ color: colors.text.secondary }}>
+              <strong>Fecha:</strong>{" "}
+              {new Date(documento.fecha).toLocaleDateString("es-MX")}
+            </Typography>
+          )}
+          {documento.estado && (
+            <Chip
+              label={documento.estado}
+              size="small"
+              sx={{
+                height: "18px",
+                fontSize: "0.65rem",
+                fontWeight: "600",
+                backgroundColor:
+                  documento.estado === "aprobado"
+                    ? "#e8f5e9"
+                    : documento.estado === "rechazado"
+                      ? "#ffebee"
+                      : "#fff3e0",
+                color:
+                  documento.estado === "aprobado"
+                    ? "#2e7d32"
+                    : documento.estado === "rechazado"
+                      ? "#c62828"
+                      : "#e65100",
+              }}
+            />
+          )}
+        </Box>
+      </Box>
+
+      <Box
+        sx={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}
+      >
+        {estadoValidacion && (
+          <Chip
+            label={
+              estadoValidacion.estado === "enviado" ? "ENVIADO" : "PENDIENTE"
+            }
+            size="small"
+            color={
+              estadoValidacion.estado === "enviado" ? "success" : "warning"
+            }
+            icon={
+              estadoValidacion.estado === "enviado" ? (
+                <CheckCircleIcon />
+              ) : (
+                <WarningIcon />
+              )
+            }
+            sx={{ height: "24px", fontSize: "0.7rem" }}
+          />
+        )}
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Ver certificado" arrow>
+            <IconButton
+              size="small"
+              onClick={() => onVer(documento)}
+              sx={{
+                color: colors.primary.main,
+                backgroundColor: `${colors.primary.main}15`,
+                "&:hover": { backgroundColor: `${colors.primary.main}25` },
+              }}
+            >
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Descargar" arrow>
+            <IconButton
+              size="small"
+              onClick={() => onDescargar(documento)}
+              sx={{
+                color: colors.status.success,
+                backgroundColor: "#e8f5e9",
+                "&:hover": { backgroundColor: "#c8e6c9" },
+              }}
+            >
+              <DownloadIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Eliminar" arrow>
+            <IconButton
+              size="small"
+              onClick={() => onEliminar(documento)}
+              sx={{
+                color: colors.status.error,
+                backgroundColor: "#ffebee",
+                "&:hover": { backgroundColor: "#ffcdd2" },
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
+    </Box>
+  );
+};
+
+// ============================================================
+// EXPEDIENTE PRINCIPAL
+// ============================================================
 const Expediente = () => {
-  const [expanded, setExpanded] = useState(null);
-  const [apartados, setApartados] = useState([]);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Estados principales
+  const [expediente, setExpediente] = useState(null);
+  const [archivosSubidos, setArchivosSubidos] = useState({});
+  const [apartadosDinamicos, setApartadosDinamicos] = useState([]);
+  const [loadingApartados, setLoadingApartados] = useState(false);
+  const [expanded, setExpanded] = useState("panel1");
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  // Estados para certificaciones de programas
+  const [documentosProgramas, setDocumentosProgramas] = useState({});
+  const [estadosValidacionProgramas, setEstadosValidacionProgramas] = useState(
+    {},
+  );
+  const [certModalOpen, setCertModalOpen] = useState(false);
+  const [progSeleccionado, setProgSeleccionado] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [nuevaCertificacion, setNuevaCertificacion] = useState({
+    subseccion: "",
+    tipoDocumento: "",
+    institucion: "",
+    fecha: new Date().toISOString().split("T")[0],
+    horas: "",
+    archivo: null,
+    nombreArchivo: "",
+  });
+
+  // Estados para modales
+  const [uploadDialog, setUploadDialog] = useState({
+    open: false,
+    tipo: "",
+    titulo: "",
+    archivo: null,
+    nombreArchivo: "",
+    idDocumentoPlantilla: null,
+    uploading: false,
+    progress: 0,
+  });
+
+  const [previewDialog, setPreviewDialog] = useState({
+    open: false,
+    documento: null,
+    nombre: "",
+    tipo: "",
+    seccion: "",
+    loading: false,
+    objectUrl: null,
+  });
+
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    seccion: "",
+    subseccion: "",
+    documentoId: null,
+    tipo: "",
+    nombre: "",
+    horas: 0,
+    itemName: "",
+    itemIndex: null,
+  });
+
   const [validacionDialog, setValidacionDialog] = useState({
     open: false,
-    apartadoId: '',
-    titulo: '',
-    fecha: ''
-  });
-  const [estadosValidacion, setEstadosValidacion] = useState({});
-  const [reunionDialog, setReunionDialog] = useState({
-    open: false,
-    apartadoId: '',
-    reunion: null,
-    editing: false
-  });
-  const [nuevaReunion, setNuevaReunion] = useState({
-    fecha: '',
-    tipo: '',
-    asunto: '',
-    participantes: '',
-    acuerdos: '',
-    documento: null
+    programa: null,
+    documento: null,
+    fecha: "",
   });
 
-  // Cargar datos desde "base de datos" al iniciar
+  // ============================================================
+  // EFECTOS
+  // ============================================================
+
   useEffect(() => {
-    // Simular carga desde API
-    setApartados(apartadosDesdeBD);
-  }, []);
+    const cargarExpediente = async () => {
+      if (!user?.id || !user?.instanciaId) return;
+      try {
+        const miExpediente = await getMiExpediente();
+        setExpediente(miExpediente);
+      } catch (error) {
+        console.error("Error cargando expediente:", error);
+      }
+    };
+    cargarExpediente();
+  }, [user?.id, user?.instanciaId]);
+
+  useEffect(() => {
+    const cargarApartados = async () => {
+      if (!user?.instanciaId) return;
+      setLoadingApartados(true);
+      try {
+        const todos = await getTodosApartados();
+        const globales = todos.filter(
+          (a) => !a.idInstancia || a.idInstancia === user.instanciaId,
+        );
+
+        const apartadosTransformados = await Promise.all(
+          globales.map(async (apartado) => {
+            let programas = [];
+            try {
+              programas = await getProgramasPorApartadoActivos(
+                apartado.idApartado,
+              );
+            } catch (error) {
+              console.error(
+                `Error cargando programas del apartado ${apartado.idApartado}:`,
+                error,
+              );
+            }
+            let documentos = [];
+            try {
+              documentos = await getDocumentosPorApartadoActivos(
+                apartado.idApartado,
+              );
+            } catch (error) {
+              console.error(
+                `Error cargando docs del apartado ${apartado.idApartado}:`,
+                error,
+              );
+            }
+            return {
+              id: `apartado_${apartado.idApartado}`,
+              idApartado: apartado.idApartado,
+              nombre: apartado.nombre,
+              titulo: apartado.nombre,
+              descripcion: apartado.descripcion || "",
+              icono: apartado.icono || "description",
+              orden: apartado.orden || 0,
+              obligatorio: apartado.obligatorio || false,
+              esGlobal: !apartado.idInstancia,
+              documentos: documentos || [],
+              programas: programas || [],
+            };
+          }),
+        );
+
+        setApartadosDinamicos(apartadosTransformados);
+
+        if (expediente?.id) {
+          const subidosPorApartado = {};
+          await Promise.all(
+            globales.map(async (apartado) => {
+              try {
+                const docs = await getDocumentosSubidosPorApartado(
+                  expediente.id,
+                  apartado.idApartado,
+                );
+                if (docs?.length > 0) {
+                  subidosPorApartado[apartado.idApartado] = {};
+                  docs.forEach((doc) => {
+                    if (doc.idDocumentoPlantilla) {
+                      subidosPorApartado[apartado.idApartado][
+                        doc.idDocumentoPlantilla
+                      ] = doc;
+                    }
+                  });
+                }
+              } catch (error) {
+                console.error(
+                  `Error cargando docs subidos del apartado ${apartado.idApartado}:`,
+                  error,
+                );
+              }
+            }),
+          );
+          setArchivosSubidos(subidosPorApartado);
+
+          try {
+            const certs = await getCertificacionesPorExpediente(expediente.id);
+            const docsPrograma = {};
+            certs.forEach((cert) => {
+              if (cert.idPrograma) {
+                docsPrograma[cert.idPrograma] = {
+                  id: cert.idCertExp,
+                  idCertificacion: cert.idCertificacion,
+                  nombreArchivo:
+                    cert.nombreArchivo ||
+                    cert.nombreCertificacion ||
+                    "documento",
+                  nombre: cert.nombreCertificacion,
+                  institucion: cert.institucion,
+                  horas: cert.horasAcreditadas,
+                  fecha: cert.fechaEmision,
+                  idDocumentoSubido: cert.mongoDocumentoId,
+                  estado: cert.estado,
+                };
+              }
+            });
+            setDocumentosProgramas(docsPrograma);
+          } catch (error) {
+            console.error("Error cargando certs de programas:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Error cargando apartados:", error);
+        setSnackbar({
+          open: true,
+          message: "Error al cargar los apartados",
+          severity: "error",
+        });
+      } finally {
+        setLoadingApartados(false);
+      }
+    };
+    cargarApartados();
+  }, [user?.instanciaId, expediente?.id]);
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  const getIconForApartado = (icono) => {
+    const iconMap = {
+      description: <DescriptionIcon />,
+      folder: <FolderIcon />,
+      security: <SecurityIcon />,
+      work: <WorkIcon />,
+      business: <BusinessIcon />,
+      cloud: <CloudUploadIcon />,
+      verified: <VerifiedIcon />,
+      person: <PersonIcon />,
+      gavel: <GavelIcon />,
+      school: <SchoolIcon />,
+      file: <DescriptionIcon />,
+      document: <DescriptionIcon />,
+      certificate: <VerifiedIcon />,
+      assignment: <AssignmentIcon />,
+      article: <DescriptionIcon />,
+      book: <SchoolIcon />,
+      menu_book: <SchoolIcon />,
+      fact_check: <VerifiedIcon />,
+      check_circle: <CheckCircleIcon />,
+      warning: <WarningIcon />,
+      info: <InfoIcon />,
+      timeline: <TimelineIcon />,
+      assessment: <AssessmentIcon />,
+      shield: <ShieldIcon />,
+    };
+    return iconMap[icono?.toLowerCase()] || <DescriptionIcon />;
+  };
 
   const handleAccordionChange = (panel) => (event, isExpanded) => {
     setExpanded(isExpanded ? panel : false);
   };
 
-  const handleDocumentoUpload = (apartadoId) => {
-    const fechaActual = new Date().toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
+  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+
+  const detectarTipoArchivo = (nombreArchivo) => {
+    const ext = nombreArchivo?.split(".").pop()?.toLowerCase();
+    if (ext === "pdf") return "pdf";
+    if (["png", "jpg", "jpeg", "gif"].includes(ext)) return "image";
+    if (["docx", "xlsx", "pptx"].includes(ext)) return "office";
+    if (["txt", "csv"].includes(ext)) return "text";
+    if (ext === "mp4") return "video";
+    if (ext === "mp3") return "audio";
+    return "unknown";
+  };
+
+  // ============================================================
+  // HANDLERS DE DOCUMENTOS
+  // ============================================================
+
+  const handleVerDocumento = async (documento, seccion) => {
+    const nombre =
+      documento.nombreOriginal ||
+      documento.nombreArchivo ||
+      documento.documento ||
+      "documento";
+
+    if (!documento.idDocumentoSubido) {
+      setPreviewDialog({
+        open: true,
+        documento: null,
+        nombre,
+        tipo: detectarTipoArchivo(nombre),
+        seccion,
+        loading: false,
+        objectUrl: null,
+      });
+      return;
+    }
+
+    setPreviewDialog({
+      open: true,
+      documento: null,
+      nombre,
+      tipo: detectarTipoArchivo(nombre),
+      seccion,
+      loading: true,
+      objectUrl: null,
     });
 
-    setApartados(prev => prev.map(apartado => {
-      if (apartado.id === apartadoId) {
-        return {
-          ...apartado,
-          documento: `${apartado.id}_${Date.now()}.pdf`,
-          estado: 'en_revision',
-          fechaRevision: fechaActual
-        };
+    try {
+      const blob = await obtenerArchivoBlob(documento.idDocumentoSubido);
+      const objectUrl = URL.createObjectURL(blob);
+      setPreviewDialog((prev) => ({ ...prev, loading: false, objectUrl }));
+    } catch (error) {
+      console.error("Error al cargar vista previa:", error);
+      setSnackbar({
+        open: true,
+        message: "No se pudo cargar la vista previa",
+        severity: "error",
+      });
+      setPreviewDialog((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleDescargarDocumento = async (documento) => {
+    if (documento.idDocumentoSubido) {
+      try {
+        setSnackbar({
+          open: true,
+          message: "Descargando archivo...",
+          severity: "info",
+        });
+        await descargarArchivo(
+          documento.idDocumentoSubido,
+          documento.nombreOriginal,
+        );
+        setSnackbar({
+          open: true,
+          message: "Archivo descargado correctamente",
+          severity: "success",
+        });
+      } catch (error) {
+        console.error("Error al descargar:", error);
+        setSnackbar({
+          open: true,
+          message: "Error al descargar el archivo",
+          severity: "error",
+        });
       }
-      return apartado;
-    }));
-  };
-
-  const handleCampoChange = (apartadoId, campoId, valor) => {
-    setApartados(prev => prev.map(apartado => {
-      if (apartado.id === apartadoId) {
-        return {
-          ...apartado,
-          campos: apartado.campos?.map(campo => 
-            campo.id === campoId ? { ...campo, valor } : campo
-          )
-        };
-      }
-      return apartado;
-    }));
-  };
-
-  const handleVerDocumento = (documento) => {
-    console.log(`Ver documento: ${documento}`);
-    // Aquí iría la lógica para ver el documento
-  };
-
-  const handleAbrirValidacionDialog = (apartadoId, titulo) => {
-    const fechaActual = new Date().toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      return;
+    }
+    setSnackbar({
+      open: true,
+      message: `Descargando ${documento.nombreArchivo || documento.nombreOriginal}...`,
+      severity: "info",
     });
-    
+    setTimeout(
+      () =>
+        setSnackbar({
+          open: true,
+          message: "Documento descargado correctamente",
+          severity: "success",
+        }),
+      1000,
+    );
+  };
+
+  const handleEliminarDocumentoSubido = (doc, idApartado) => {
+    setDeleteDialog({
+      open: true,
+      seccion: "documentoSubido",
+      subseccion: doc.idDocumentoPlantilla,
+      documentoId: doc.idDocumentoSubido,
+      tipo: "documentoSubido",
+      nombre: doc.nombreOriginal,
+      horas: 0,
+      itemName: "",
+      itemIndex: idApartado,
+    });
+  };
+
+  const handleEliminarDocumentoPrograma = (programaId, documento) => {
+    setDeleteDialog({
+      open: true,
+      seccion: "programa",
+      subseccion: documento.idCertificacion,
+      documentoId: documento.id,
+      tipo: "programa",
+      nombre: documento.nombreArchivo || documento.nombre,
+      horas: 0,
+      itemName: "",
+      itemIndex: programaId,
+    });
+  };
+
+  const handleEnviarValidacionPrograma = (programa, documento) => {
+    const fechaActual = new Date().toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     setValidacionDialog({
       open: true,
-      apartadoId,
-      titulo,
-      fecha: fechaActual
+      programa,
+      documento,
+      fecha: fechaActual,
+    });
+  };
+
+  const handleConfirmarValidacionPrograma = () => {
+    const { programa, documento, fecha } = validacionDialog;
+    setEstadosValidacionProgramas((prev) => ({
+      ...prev,
+      [programa.id]: {
+        enviado: true,
+        fechaEnvio: fecha,
+        estado: "enviado",
+        documentoId: documento.id,
+      },
+    }));
+    setSnackbar({
+      open: true,
+      message: `Certificación enviada a validación correctamente`,
+      severity: "success",
+    });
+    setValidacionDialog({
+      open: false,
+      programa: null,
+      documento: null,
+      fecha: "",
     });
   };
 
   const handleCerrarValidacionDialog = () => {
     setValidacionDialog({
       open: false,
-      apartadoId: '',
-      titulo: '',
-      fecha: ''
+      programa: null,
+      documento: null,
+      fecha: "",
     });
   };
 
-  const handleConfirmarValidacion = () => {
-    const { apartadoId, fecha } = validacionDialog;
-    
-    setEstadosValidacion(prev => ({
-      ...prev,
-      [apartadoId]: {
-        enviado: true,
-        fechaEnvio: fecha,
-        estado: 'en_revision'
+  const handleConfirmarEliminacion = async () => {
+    const { seccion, documentoId, itemIndex, subseccion } = deleteDialog;
+
+    if (seccion === "documentoSubido") {
+      try {
+        await eliminarDocumentoSubido(documentoId);
+        const idApartado = itemIndex;
+        const idPlantilla = subseccion;
+        setArchivosSubidos((prev) => {
+          const apartadoDocs = { ...(prev[idApartado] || {}) };
+          delete apartadoDocs[idPlantilla];
+          return { ...prev, [idApartado]: apartadoDocs };
+        });
+      } catch (error) {
+        console.error("Error al eliminar documento:", error);
+        setSnackbar({
+          open: true,
+          message: "Error al eliminar el documento",
+          severity: "error",
+        });
+        setDeleteDialog({
+          open: false,
+          seccion: "",
+          subseccion: "",
+          documentoId: null,
+          tipo: "",
+          nombre: "",
+          horas: 0,
+          itemName: "",
+          itemIndex: null,
+        });
+        return;
       }
-    }));
+    } else if (seccion === "programa") {
+      try {
+        await eliminarCertificacionCompleta(documentoId, subseccion);
+        const programaId = itemIndex;
+        setDocumentosProgramas((prev) => {
+          const newDocs = { ...prev };
+          delete newDocs[programaId];
+          return newDocs;
+        });
+        setEstadosValidacionProgramas((prev) => {
+          const newState = { ...prev };
+          delete newState[programaId];
+          return newState;
+        });
+      } catch (error) {
+        console.error("Error al eliminar certificación:", error);
+        setSnackbar({
+          open: true,
+          message: "Error al eliminar la certificación",
+          severity: "error",
+        });
+        setDeleteDialog({
+          open: false,
+          seccion: "",
+          subseccion: "",
+          documentoId: null,
+          tipo: "",
+          nombre: "",
+          horas: 0,
+          itemName: "",
+          itemIndex: null,
+        });
+        return;
+      }
+    }
 
-    handleCerrarValidacionDialog();
+    setSnackbar({
+      open: true,
+      message: "Documento eliminado correctamente",
+      severity: "success",
+    });
+    setDeleteDialog({
+      open: false,
+      seccion: "",
+      subseccion: "",
+      documentoId: null,
+      tipo: "",
+      nombre: "",
+      horas: 0,
+      itemName: "",
+      itemIndex: null,
+    });
   };
 
-  const obtenerEstadoValidacion = (apartadoId) => {
-    return estadosValidacion[apartadoId] || { enviado: false, fechaEnvio: null, estado: 'pendiente' };
+  const handleOpenUploadDialog = (
+    tipo,
+    titulo,
+    idDocumentoPlantilla = null,
+  ) => {
+    setUploadDialog({
+      open: true,
+      tipo,
+      titulo,
+      archivo: null,
+      nombreArchivo: "",
+      idDocumentoPlantilla,
+      uploading: false,
+      progress: 0,
+    });
   };
 
-  // Funciones para Reuniones (apartados con tabla)
-  const handleAbrirDialogReunion = (apartadoId, reunion = null) => {
-    if (reunion) {
-      setNuevaReunion({ ...reunion });
-      setReunionDialog({ open: true, apartadoId, reunion, editing: true });
-    } else {
-      setNuevaReunion({
-        fecha: '',
-        tipo: '',
-        asunto: '',
-        participantes: '',
-        acuerdos: '',
-        documento: null
+  const handleCumplimientoFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setSnackbar({
+        open: true,
+        message: "El archivo no puede ser mayor a 10MB",
+        severity: "error",
       });
-      setReunionDialog({ open: true, apartadoId, reunion: null, editing: false });
+      return;
+    }
+    const tiposPermitidos = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    if (!tiposPermitidos.includes(file.type)) {
+      setSnackbar({
+        open: true,
+        message: "Formato no permitido. Use PDF, DOC o DOCX",
+        severity: "error",
+      });
+      return;
+    }
+    setUploadDialog({
+      ...uploadDialog,
+      archivo: file,
+      nombreArchivo: file.name,
+    });
+  };
+
+  const handleGuardarDocumentoCumplimiento = async () => {
+    if (!uploadDialog.archivo) return;
+
+    setUploadDialog((prev) => ({ ...prev, uploading: true, progress: 0 }));
+
+    const progressInterval = setInterval(() => {
+      setUploadDialog((prev) => {
+        if (prev.progress >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return { ...prev, progress: prev.progress + 10 };
+      });
+    }, 200);
+
+    if (uploadDialog.tipo?.startsWith("apartado_")) {
+      const idApartado = parseInt(uploadDialog.tipo.replace("apartado_", ""));
+      try {
+        const payload = {
+          idExpediente: expediente?.id,
+          idInstancia: user.instanciaId,
+          idApartado: idApartado,
+          idDocumentoPlantilla: uploadDialog.idDocumentoPlantilla,
+          nombreOriginal: uploadDialog.archivo.name,
+          requiereValidacion: false,
+          usuarioCarga: user.id,
+        };
+
+        clearInterval(progressInterval);
+        setUploadDialog((prev) => ({ ...prev, progress: 100 }));
+
+        const documentoGuardado = await subirDocumento(
+          payload,
+          uploadDialog.archivo,
+        );
+
+        setTimeout(() => {
+          setArchivosSubidos((prev) => ({
+            ...prev,
+            [idApartado]: {
+              ...(prev[idApartado] || {}),
+              [uploadDialog.idDocumentoPlantilla]: {
+                ...documentoGuardado,
+                fechaSubida: new Date().toLocaleDateString("es-MX"),
+              },
+            },
+          }));
+          setSnackbar({
+            open: true,
+            message: `Documento "${uploadDialog.archivo.name}" subido correctamente`,
+            severity: "success",
+          });
+          setUploadDialog({
+            open: false,
+            tipo: "",
+            titulo: "",
+            archivo: null,
+            nombreArchivo: "",
+            uploading: false,
+            progress: 0,
+          });
+        }, 500);
+      } catch (error) {
+        clearInterval(progressInterval);
+        console.error("Error al subir documento:", error);
+        setSnackbar({
+          open: true,
+          message: "Error al subir el documento",
+          severity: "error",
+        });
+        setUploadDialog((prev) => ({ ...prev, uploading: false, progress: 0 }));
+      }
     }
   };
 
-  const handleCerrarDialogReunion = () => {
-    setReunionDialog({ open: false, apartadoId: '', reunion: null, editing: false });
+  // Handlers para certificaciones
+  const handleNuevaCertificacionChange = (campo) => (event) => {
+    setNuevaCertificacion((prev) => ({ ...prev, [campo]: event.target.value }));
   };
 
-  const handleAgregarReunion = () => {
-    const { apartadoId, editing } = reunionDialog;
-    
-    setApartados(prev => prev.map(apartado => {
-      if (apartado.id === apartadoId && apartado.esTabla) {
-        const nuevasReuniones = editing
-          ? apartado.datosTabla.map(r => 
-              r.id === reunionDialog.reunion.id ? { ...nuevaReunion, id: r.id } : r
-            )
-          : [...apartado.datosTabla, { ...nuevaReunion, id: Date.now(), estado: 'pendiente' }];
-        
-        return {
-          ...apartado,
-          datosTabla: nuevasReuniones
-        };
-      }
-      return apartado;
+  const handleCertFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setSnackbar({
+        open: true,
+        message: "El archivo no puede ser mayor a 10MB",
+        severity: "error",
+      });
+      return;
+    }
+    const tiposPermitidos = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "image/jpeg",
+      "image/png",
+    ];
+    if (!tiposPermitidos.includes(file.type)) {
+      setSnackbar({
+        open: true,
+        message: "Formato no permitido. Use PDF, DOC, DOCX, JPG o PNG",
+        severity: "error",
+      });
+      return;
+    }
+    setNuevaCertificacion((prev) => ({
+      ...prev,
+      archivo: file,
+      nombreArchivo: file.name,
     }));
-    
-    handleCerrarDialogReunion();
+    setUploading(true);
+    setUploadProgress(0);
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setUploading(false);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 300);
   };
 
-  const handleEliminarReunion = (apartadoId, reunionId) => {
-    setApartados(prev => prev.map(apartado => {
-      if (apartado.id === apartadoId && apartado.esTabla) {
-        return {
-          ...apartado,
-          datosTabla: apartado.datosTabla.filter(r => r.id !== reunionId)
-        };
+  const handleGuardarCertDesdePrograma = async () => {
+    if (
+      !nuevaCertificacion.tipoDocumento ||
+      !nuevaCertificacion.institucion ||
+      !nuevaCertificacion.horas ||
+      !nuevaCertificacion.archivo
+    ) {
+      setSnackbar({
+        open: true,
+        message: "Complete todos los campos requeridos",
+        severity: "warning",
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      const nuevoDoc = await crearCertificacionCompleta(
+        {
+          nombre: nuevaCertificacion.tipoDocumento,
+          institucion: nuevaCertificacion.institucion,
+          horas: parseInt(nuevaCertificacion.horas),
+          fecha: nuevaCertificacion.fecha,
+          nombreArchivo: nuevaCertificacion.nombreArchivo,
+          descripcion: "",
+        },
+        user?.instanciaId,
+        expediente?.id,
+        progSeleccionado?.id,
+        nuevaCertificacion.archivo,
+      );
+
+      if (progSeleccionado) {
+        setDocumentosProgramas((prev) => ({
+          ...prev,
+          [progSeleccionado.id]: {
+            id: nuevoDoc.idCertExp,
+            idCertificacion: nuevoDoc.idCertificacion,
+            nombreArchivo:
+              nuevoDoc.nombreArchivo || nuevaCertificacion.nombreArchivo,
+            nombre:
+              nuevoDoc.nombreCertificacion || nuevaCertificacion.tipoDocumento,
+            institucion: nuevoDoc.institucion || nuevaCertificacion.institucion,
+            horas:
+              nuevoDoc.horasAcreditadas || parseInt(nuevaCertificacion.horas),
+            fecha: nuevoDoc.fechaEmision || nuevaCertificacion.fecha,
+            idDocumentoSubido: nuevoDoc.mongoDocumentoId,
+            estado: nuevoDoc.estado || "pendiente",
+          },
+        }));
       }
-      return apartado;
-    }));
-  };
 
-  // Calcular cumplimiento basado en documentos subidos
-  const calculateCompliance = () => {
-    const obligatorios = apartados.filter(a => a.obligatorio);
-    if (obligatorios.length === 0) return 0;
-    
-    const completados = obligatorios.filter(a => a.documento).length;
-    return Math.round((completados / obligatorios.length) * 100);
-  };
-
-  const compliance = calculateCompliance();
-
-  // Renderizar campo según tipo
-  const renderCampo = (apartadoId, campo) => {
-    const commonProps = {
-      fullWidth: true,
-      label: campo.label,
-      value: campo.valor || '',
-      onChange: (e) => handleCampoChange(apartadoId, campo.id, e.target.value),
-      sx: { mb: 2 },
-      InputLabelProps: { shrink: true },
-      required: campo.requerido
-    };
-
-    switch (campo.tipo) {
-      case tiposCampos.texto_largo:
-        return (
-          <TextField
-            {...commonProps}
-            multiline
-            rows={campo.filas || 4}
-            helperText={campo.descripcion || ''}
-          />
-        );
-      
-      case tiposCampos.fecha:
-        return (
-          <TextField
-            {...commonProps}
-            type="date"
-            helperText={campo.descripcion || ''}
-          />
-        );
-      
-      case tiposCampos.seleccion:
-        return (
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel shrink sx={{ '&.Mui-focused': { color: institutionalColors.primary } }}>{campo.label}</InputLabel>
-            <Select
-              value={campo.valor || ''}
-              onChange={(e) => handleCampoChange(apartadoId, campo.id, e.target.value)}
-              label={campo.label}
-              required={campo.requerido}
-              sx={{
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: institutionalColors.primary,
-                }
-              }}
-            >
-              {campo.opciones?.map((opcion, index) => (
-                <MenuItem key={index} value={opcion.valor}>
-                  {opcion.etiqueta}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        );
-      
-      case tiposCampos.numero:
-        return (
-          <TextField
-            {...commonProps}
-            type="number"
-            helperText={campo.descripcion || ''}
-          />
-        );
-      
-      default: // texto
-        return (
-          <TextField
-            {...commonProps}
-            helperText={campo.descripcion || ''}
-          />
-        );
+      setSnackbar({
+        open: true,
+        message: "Certificación enviada para validación",
+        severity: "success",
+      });
+      setCertModalOpen(false);
+      setProgSeleccionado(null);
+      setNuevaCertificacion({
+        subseccion: "",
+        tipoDocumento: "",
+        institucion: "",
+        fecha: new Date().toISOString().split("T")[0],
+        horas: "",
+        archivo: null,
+        nombreArchivo: "",
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error.response?.data?.message || "Error al guardar la certificación",
+        severity: "error",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Renderizar apartado dinámico
-  const renderApartado = (apartado) => {
-    const estadoValidacion = obtenerEstadoValidacion(apartado.id);
-    const Icono = iconosApartados[apartado.tipo] || DescriptionIcon;
-    const color = coloresApartados[apartado.tipo] || institutionalColors.primary;
-    const tieneDocumento = !!apartado.documento;
-    
+  // ============================================================
+  // RENDER APARTADO DINÁMICO
+  // ============================================================
+  const renderApartadoDinamico = (apartado) => {
+    const tieneDocumentos = apartado.documentos?.length > 0;
+    const tieneProgramas = apartado.programas?.length > 0;
+    const documentosSubidosCount = Object.keys(
+      archivosSubidos[apartado.idApartado] || {},
+    ).length;
+    const programasCompletados =
+      apartado.programas?.filter((p) => documentosProgramas[p.id]).length || 0;
+
+    const progresoTotal =
+      tieneDocumentos || tieneProgramas
+        ? Math.round(
+            ((documentosSubidosCount + programasCompletados) /
+              ((tieneDocumentos ? apartado.documentos.length : 0) +
+                (tieneProgramas ? apartado.programas.length : 0))) *
+              100,
+          )
+        : 0;
+
     return (
-      <Accordion 
+      <Accordion
         key={apartado.id}
         expanded={expanded === apartado.id}
         onChange={handleAccordionChange(apartado.id)}
-        sx={{ 
-          mb: 3,
-          border: '2px solid',
-          borderColor: tieneDocumento ? color : institutionalColors.warning,
-          borderRadius: '8px !important',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-          '&:before': { display: 'none' }
+        sx={{
+          mb: 2,
+          border: "1px solid",
+          borderColor:
+            progresoTotal === 100
+              ? colors.status.success + "80"
+              : colors.primary.light + "40",
+          borderRadius: "8px !important",
+          overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          "&:before": { display: "none" },
+          "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
         }}
       >
-        <AccordionSummary 
+        <AccordionSummary
           expandIcon={<ExpandMoreIcon />}
-          sx={{ 
-            backgroundColor: expanded === apartado.id ? 
-              (tieneDocumento ? `${color}10` : '#fff3e0') : 'white',
-            borderRadius: '8px',
-            minHeight: '70px'
+          sx={{
+            backgroundColor: expanded === apartado.id ? "#f8f9fa" : "white",
+            "& .MuiAccordionSummary-content": { alignItems: "center" },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-            <Box sx={{ 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              backgroundColor: tieneDocumento ? `${color}20` : '#fff3e0',
-              color: tieneDocumento ? color : institutionalColors.warning
-            }}>
-              <Icono />
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              width: "100%",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                backgroundColor:
+                  progresoTotal === 100
+                    ? "#e8f5e9"
+                    : apartado.esGlobal
+                      ? "#f3e5f5"
+                      : "#e3f2fd",
+                color:
+                  progresoTotal === 100
+                    ? colors.status.success
+                    : apartado.esGlobal
+                      ? colors.accents.purple
+                      : colors.primary.main,
+              }}
+            >
+              {getIconForApartado(apartado.icono)}
             </Box>
-            
+
             <Box sx={{ flexGrow: 1 }}>
-              <Typography sx={{ 
-                fontWeight: '700', 
-                color: institutionalColors.textPrimary,
-                fontSize: '1rem',
-                mb: 0.5
-              }}>
-                {apartado.titulo} {apartado.obligatorio && '(OBLIGATORIO)'}
+              <Typography
+                sx={{
+                  fontWeight: "700",
+                  color: colors.text.primary,
+                  fontSize: "1rem",
+                }}
+              >
+                {apartado.nombre}
               </Typography>
-              <Typography variant="caption" sx={{ color: institutionalColors.textSecondary }}>
-                {apartado.subtitulo}
-              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  mt: 0.5,
+                }}
+              >
+                {apartado.descripcion && (
+                  <Typography
+                    variant="caption"
+                    sx={{ color: colors.text.secondary }}
+                  >
+                    {apartado.descripcion}
+                  </Typography>
+                )}
+                {apartado.esGlobal && (
+                  <Chip
+                    label="Global"
+                    size="small"
+                    sx={{
+                      height: "18px",
+                      fontSize: "0.6rem",
+                      backgroundColor: colors.accents.purple,
+                      color: "white",
+                    }}
+                  />
+                )}
+              </Box>
             </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {apartado.dinamico && (
-                <Chip 
-                  label="DINÁMICO"
-                  size="small"
-                  sx={{ 
-                    bgcolor: institutionalColors.lightBlue,
-                    color: institutionalColors.primary,
-                    height: '24px', 
-                    fontSize: '0.7rem' 
-                  }}
-                />
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              {progresoTotal > 0 && (
+                <Box
+                  sx={{ width: "80px", display: { xs: "none", sm: "block" } }}
+                >
+                  <LinearProgress
+                    variant="determinate"
+                    value={progresoTotal}
+                    sx={{
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: "#f0f0f0",
+                      "& .MuiLinearProgress-bar": {
+                        backgroundColor:
+                          progresoTotal === 100
+                            ? colors.status.success
+                            : colors.primary.main,
+                      },
+                    }}
+                  />
+                </Box>
               )}
-              {apartado.esTabla && (
-                <Chip 
-                  label={`${apartado.datosTabla?.length || 0} REGISTROS`}
-                  size="small"
-                  sx={{ 
-                    bgcolor: institutionalColors.lightBlue,
-                    color: institutionalColors.primary,
-                    height: '24px' 
-                  }}
-                />
-              )}
-              <Chip 
-                label={tieneDocumento ? "DOCUMENTO SUBIDO" : "PENDIENTE"}
-                size="small"
-                color={tieneDocumento ? "success" : "warning"}
-                sx={{ height: '24px' }}
-              />
-              {estadoValidacion.enviado && (
-                <Chip 
-                  icon={<CheckCircleIcon />}
-                  label="En revisión"
-                  size="small"
-                  sx={{ 
-                    bgcolor: institutionalColors.lightBlue,
-                    color: institutionalColors.primary,
-                    height: '24px' 
-                  }}
-                />
-              )}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {tieneDocumentos && (
+                  <Tooltip title="Documentos requeridos">
+                    <Chip
+                      icon={
+                        <DescriptionIcon
+                          sx={{ fontSize: "0.8rem !important" }}
+                        />
+                      }
+                      label={`${documentosSubidosCount}/${apartado.documentos.length}`}
+                      size="small"
+                      color={
+                        documentosSubidosCount === apartado.documentos.length
+                          ? "success"
+                          : "default"
+                      }
+                      sx={{ height: "24px", fontSize: "0.7rem" }}
+                    />
+                  </Tooltip>
+                )}
+                {tieneProgramas && (
+                  <Tooltip title="Programas">
+                    <Chip
+                      icon={
+                        <SchoolIcon sx={{ fontSize: "0.8rem !important" }} />
+                      }
+                      label={`${programasCompletados}/${apartado.programas.length}`}
+                      size="small"
+                      color={
+                        programasCompletados === apartado.programas.length
+                          ? "success"
+                          : "primary"
+                      }
+                      sx={{ height: "24px", fontSize: "0.7rem" }}
+                    />
+                  </Tooltip>
+                )}
+                {apartado.obligatorio && (
+                  <Chip
+                    label="Obligatorio"
+                    size="small"
+                    color="error"
+                    sx={{ height: "20px", fontSize: "0.65rem" }}
+                  />
+                )}
+              </Box>
             </Box>
           </Box>
         </AccordionSummary>
-        
-        <AccordionDetails sx={{ pt: 3, pb: 3 }}>
-          {/* Estado de validación */}
-          {estadoValidacion.enviado && (
-            <Alert 
-              severity="info" 
-              sx={{ mb: 3, bgcolor: institutionalColors.lightBlue }}
-              icon={<VerifiedIcon sx={{ color: institutionalColors.primary }} />}
+
+        <AccordionDetails sx={{ pt: 3, pb: 3, backgroundColor: "#fafafa" }}>
+          {/* DOCUMENTOS REQUERIDOS */}
+          {tieneDocumentos && (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                mb: tieneProgramas ? 3 : 0,
+                borderRadius: 2,
+                border: `2px solid ${documentosSubidosCount === apartado.documentos.length ? colors.status.success + "80" : colors.primary.main + "20"}`,
+              }}
             >
-              <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                <strong>Documento enviado a revisión por el comité</strong>
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 0.5, color: institutionalColors.textSecondary }}>
-                Enviado el {estadoValidacion.fechaEnvio}
-              </Typography>
-            </Alert>
-          )}
-          
-          <Paper 
-            variant="outlined" 
-            sx={{ 
-              p: 3, 
-              mb: 3,
-              borderRadius: 2,
-              border: '2px solid #e0e0e0',
-              '&:hover': {
-                borderColor: color
-              }
-            }}
-          >
-            <Typography variant="h6" sx={{ 
-              fontWeight: '600',
-              color: institutionalColors.primary,
-              mb: 3,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.5
-            }}>
-              <Icono sx={{ color }} />
-              {apartado.titulo.replace('(OBLIGATORIO)', '').trim()}
-            </Typography>
-            
-            {/* Descripción del apartado */}
-            {apartado.descripcion && (
-              <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, mb: 3, lineHeight: 1.6 }}>
-                {apartado.descripcion}
-              </Typography>
-            )}
-            
-            {/* Campos del apartado */}
-            {apartado.campos && apartado.campos.length > 0 && (
-              <Grid container spacing={3} sx={{ mb: 3 }}>
-                {apartado.campos.map((campo) => (
-                  <Grid item xs={12} md={campo.tipo === tiposCampos.texto_largo ? 12 : 6} key={campo.id}>
-                    {renderCampo(apartado.id, campo)}
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-            
-            {/* Tabla para apartados con datos tabulares */}
-            {apartado.esTabla && apartado.datosTabla && (
-              <Box sx={{ mb: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: '600', color: institutionalColors.textPrimary }}>
-                    Registros
-                  </Typography>
-                  <Button
-                    startIcon={<AddIcon />}
-                    variant="contained"
-                    size="small"
-                    onClick={() => handleAbrirDialogReunion(apartado.id)}
-                    sx={{ 
-                      textTransform: 'none', 
-                      backgroundColor: color,
-                      '&:hover': { backgroundColor: institutionalColors.secondary }
-                    }}
-                  >
-                    Agregar Registro
-                  </Button>
-                </Box>
-                
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Fecha</TableCell>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Tipo</TableCell>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Asunto</TableCell>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Participantes</TableCell>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Acuerdos</TableCell>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Estado</TableCell>
-                        <TableCell sx={{ fontWeight: '600', color: institutionalColors.primary }}>Acciones</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {apartado.datosTabla.map((reunion) => (
-                        <TableRow key={reunion.id} hover>
-                          <TableCell sx={{ color: institutionalColors.textPrimary }}>{reunion.fecha}</TableCell>
-                          <TableCell sx={{ color: institutionalColors.textPrimary }}>{reunion.tipo}</TableCell>
-                          <TableCell sx={{ color: institutionalColors.textPrimary }}>{reunion.asunto}</TableCell>
-                          <TableCell sx={{ color: institutionalColors.textPrimary }}>{reunion.participantes}</TableCell>
-                          <TableCell sx={{ color: institutionalColors.textPrimary }}>{reunion.acuerdos}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={reunion.estado === 'aprobado' ? 'APROBADO' : 'PENDIENTE'}
-                              size="small"
-                              color={reunion.estado === 'aprobado' ? 'success' : 'warning'}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Stack direction="row" spacing={1}>
-                              <IconButton 
-                                size="small"
-                                onClick={() => handleAbrirDialogReunion(apartado.id, reunion)}
-                                sx={{ color: institutionalColors.primary }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton 
-                                size="small"
-                                onClick={() => handleEliminarReunion(apartado.id, reunion.id)}
-                                sx={{ color: institutionalColors.error }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                              {reunion.documento && (
-                                <IconButton 
-                                  size="small"
-                                  onClick={() => handleVerDocumento(reunion.documento)}
-                                  sx={{ color: institutionalColors.success }}
-                                >
-                                  <VisibilityIcon fontSize="small" />
-                                </IconButton>
-                              )}
-                            </Stack>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
-            
-            {/* Upload de documento */}
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: '600', color: institutionalColors.textPrimary, mb: 2 }}>
-                Documento del Sistema
-              </Typography>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                {apartado.documento ? (
-                  <Box sx={{ width: '100%' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                      <Typography variant="body2" sx={{ color: institutionalColors.textPrimary, fontWeight: '500', flex: 1 }}>
-                        Documento cargado: {apartado.documento}
-                      </Typography>
-                      <Chip 
-                        label={apartado.estado === 'en_revision' ? "EN REVISIÓN" : "APROBADO"}
-                        size="small"
-                        color={apartado.estado === 'en_revision' ? "warning" : "success"}
-                      />
-                    </Box>
-                    {apartado.fechaRevision && (
-                      <Typography variant="caption" sx={{ color: institutionalColors.textSecondary, display: 'block', mb: 2 }}>
-                        Última revisión: {apartado.fechaRevision}
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={2}>
-                      <Button
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        variant="outlined"
-                        onClick={() => handleVerDocumento(apartado.documento)}
-                        sx={{ 
-                          textTransform: 'none',
-                          borderColor: institutionalColors.primary,
-                          color: institutionalColors.primary,
-                          '&:hover': {
-                            borderColor: institutionalColors.secondary,
-                            bgcolor: institutionalColors.lightBlue
-                          }
-                        }}
-                      >
-                        Ver Documento
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<CloudUploadIcon />}
-                        variant="outlined"
-                        sx={{ 
-                          textTransform: 'none', 
-                          borderColor: color, 
-                          color: color,
-                          '&:hover': {
-                            borderColor: institutionalColors.secondary,
-                            bgcolor: institutionalColors.lightBlue
-                          }
-                        }}
-                        onClick={() => handleDocumentoUpload(apartado.id)}
-                      >
-                        Reemplazar
-                      </Button>
-                    </Stack>
-                  </Box>
-                ) : (
-                  <Button
-                    fullWidth
-                    startIcon={<CloudUploadIcon />}
-                    variant="contained"
-                    sx={{ 
-                      textTransform: 'none', 
-                      py: 1.5,
-                      backgroundColor: color,
-                      '&:hover': { backgroundColor: institutionalColors.secondary }
-                    }}
-                    onClick={() => handleDocumentoUpload(apartado.id)}
-                  >
-                    SUBIR DOCUMENTO {apartado.obligatorio ? '(OBLIGATORIO)' : ''}
-                  </Button>
-                )}
-              </Box>
-            </Box>
-            
-            {/* Alertas específicas por tipo */}
-            {apartado.obligatorio && (
-              <Alert severity="warning" sx={{ mt: 3, backgroundColor: '#fff3e0' }}>
-                <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                  <strong>Importante:</strong> Este documento es obligatorio para completar su expediente. 
-                  Debe ser aprobado por el comité antes de continuar.
-                </Typography>
-              </Alert>
-            )}
-          </Paper>
-          
-          {/* Botón de validación */}
-          <Box sx={{ 
-            mt: 3, 
-            p: 2.5, 
-            backgroundColor: '#f8f9fa', 
-            borderRadius: 2,
-            border: '1px solid #e0e0e0'
-          }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box>
-                <Typography variant="body1" sx={{ fontWeight: '600', color: institutionalColors.textPrimary, mb: 0.5 }}>
-                  Validación del Documento
-                </Typography>
-                <Typography variant="body2" sx={{ color: institutionalColors.textSecondary }}>
-                  Envíe el documento para revisión formal
-                </Typography>
-              </Box>
-              
-              <Button
-                variant="contained"
-                startIcon={<SendIcon />}
-                onClick={() => handleAbrirValidacionDialog(apartado.id, apartado.titulo)}
-                disabled={
-                  estadoValidacion.enviado || 
-                  !apartado.documento || 
-                  (apartado.campos && apartado.campos.some(c => c.requerido && !c.valor)) ||
-                  (apartado.esTabla && (!apartado.datosTabla || apartado.datosTabla.length === 0))
-                }
-                sx={{ 
-                  textTransform: 'none',
-                  px: 3,
-                  py: 1,
-                  bgcolor: institutionalColors.primary,
-                  '&:hover': { bgcolor: institutionalColors.secondary }
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 3,
                 }}
               >
-                {estadoValidacion.enviado ? 'Enviado para Revisión' : 'Enviar para Validación'}
-              </Button>
-            </Box>
-            
-            {/* Validaciones de campos requeridos */}
-            {!estadoValidacion.enviado && (
-              <Box sx={{ mt: 2 }}>
-                {!apartado.documento && (
-                  <Alert severity="warning" sx={{ py: 1, mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                      Debe subir el documento primero
-                    </Typography>
-                  </Alert>
-                )}
-                {apartado.campos && apartado.campos.some(c => c.requerido && !c.valor) && (
-                  <Alert severity="warning" sx={{ py: 1, mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                      Complete todos los campos requeridos
-                    </Typography>
-                  </Alert>
-                )}
-                {apartado.esTabla && (!apartado.datosTabla || apartado.datosTabla.length === 0) && (
-                  <Alert severity="warning" sx={{ py: 1 }}>
-                    <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-                      Debe agregar al menos un registro a la tabla
-                    </Typography>
-                  </Alert>
-                )}
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: "600",
+                    color: colors.text.primary,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                  }}
+                >
+                  <DescriptionIcon
+                    sx={{
+                      color:
+                        documentosSubidosCount === apartado.documentos.length
+                          ? colors.status.success
+                          : colors.primary.main,
+                    }}
+                  />
+                  Documentos Requeridos
+                  {documentosSubidosCount === apartado.documentos.length && (
+                    <Chip
+                      icon={<CheckCircleIcon />}
+                      label="Completado"
+                      size="small"
+                      color="success"
+                      sx={{ ml: 1, height: "24px" }}
+                    />
+                  )}
+                </Typography>
               </Box>
-            )}
-          </Box>
+
+              <Stack spacing={2}>
+                {apartado.documentos.map((doc) => {
+                  const docSubido =
+                    archivosSubidos[apartado.idApartado]?.[doc.idDocumento];
+                  return (
+                    <Paper
+                      key={doc.idDocumento}
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        border: `1px solid ${docSubido ? colors.status.success + "40" : colors.primary.main + "20"}`,
+                        borderLeft: `4px solid ${docSubido ? colors.status.success : colors.primary.main}`,
+                        backgroundColor: "white",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: "50%",
+                            flexShrink: 0,
+                            backgroundColor: docSubido
+                              ? "#e8f5e9"
+                              : `${colors.primary.main}10`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {docSubido ? (
+                            <CheckCircleIcon
+                              sx={{
+                                color: colors.status.success,
+                                fontSize: "1.2rem",
+                              }}
+                            />
+                          ) : (
+                            <DescriptionIcon
+                              sx={{
+                                color: colors.primary.main,
+                                fontSize: "1.2rem",
+                              }}
+                            />
+                          )}
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              mb: 1,
+                            }}
+                          >
+                            <Box>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: "700",
+                                  color: colors.text.primary,
+                                }}
+                              >
+                                {doc.nombreArchivo}
+                              </Typography>
+                              {doc.descripcion && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: colors.text.secondary,
+                                    display: "block",
+                                    mt: 0.5,
+                                  }}
+                                >
+                                  {doc.descripcion}
+                                </Typography>
+                              )}
+                            </Box>
+                            {doc.obligatorio && (
+                              <Chip
+                                label="Obligatorio"
+                                size="small"
+                                color="error"
+                                sx={{
+                                  height: "20px",
+                                  fontSize: "0.65rem",
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+                          </Box>
+                          {docSubido ? (
+                            <DocumentoSubidoItem
+                              documento={docSubido}
+                              onVer={handleVerDocumento}
+                              onDescargar={handleDescargarDocumento}
+                              onEliminar={(doc) =>
+                                handleEliminarDocumentoSubido(
+                                  doc,
+                                  apartado.idApartado,
+                                )
+                              }
+                              mostrarFecha={true}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                mt: 1,
+                              }}
+                            >
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<CloudUploadIcon />}
+                                onClick={() =>
+                                  handleOpenUploadDialog(
+                                    `apartado_${apartado.idApartado}`,
+                                    doc.nombreArchivo,
+                                    doc.idDocumento,
+                                  )
+                                }
+                                sx={{
+                                  textTransform: "none",
+                                  fontSize: "0.8rem",
+                                  color: colors.primary.main,
+                                  borderColor: colors.primary.main,
+                                  "&:hover": {
+                                    backgroundColor: `${colors.primary.main}10`,
+                                  },
+                                }}
+                              >
+                                Subir Documento
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* PROGRAMAS Y CERTIFICACIONES */}
+          {tieneProgramas && (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                border: `2px solid ${programasCompletados === apartado.programas.length ? colors.status.success + "80" : colors.accents.purple + "20"}`,
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 3,
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: "600",
+                    color: colors.text.primary,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                  }}
+                >
+                  <SchoolIcon
+                    sx={{
+                      color:
+                        programasCompletados === apartado.programas.length
+                          ? colors.status.success
+                          : colors.accents.purple,
+                    }}
+                  />
+                  Programas y Certificaciones
+                  {programasCompletados === apartado.programas.length && (
+                    <Chip
+                      icon={<CheckCircleIcon />}
+                      label="Completado"
+                      size="small"
+                      color="success"
+                      sx={{ ml: 1, height: "24px" }}
+                    />
+                  )}
+                </Typography>
+              </Box>
+
+              <Stack spacing={2}>
+                {apartado.programas.map((prog) => {
+                  const docPrograma = documentosProgramas[prog.id];
+                  const estadoValidacion = estadosValidacionProgramas[prog.id];
+                  return (
+                    <Paper
+                      key={prog.id}
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        border: `1px solid ${docPrograma ? colors.status.success + "40" : colors.accents.purple + "20"}`,
+                        borderLeft: `4px solid ${docPrograma ? colors.status.success : colors.accents.purple}`,
+                        backgroundColor: "white",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: "50%",
+                            flexShrink: 0,
+                            backgroundColor: docPrograma
+                              ? "#e8f5e9"
+                              : `${colors.accents.purple}10`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {docPrograma ? (
+                            <CheckCircleIcon
+                              sx={{
+                                color: colors.status.success,
+                                fontSize: "1.2rem",
+                              }}
+                            />
+                          ) : (
+                            <SchoolIcon
+                              sx={{
+                                color: colors.accents.purple,
+                                fontSize: "1.2rem",
+                              }}
+                            />
+                          )}
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              mb: 1,
+                            }}
+                          >
+                            <Box>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: "700",
+                                  color: colors.text.primary,
+                                }}
+                              >
+                                {prog.nombre}
+                              </Typography>
+                              {prog.descripcion && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: colors.text.secondary,
+                                    display: "block",
+                                    mt: 0.5,
+                                  }}
+                                >
+                                  {prog.descripcion}
+                                </Typography>
+                              )}
+                            </Box>
+                            {prog.horasRequeridas && (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.5,
+                                  alignItems: "flex-end",
+                                }}
+                              >
+                                <Chip
+                                  label={`Horas requeridas: ${prog.horasRequeridas} hrs`}
+                                  size="small"
+                                  sx={{
+                                    height: "20px",
+                                    fontSize: "0.65rem",
+                                    backgroundColor: `${colors.accents.purple}15`,
+                                    color: colors.accents.purple,
+                                  }}
+                                />
+                                <Chip
+                                  label={
+                                    docPrograma
+                                      ? docPrograma.horas >=
+                                        prog.horasRequeridas
+                                        ? "✓ Horas completas"
+                                        : `Horas faltantes: ${prog.horasRequeridas - docPrograma.horas} hrs`
+                                      : `Horas faltantes: ${prog.horasRequeridas} hrs`
+                                  }
+                                  size="small"
+                                  sx={{
+                                    height: "20px",
+                                    fontSize: "0.65rem",
+                                    backgroundColor:
+                                      docPrograma &&
+                                      docPrograma.horas >= prog.horasRequeridas
+                                        ? "#e8f5e9"
+                                        : "#fff3e0",
+                                    color:
+                                      docPrograma &&
+                                      docPrograma.horas >= prog.horasRequeridas
+                                        ? colors.status.success
+                                        : "#e65100",
+                                  }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                          {docPrograma ? (
+                            <CertificacionProgramaItem
+                              documento={docPrograma}
+                              programa={prog}
+                              onVer={(doc) => {
+                                setPreviewDialog({
+                                  open: true,
+                                  documento: null,
+                                  nombre: doc.nombreArchivo,
+                                  tipo: detectarTipoArchivo(doc.nombreArchivo),
+                                  seccion: prog.nombre,
+                                  loading: true,
+                                  objectUrl: null,
+                                });
+                                obtenerArchivoBlobCertificacion(doc.id)
+                                  .then((blob) => {
+                                    const objectUrl = URL.createObjectURL(blob);
+                                    setPreviewDialog((prev) => ({
+                                      ...prev,
+                                      loading: false,
+                                      objectUrl,
+                                    }));
+                                  })
+                                  .catch((error) => {
+                                    setSnackbar({
+                                      open: true,
+                                      message: `Error ${error.response?.status}: No se pudo cargar el archivo`,
+                                      severity: "error",
+                                    });
+                                    setPreviewDialog((prev) => ({
+                                      ...prev,
+                                      loading: false,
+                                    }));
+                                  });
+                              }}
+                              onDescargar={(doc) => {
+                                descargarArchivoCertificacion(
+                                  doc.id,
+                                  doc.nombreArchivo,
+                                ).catch(() =>
+                                  setSnackbar({
+                                    open: true,
+                                    message: "Error al descargar el archivo",
+                                    severity: "error",
+                                  }),
+                                );
+                              }}
+                              onEliminar={(doc) =>
+                                handleEliminarDocumentoPrograma(prog.id, doc)
+                              }
+                              onEnviarValidacion={
+                                handleEnviarValidacionPrograma
+                              }
+                              estadoValidacion={estadoValidacion}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                mt: 1,
+                              }}
+                            >
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={
+                                  <CloudUploadIcon
+                                    sx={{ fontSize: "0.8rem" }}
+                                  />
+                                }
+                                onClick={() => {
+                                  setProgSeleccionado(prog);
+                                  setCertModalOpen(true);
+                                }}
+                                sx={{
+                                  textTransform: "none",
+                                  fontSize: "0.75rem",
+                                  bgcolor: colors.accents.purple,
+                                  "&:hover": { bgcolor: "#5a4bd1" },
+                                  height: "32px",
+                                  px: 2,
+                                }}
+                              >
+                                Subir Certificación
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          )}
         </AccordionDetails>
       </Accordion>
     );
   };
 
+  // ============================================================
+  // CÁLCULO DE CUMPLIMIENTO
+  // ============================================================
+  const calculateCompliance = () => {
+    const totalDocumentos = apartadosDinamicos.reduce(
+      (acc, ap) => acc + (ap.documentos?.length || 0),
+      0,
+    );
+    const totalProgramas = apartadosDinamicos.reduce(
+      (acc, ap) => acc + (ap.programas?.length || 0),
+      0,
+    );
+    const totalRequerido = totalDocumentos + totalProgramas;
+    if (totalRequerido === 0) return 0;
+
+    const docsSubidos = Object.values(archivosSubidos).reduce(
+      (acc, ap) => acc + Object.keys(ap).length,
+      0,
+    );
+    const programasSubidos = Object.keys(documentosProgramas).length;
+    return Math.min(
+      100,
+      Math.round(((docsSubidos + programasSubidos) / totalRequerido) * 100),
+    );
+  };
+
+  const compliance = calculateCompliance();
+
+  // ============================================================
+  // RETURN PRINCIPAL
+  // ============================================================
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 4,
+          pb: 2,
+          borderBottom: `2px solid ${colors.primary.main}20`,
+        }}
+      >
         <Box>
-          <Typography variant="h4" sx={{ color: institutionalColors.primary, fontWeight: 'bold', mb: 1 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              color: colors.primary.dark,
+              fontWeight: "bold",
+              mb: 1,
+              letterSpacing: "-0.5px",
+            }}
+          >
             Expediente Digital
           </Typography>
-          <Typography variant="body1" sx={{ color: institutionalColors.textSecondary }}>
-            Sistema dinámico de cumplimiento y control documental
+          <Typography variant="body1" sx={{ color: colors.text.secondary }}>
+            Comienza a construir tu expediente cargando tus certificaciones y
+            documentos
           </Typography>
         </Box>
       </Box>
 
       {/* Nivel de Cumplimiento */}
-      <Card sx={{ 
-        mb: 4, 
-        bgcolor: compliance === 100 ? '#e8f5e9' : 
-               compliance >= 75 ? '#fffde7' : 
-               compliance >= 50 ? '#fff3e0' : '#ffebee' 
-      }}>
-        <CardContent>
+      <Card
+        sx={{
+          mb: 4,
+          bgcolor:
+            compliance >= 70
+              ? "#e8f5e9"
+              : compliance >= 30
+                ? "#fff3e0"
+                : "#ffebee",
+          borderRadius: 2,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
           <Grid container alignItems="center" spacing={3}>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={7}>
               <Grid container spacing={2} alignItems="center">
-                <Grid item xs={4} sm={3} md={3}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h2" sx={{ 
-                      color: compliance === 100 ? institutionalColors.success : 
-                             compliance >= 75 ? institutionalColors.warning : 
-                             compliance >= 50 ? '#1a4c7a' : institutionalColors.error,
-                      fontWeight: 'bold',
-                      mb: 0.5,
-                      fontSize: { xs: '3rem', sm: '3.5rem' }
-                    }}>
+                <Grid item xs={4} sm={3}>
+                  <Box sx={{ textAlign: "center" }}>
+                    <Typography
+                      variant="h2"
+                      sx={{
+                        color:
+                          compliance >= 70
+                            ? colors.status.success
+                            : compliance >= 30
+                              ? colors.status.warning
+                              : colors.status.error,
+                        fontWeight: "bold",
+                        mb: 0.5,
+                        fontSize: { xs: "3rem", sm: "3.5rem" },
+                      }}
+                    >
                       {compliance}%
                     </Typography>
-                    <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, fontWeight: '500' }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: colors.text.secondary, fontWeight: "500" }}
+                    >
                       Cumplimiento
                     </Typography>
                   </Box>
                 </Grid>
-                
-                <Grid item xs={8} sm={8} md={8}>
-                  <Typography variant="h6" sx={{ color: institutionalColors.textPrimary, fontWeight: 'bold', mb: 1, fontSize: '1.1rem' }}>
-                    Progreso de Documentos Obligatorios
+                <Grid
+                  item
+                  xs="auto"
+                  sx={{ display: { xs: "none", sm: "block" } }}
+                >
+                  <Divider orientation="vertical" sx={{ height: "60px" }} />
+                </Grid>
+                <Grid item xs={8} sm={8}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      mb: 1,
+                      flexWrap: "wrap",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: colors.primary.dark,
+                        fontWeight: "bold",
+                        fontSize: "1.1rem",
+                      }}
+                    >
+                      Progreso General
+                    </Typography>
+                    <Chip
+                      label={
+                        compliance >= 70
+                          ? "BUEN PROGRESO"
+                          : compliance >= 30
+                            ? "EN PROCESO"
+                            : "POR COMENZAR"
+                      }
+                      color={
+                        compliance >= 70
+                          ? "success"
+                          : compliance >= 30
+                            ? "warning"
+                            : "error"
+                      }
+                      size="small"
+                      sx={{ height: "24px" }}
+                    />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: colors.text.secondary, mb: 2 }}
+                  >
+                    {compliance >= 70
+                      ? "Excelente avance en tu expediente"
+                      : compliance >= 30
+                        ? "Continúa agregando documentos"
+                        : "Comienza cargando tu primera certificación"}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, mb: 2 }}>
-                    {compliance === 100 ? 'Todos los documentos obligatorios están completos' : 
-                     compliance >= 75 ? 'Mayoría de documentos completados' : 
-                     compliance >= 50 ? 'Documentos básicos completados' : 
-                     'Documentos en fase inicial'}
-                  </Typography>
-                  
-                  <LinearProgress 
-                    variant="determinate" 
+                  <LinearProgress
+                    variant="determinate"
                     value={compliance}
-                    sx={{ 
+                    sx={{
                       height: 8,
                       borderRadius: 5,
-                      backgroundColor: '#f0f0f0',
-                      '& .MuiLinearProgress-bar': {
-                        backgroundColor: compliance === 100 ? institutionalColors.success : 
-                                         compliance >= 75 ? institutionalColors.warning : 
-                                         compliance >= 50 ? '#1a4c7a' : institutionalColors.error
-                      }
+                      backgroundColor: "#f0f0f0",
+                      "& .MuiLinearProgress-bar": {
+                        backgroundColor:
+                          compliance >= 70
+                            ? colors.status.success
+                            : compliance >= 30
+                              ? colors.status.warning
+                              : colors.status.error,
+                        backgroundImage:
+                          compliance >= 70
+                            ? `linear-gradient(90deg, ${colors.status.success}, ${colors.secondary.main})`
+                            : undefined,
+                      },
                     }}
                   />
                 </Grid>
               </Grid>
             </Grid>
-            
+            <Grid item xs="auto" sx={{ display: { xs: "none", md: "block" } }}>
+              <Divider orientation="vertical" sx={{ height: "80px" }} />
+            </Grid>
             <Grid item xs={12} md={4}>
               <Grid container spacing={1.5}>
-                {apartados.slice(0, 4).map((apartado) => {
-                  const color = apartado.documento ? institutionalColors.success : institutionalColors.error;
-                  return (
-                    <Grid item xs={6} key={apartado.id}>
-                      <Paper sx={{ 
-                        p: 1.5, 
-                        textAlign: 'center', 
-                        borderRadius: 2, 
-                        height: '100%',
-                        border: `2px solid ${color}30`
-                      }}>
-                        <Typography variant="h5" sx={{ 
-                          color, 
-                          fontWeight: 'bold', 
-                          mb: 0.5 
-                        }}>
-                          {apartado.documento ? '1' : '0'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: institutionalColors.textSecondary, 
-                          fontSize: '0.7rem',
-                          fontWeight: '500'
-                        }}>
-                          {apartado.titulo.split(' ')[0]}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  );
-                })}
+                {[
+                  {
+                    value: Object.keys(documentosProgramas).length,
+                    label: "Certificaciones",
+                    color: colors.primary.main,
+                    icon: <SchoolIcon sx={{ fontSize: "1rem" }} />,
+                  },
+                  {
+                    value: Object.values(archivosSubidos).reduce(
+                      (acc, ap) => acc + Object.keys(ap).length,
+                      0,
+                    ),
+                    label: "Documentos",
+                    color: colors.status.error,
+                    icon: <DescriptionIcon sx={{ fontSize: "1rem" }} />,
+                  },
+                  {
+                    value: apartadosDinamicos.length,
+                    label: "Apartados",
+                    color: colors.accents.purple,
+                    icon: <FolderIcon sx={{ fontSize: "1rem" }} />,
+                  },
+                  {
+                    value: new Date().toLocaleDateString("es-MX", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "2-digit",
+                    }),
+                    label: "Última actualización",
+                    color: colors.secondary.main,
+                    icon: <UpdateIcon sx={{ fontSize: "1rem" }} />,
+                  },
+                ].map((item, i) => (
+                  <Grid item xs={6} key={i}>
+                    <Paper
+                      sx={{
+                        p: 1.5,
+                        textAlign: "center",
+                        borderRadius: 2,
+                        height: "100%",
+                        border: `1px solid ${item.color}20`,
+                        backgroundColor: "white",
+                        transition: "transform 0.2s",
+                        "&:hover": {
+                          transform: "translateY(-2px)",
+                          boxShadow: `0 4px 8px ${item.color}20`,
+                        },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          mb: 0.5,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            backgroundColor: `${item.color}15`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: item.color,
+                          }}
+                        >
+                          {item.icon}
+                        </Box>
+                      </Box>
+                      <Typography
+                        variant={i === 3 ? "h6" : "h5"}
+                        sx={{
+                          color: item.color,
+                          fontWeight: "bold",
+                          mb: 0.5,
+                          fontSize: i === 3 ? "1rem" : undefined,
+                        }}
+                      >
+                        {item.value}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: colors.text.secondary,
+                          fontWeight: "500",
+                          fontSize: "0.7rem",
+                        }}
+                      >
+                        {item.label}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
               </Grid>
             </Grid>
           </Grid>
+          <Divider sx={{ my: 2 }} />
+          <Box sx={{ textAlign: "center" }}>
+            <Button
+              component={Link}
+              to="/certifications"
+              sx={{
+                color: colors.primary.main,
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                textTransform: "none",
+                textDecoration: "underline",
+                "&:hover": { color: colors.primary.dark },
+              }}
+            >
+              Ver todas las certificaciones
+            </Button>
+          </Box>
         </CardContent>
       </Card>
 
-      {/* Apartados Dinámicos */}
+      {/* Lista de apartados */}
       <Box>
-        <Typography variant="h5" sx={{ 
-          color: institutionalColors.primary, 
-          mb: 3, 
-          fontWeight: 'bold',
-          borderBottom: `3px solid ${institutionalColors.primary}`,
-          pb: 1.5
-        }}>
-          SISTEMAS DE CUMPLIMIENTO Y CONTROL
+        <Typography
+          variant="h5"
+          sx={{
+            color: colors.primary.dark,
+            mb: 3,
+            fontWeight: "bold",
+            borderBottom: `3px solid ${colors.primary.dark}`,
+            pb: 1.5,
+            letterSpacing: "-0.5px",
+          }}
+        >
+          # INFORMACIÓN COMPLEMENTARIA
         </Typography>
-        
-        {apartados.map((apartado) => renderApartado(apartado))}
+
+        {loadingApartados && (
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <LinearProgress sx={{ maxWidth: "300px", mx: "auto", mb: 2 }} />
+            <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+              Cargando apartados...
+            </Typography>
+          </Box>
+        )}
+
+        {!loadingApartados && apartadosDinamicos.length > 0 && (
+          <Box sx={{ width: "100%" }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ color: colors.primary.main, mb: 2, fontWeight: "600" }}
+            >
+              Apartados disponibles ({apartadosDinamicos.length})
+            </Typography>
+            <Box sx={{ width: "100%" }}>
+              {apartadosDinamicos.map((apartado) => (
+                <Box key={apartado.id} sx={{ width: "100%", mb: 2 }}>
+                  {renderApartadoDinamico(apartado)}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {!loadingApartados &&
+          apartadosDinamicos.length === 0 &&
+          user?.instanciaId && (
+            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+              No hay apartados configurados para esta instancia
+            </Alert>
+          )}
       </Box>
 
-      {/* Diálogo para agregar/editar registro en tabla */}
-      <Dialog open={reunionDialog.open} onClose={handleCerrarDialogReunion} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ borderBottom: '1px solid #e0e0e0', pb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {reunionDialog.editing ? <EditIcon sx={{ color: institutionalColors.primary }} /> : <AddIcon sx={{ color: institutionalColors.primary }} />}
-            <Typography variant="h6" sx={{ color: institutionalColors.textPrimary, fontWeight: '600' }}>
-              {reunionDialog.editing ? 'Editar Registro' : 'Agregar Nuevo Registro'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3, pb: 2 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="date"
-                label="Fecha"
-                value={nuevaReunion.fecha || ''}
-                onChange={(e) => setNuevaReunion({...nuevaReunion, fecha: e.target.value})}
-                InputLabelProps={{ shrink: true }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Tipo"
-                value={nuevaReunion.tipo || ''}
-                onChange={(e) => setNuevaReunion({...nuevaReunion, tipo: e.target.value})}
-                placeholder="Ej: Junta Directiva, Comité, Reunión de Trabajo"
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Asunto/Agenda"
-                value={nuevaReunion.asunto || ''}
-                onChange={(e) => setNuevaReunion({...nuevaReunion, asunto: e.target.value})}
-                multiline
-                rows={2}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Número de Participantes"
-                value={nuevaReunion.participantes || ''}
-                onChange={(e) => setNuevaReunion({...nuevaReunion, participantes: e.target.value})}
-                type="number"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Acuerdos Tomados"
-                value={nuevaReunion.acuerdos || ''}
-                onChange={(e) => setNuevaReunion({...nuevaReunion, acuerdos: e.target.value})}
-                placeholder="Número de acuerdos"
-                type="number"
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Button
-                startIcon={<CloudUploadIcon />}
-                variant="outlined"
-                fullWidth
-                sx={{ 
-                  py: 1.5,
-                  borderColor: institutionalColors.primary,
-                  color: institutionalColors.primary,
-                  '&:hover': {
-                    borderColor: institutionalColors.secondary,
-                    bgcolor: institutionalColors.lightBlue
-                  }
-                }}
-              >
-                Adjuntar Documento
-              </Button>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #e0e0e0' }}>
-          <Button 
-            onClick={handleCerrarDialogReunion}
-            variant="outlined"
-            sx={{ 
-              textTransform: 'none',
-              borderColor: institutionalColors.primary,
-              color: institutionalColors.primary,
-              '&:hover': {
-                borderColor: institutionalColors.secondary,
-                bgcolor: institutionalColors.lightBlue
-              }
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleAgregarReunion}
-            variant="contained"
-            sx={{ 
-              textTransform: 'none',
-              bgcolor: institutionalColors.primary,
-              '&:hover': { bgcolor: institutionalColors.secondary }
-            }}
-            disabled={!nuevaReunion.fecha || !nuevaReunion.tipo || !nuevaReunion.asunto}
-          >
-            {reunionDialog.editing ? 'Actualizar Registro' : 'Agregar Registro'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* MODALES */}
+      <UploadDocumentModal
+        open={uploadDialog.open}
+        onClose={() =>
+          setUploadDialog({
+            open: false,
+            tipo: "",
+            titulo: "",
+            archivo: null,
+            nombreArchivo: "",
+            uploading: false,
+            progress: 0,
+          })
+        }
+        titulo={uploadDialog.titulo}
+        archivo={uploadDialog.archivo}
+        nombreArchivo={uploadDialog.nombreArchivo}
+        uploading={uploadDialog.uploading}
+        progress={uploadDialog.progress}
+        onFileSelect={handleCumplimientoFileSelect}
+        onRemoveFile={() =>
+          setUploadDialog({
+            ...uploadDialog,
+            archivo: null,
+            nombreArchivo: "",
+          })
+        }
+        onUpload={handleGuardarDocumentoCumplimiento}
+      />
 
-      {/* Diálogo de confirmación de validación */}
-      <Dialog open={validacionDialog.open} onClose={handleCerrarValidacionDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ borderBottom: '1px solid #e0e0e0', pb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <SendIcon sx={{ color: institutionalColors.primary }} />
-            <Typography variant="h6" sx={{ color: institutionalColors.textPrimary, fontWeight: '600' }}>
-              Enviar Documento para Validación
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3, pb: 2 }}>
-          <Alert severity="info" sx={{ mb: 3, bgcolor: institutionalColors.lightBlue }}>
-            <Typography variant="body2" sx={{ fontWeight: '600', color: institutionalColors.primary }}>
-              Confirmación de Envío
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 0.5, color: institutionalColors.textSecondary }}>
-              ¿Está seguro de enviar el documento para revisión por el comité?
-            </Typography>
-          </Alert>
-          
-          <Paper variant="outlined" sx={{ p: 2.5, mb: 3, backgroundColor: '#f8f9fa' }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, fontWeight: '500', mb: 0.5 }}>
-                  Documento a validar:
-                </Typography>
-                <Typography variant="body1" sx={{ color: institutionalColors.textPrimary, fontWeight: '600' }}>
-                  {validacionDialog.titulo}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Typography variant="body2" sx={{ color: institutionalColors.textSecondary, fontWeight: '500', mb: 0.5 }}>
-                  Fecha de envío:
-                </Typography>
-                <Typography variant="body1" sx={{ color: institutionalColors.textPrimary, fontWeight: '600' }}>
-                  {validacionDialog.fecha}
-                </Typography>
-              </Grid>
-            </Grid>
-          </Paper>
-          
-          <Alert severity="warning" sx={{ backgroundColor: '#fff8e1' }}>
-            <Typography variant="body2" sx={{ color: institutionalColors.textPrimary }}>
-              <strong>Nota importante:</strong> Una vez enviado, el documento no podrá ser modificado hasta que el comité complete la revisión.
-            </Typography>
-          </Alert>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #e0e0e0' }}>
-          <Button 
-            onClick={handleCerrarValidacionDialog}
-            variant="outlined"
-            sx={{ 
-              textTransform: 'none',
-              borderColor: institutionalColors.primary,
-              color: institutionalColors.primary,
-              '&:hover': {
-                borderColor: institutionalColors.secondary,
-                bgcolor: institutionalColors.lightBlue
-              }
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleConfirmarValidacion}
-            variant="contained"
-            startIcon={<SendIcon />}
-            sx={{ 
-              textTransform: 'none',
-              bgcolor: institutionalColors.primary,
-              '&:hover': { bgcolor: institutionalColors.secondary }
-            }}
-          >
-            Confirmar Envío
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ValidationSendModal
+        open={validacionDialog.open}
+        onClose={handleCerrarValidacionDialog}
+        onConfirm={handleConfirmarValidacionPrograma}
+        programa={validacionDialog.programa}
+        documento={validacionDialog.documento}
+        fecha={validacionDialog.fecha}
+      />
+
+      <PreviewDocumentModal
+        open={previewDialog.open}
+        onClose={() => {
+          if (previewDialog.objectUrl)
+            URL.revokeObjectURL(previewDialog.objectUrl);
+          setPreviewDialog({
+            open: false,
+            documento: null,
+            nombre: "",
+            tipo: "",
+            seccion: "",
+            loading: false,
+            objectUrl: null,
+          });
+        }}
+        nombre={previewDialog.nombre}
+        tipo={previewDialog.tipo}
+        loading={previewDialog.loading}
+        objectUrl={previewDialog.objectUrl}
+        onDownload={() => {
+          const a = document.createElement("a");
+          a.href = previewDialog.objectUrl;
+          a.download = previewDialog.nombre;
+          a.click();
+        }}
+      />
+
+      <DeleteConfirmModal
+        open={deleteDialog.open}
+        onClose={() =>
+          setDeleteDialog({
+            open: false,
+            seccion: "",
+            subseccion: "",
+            documentoId: null,
+            tipo: "",
+            nombre: "",
+            horas: 0,
+            itemName: "",
+            itemIndex: null,
+          })
+        }
+        onConfirm={handleConfirmarEliminacion}
+        nombre={deleteDialog.nombre}
+        tipo={deleteDialog.tipo}
+      />
+
+      <AddCertificationModal
+        open={certModalOpen}
+        onClose={() => {
+          if (saving) return;
+          setCertModalOpen(false);
+          setProgSeleccionado(null);
+          setNuevaCertificacion({
+            subseccion: "",
+            tipoDocumento: "",
+            institucion: "",
+            fecha: new Date().toISOString().split("T")[0],
+            horas: "",
+            archivo: null,
+            nombreArchivo: "",
+          });
+        }}
+        onSave={handleGuardarCertDesdePrograma}
+        nuevaCertificacion={nuevaCertificacion}
+        onFieldChange={handleNuevaCertificacionChange}
+        onFileChange={handleCertFileChange}
+        onRemoveFile={() =>
+          setNuevaCertificacion((prev) => ({
+            ...prev,
+            archivo: null,
+            nombreArchivo: "",
+          }))
+        }
+        uploading={uploading}
+        uploadProgress={uploadProgress}
+        saving={saving}
+        subseccionFija={progSeleccionado?.nombre}
+        titulo="Enviar Certificación para Validación"
+        labelBotonGuardar="Enviar para Validación"
+      />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{
+            width: "100%",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            borderRadius: 2,
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
