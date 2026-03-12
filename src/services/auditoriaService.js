@@ -119,6 +119,33 @@ class AuditoriaService {
       return new Error("Error al realizar la petición: " + error.message);
     }
   }
+
+
+   // ========== NUEVO MÉTODO PARA AGENTES ==========
+  async findByAgente(idUsuario, { desde, hasta } = {}) {
+    try {
+      const params = {};
+      if (desde) params.desde = desde instanceof Date ? desde.toISOString() : desde;
+      if (hasta) params.hasta = hasta instanceof Date ? hasta.toISOString() : hasta;
+
+      const response = await API.get(`/auditoria/agente/${idUsuario}`, { params });
+      return response.data;
+    } catch (error) {
+      throw this._handleError(error);
+    }
+  }
+
+  _handleError(error) {
+    if (error.response) {
+      const { status, data } = error.response;
+      const message = data?.error || data?.message || data?.mensaje || `Error ${status}`;
+      return new Error(message);
+    } else if (error.request) {
+      return new Error("No se pudo conectar con el servidor.");
+    } else {
+      return new Error("Error al realizar la petición: " + error.message);
+    }
+  }
 }
 
 export default new AuditoriaService();
