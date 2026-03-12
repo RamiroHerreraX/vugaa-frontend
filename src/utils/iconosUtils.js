@@ -1,3 +1,5 @@
+
+//src > utils >iconosUtils.js
 // Colores institucionales
 export const institutionalColors = {
   primary: "#133B6B",

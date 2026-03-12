@@ -87,3 +87,15 @@
     );
     return response.data;
   };
+
+
+// ========================================
+// 🆕 NUEVO: LISTAR POR ROL (ASOCIACION)
+// trae activos + instancia enviada + globales
+// ========================================
+export const getApartadosPorRol = async (rol, idInstancia) => {
+  const response = await API.get(`${ENDPOINT}/rol/${rol}`, {
+    params: { idInstancia }
+  });
+  return response.data;
+};

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getTodosApartados } from "../../services/apartado";
+import { getApartadosPorRol } from "../../services/apartado";
 import {
   subirDocumento,
   getDocumentosSubidosPorApartado,
@@ -77,7 +78,10 @@ import {
   Timeline as TimelineIcon,
   Shield as ShieldIcon,
 } from "@mui/icons-material";
-
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import BuildIcon from "@mui/icons-material/Build";
+import ArticleIcon from "@mui/icons-material/Article";
+import ReceiptIcon from "@mui/icons-material/Receipt";
 const colors = {
   primary: {
     dark: "#0D2A4D",
@@ -372,10 +376,6 @@ const CertificacionProgramaItem = ({
     </Box>
   );
 };
-
-// ============================================================
-// EXPEDIENTE PRINCIPAL
-// ============================================================
 const Expediente = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -394,9 +394,7 @@ const Expediente = () => {
 
   // Estados para certificaciones de programas
   const [documentosProgramas, setDocumentosProgramas] = useState({});
-  const [estadosValidacionProgramas, setEstadosValidacionProgramas] = useState(
-    {},
-  );
+  const [estadosValidacionProgramas, setEstadosValidacionProgramas] = useState({});
   const [certModalOpen, setCertModalOpen] = useState(false);
   const [progSeleccionado, setProgSeleccionado] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -470,40 +468,49 @@ const Expediente = () => {
     cargarExpediente();
   }, [user?.id, user?.instanciaId]);
 
+  // ✅ EFECTO PRINCIPAL MODIFICADO - USA getApartadosPorRol
   useEffect(() => {
     const cargarApartados = async () => {
-      if (!user?.instanciaId) return;
+      if (!user?.instanciaId || !user?.rol) return;
+      
       setLoadingApartados(true);
+      
       try {
-        const todos = await getTodosApartados();
-        const globales = todos.filter(
-          (a) => !a.idInstancia || a.idInstancia === user.instanciaId,
-        );
+        // ✅ USAR EL NUEVO MÉTODO: OBTENER APARTADOS POR ROL
+        // El backend ya filtra: activos, instancia específica y globales
+        const rolMap = {
+          'asociacion': 'ASOCIACION',
+          'admin': 'ADMIN',
+          'comite': 'COMITE',
+          'agente': 'AGENTE',
+          'profesionista': 'PROFESIONISTA',
+          'empresario': 'EMPRESARIO',
+          'supera': 'SUPERADMIN'
+        };
+        
+        const rolBackend = rolMap[user.rol] || user.rol.toUpperCase();
+        
+        console.log(`📡 Cargando apartados para rol: ${rolBackend}, instancia: ${user.instanciaId}`);
+        
+        // ✅ LLAMADA AL NUEVO ENDPOINT
+        const apartadosData = await getApartadosPorRol(rolBackend, user.instanciaId);
+        
+        console.log(`✅ Apartados recibidos: ${apartadosData.length}`, apartadosData);
 
+        // Transformar los datos al formato que espera el componente
         const apartadosTransformados = await Promise.all(
-          globales.map(async (apartado) => {
+          apartadosData.map(async (apartado) => {
             let programas = [];
-            try {
-              programas = await getProgramasPorApartadoActivos(
-                apartado.idApartado,
-              );
-            } catch (error) {
-              console.error(
-                `Error cargando programas del apartado ${apartado.idApartado}:`,
-                error,
-              );
-            }
             let documentos = [];
+            
             try {
-              documentos = await getDocumentosPorApartadoActivos(
-                apartado.idApartado,
-              );
+              // Cargar programas y documentos asociados al apartado
+              programas = await getProgramasPorApartadoActivos(apartado.idApartado).catch(() => []);
+              documentos = await getDocumentosPorApartadoActivos(apartado.idApartado).catch(() => []);
             } catch (error) {
-              console.error(
-                `Error cargando docs del apartado ${apartado.idApartado}:`,
-                error,
-              );
+              console.error(`Error cargando contenido del apartado ${apartado.idApartado}:`, error);
             }
+            
             return {
               id: `apartado_${apartado.idApartado}`,
               idApartado: apartado.idApartado,
@@ -513,44 +520,50 @@ const Expediente = () => {
               icono: apartado.icono || "description",
               orden: apartado.orden || 0,
               obligatorio: apartado.obligatorio || false,
-              esGlobal: !apartado.idInstancia,
+              esGlobal: apartado.esGlobal || false, // ✅ EL BACKEND YA INDICA SI ES GLOBAL
               documentos: documentos || [],
               programas: programas || [],
             };
-          }),
+          })
         );
 
+        // Ordenar por orden
+        apartadosTransformados.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        
         setApartadosDinamicos(apartadosTransformados);
 
+        // Si hay expediente, cargar documentos subidos
         if (expediente?.id) {
           const subidosPorApartado = {};
+          
           await Promise.all(
-            globales.map(async (apartado) => {
+            apartadosData.map(async (apartado) => {
               try {
                 const docs = await getDocumentosSubidosPorApartado(
                   expediente.id,
                   apartado.idApartado,
                 );
+                
                 if (docs?.length > 0) {
                   subidosPorApartado[apartado.idApartado] = {};
                   docs.forEach((doc) => {
                     if (doc.idDocumentoPlantilla) {
-                      subidosPorApartado[apartado.idApartado][
-                        doc.idDocumentoPlantilla
-                      ] = doc;
+                      subidosPorApartado[apartado.idApartado][doc.idDocumentoPlantilla] = {
+                        ...doc,
+                        fechaSubida: new Date(doc.fechaSubida || Date.now()).toLocaleDateString("es-MX")
+                      };
                     }
                   });
                 }
               } catch (error) {
-                console.error(
-                  `Error cargando docs subidos del apartado ${apartado.idApartado}:`,
-                  error,
-                );
+                console.error(`Error cargando docs subidos del apartado ${apartado.idApartado}:`, error);
               }
             }),
           );
+          
           setArchivosSubidos(subidosPorApartado);
 
+          // Cargar certificaciones
           try {
             const certs = await getCertificacionesPorExpediente(expediente.id);
             const docsPrograma = {};
@@ -559,10 +572,7 @@ const Expediente = () => {
                 docsPrograma[cert.idPrograma] = {
                   id: cert.idCertExp,
                   idCertificacion: cert.idCertificacion,
-                  nombreArchivo:
-                    cert.nombreArchivo ||
-                    cert.nombreCertificacion ||
-                    "documento",
+                  nombreArchivo: cert.nombreArchivo || cert.nombreCertificacion || "documento",
                   nombre: cert.nombreCertificacion,
                   institucion: cert.institucion,
                   horas: cert.horasAcreditadas,
@@ -574,56 +584,84 @@ const Expediente = () => {
             });
             setDocumentosProgramas(docsPrograma);
           } catch (error) {
-            console.error("Error cargando certs de programas:", error);
+            console.error("Error cargando certificaciones:", error);
           }
         }
       } catch (error) {
-        console.error("Error cargando apartados:", error);
+        console.error("❌ Error cargando apartados:", error);
         setSnackbar({
           open: true,
-          message: "Error al cargar los apartados",
+          message: error.response?.data?.message || "Error al cargar los apartados",
           severity: "error",
         });
       } finally {
         setLoadingApartados(false);
       }
     };
+    
     cargarApartados();
-  }, [user?.instanciaId, expediente?.id]);
+  }, [user?.instanciaId, user?.rol, expediente?.id]); // ✅ DEPENDENCIAS ACTUALIZA
 
   // ============================================================
   // HELPERS
   // ============================================================
 
   const getIconForApartado = (icono) => {
-    const iconMap = {
-      description: <DescriptionIcon />,
-      folder: <FolderIcon />,
-      security: <SecurityIcon />,
-      work: <WorkIcon />,
-      business: <BusinessIcon />,
-      cloud: <CloudUploadIcon />,
-      verified: <VerifiedIcon />,
-      person: <PersonIcon />,
-      gavel: <GavelIcon />,
-      school: <SchoolIcon />,
-      file: <DescriptionIcon />,
-      document: <DescriptionIcon />,
-      certificate: <VerifiedIcon />,
-      assignment: <AssignmentIcon />,
-      article: <DescriptionIcon />,
-      book: <SchoolIcon />,
-      menu_book: <SchoolIcon />,
-      fact_check: <VerifiedIcon />,
-      check_circle: <CheckCircleIcon />,
-      warning: <WarningIcon />,
-      info: <InfoIcon />,
-      timeline: <TimelineIcon />,
-      assessment: <AssessmentIcon />,
-      shield: <ShieldIcon />,
-    };
-    return iconMap[icono?.toLowerCase()] || <DescriptionIcon />;
+  // Mapa de emojis a íconos de Material-UI
+  const emojiToIconMap = {
+    '📁': <FolderIcon />,
+    '📄': <DescriptionIcon />,
+    '👤': <PersonIcon />,
+    '💼': <WorkIcon />,
+    '🎓': <SchoolIcon />,
+    '🏢': <BusinessIcon />,
+    '📋': <AssignmentIcon />,
+    '⚖️': <GavelIcon />,
+    '💰': <AttachMoneyIcon />,
+    '🛡️': <SecurityIcon />,
+    '📊': <AssessmentIcon />,
+    '🔧': <BuildIcon />,
+    '📈': <TimelineIcon />,
+    '📃': <DescriptionIcon />,
+    '📑': <ArticleIcon />,
+    '🧾': <ReceiptIcon />,
   };
+
+  // Si es un emoji conocido, usar su ícono correspondiente
+  if (emojiToIconMap[icono]) {
+    return emojiToIconMap[icono];
+  }
+
+  // Mapa de íconos de texto de Material-UI
+  const iconMap = {
+    description: <DescriptionIcon />,
+    folder: <FolderIcon />,
+    security: <SecurityIcon />,
+    work: <WorkIcon />,
+    business: <BusinessIcon />,
+    cloud: <CloudUploadIcon />,
+    verified: <VerifiedIcon />,
+    person: <PersonIcon />,
+    gavel: <GavelIcon />,
+    school: <SchoolIcon />,
+    file: <DescriptionIcon />,
+    document: <DescriptionIcon />,
+    certificate: <VerifiedIcon />,
+    assignment: <AssignmentIcon />,
+    article: <DescriptionIcon />,
+    book: <SchoolIcon />,
+    menu_book: <SchoolIcon />,
+    fact_check: <VerifiedIcon />,
+    check_circle: <CheckCircleIcon />,
+    warning: <WarningIcon />,
+    info: <InfoIcon />,
+    timeline: <TimelineIcon />,
+    assessment: <AssessmentIcon />,
+    shield: <ShieldIcon />,
+  };
+  
+  return iconMap[icono?.toLowerCase()] || <DescriptionIcon />;
+};
 
   const handleAccordionChange = (panel) => (event, isExpanded) => {
     setExpanded(isExpanded ? panel : false);
@@ -2125,23 +2163,8 @@ const Expediente = () => {
               </Grid>
             </Grid>
           </Grid>
-          <Divider sx={{ my: 2 }} />
-          <Box sx={{ textAlign: "center" }}>
-            <Button
-              component={Link}
-              to="/certifications"
-              sx={{
-                color: colors.primary.main,
-                fontSize: "0.85rem",
-                fontWeight: "600",
-                textTransform: "none",
-                textDecoration: "underline",
-                "&:hover": { color: colors.primary.dark },
-              }}
-            >
-              Ver todas las certificaciones
-            </Button>
-          </Box>
+          
+         
         </CardContent>
       </Card>
 
