@@ -171,7 +171,7 @@ const CreateNivelDialog = ({ open, onClose, onSave, saving }) => {
 
                     {!loadingProgramas && programas.length === 0 && !programasError && (
                         <Alert severity="warning" sx={{ mb: 2 }}>
-                            No hay programas disponibles. Contacta al administrador.
+                            No se encontraron programas. Crea uno desde la sección de Certificaciones.
                         </Alert>
                     )}
 
