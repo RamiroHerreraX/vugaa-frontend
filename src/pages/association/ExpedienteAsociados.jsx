@@ -52,7 +52,6 @@ import {
 } from "@mui/material";
 import {
   ExpandMore as ExpandMoreIcon,
-  Add as AddIcon,
   Delete as DeleteIcon,
   Visibility as VisibilityIcon,
   Download as DownloadIcon,
@@ -66,22 +65,26 @@ import {
   CloudUpload as CloudUploadIcon,
   Gavel as GavelIcon,
   Verified as VerifiedIcon,
-  Send as SendIcon,
   School as SchoolIcon,
   Update as UpdateIcon,
   Info as InfoIcon,
   FilePresent as FilePresentIcon,
-  Close as CloseIcon,
   Folder as FolderIcon,
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Timeline as TimelineIcon,
   Shield as ShieldIcon,
+  Label as LabelIcon,
+  InsertDriveFile as InsertDriveFileIcon,
+  OndemandVideo as OndemandVideoIcon,
+  People as PeopleIcon,
+  Laptop as LaptopIcon,
 } from "@mui/icons-material";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import BuildIcon from "@mui/icons-material/Build";
 import ArticleIcon from "@mui/icons-material/Article";
 import ReceiptIcon from "@mui/icons-material/Receipt";
+
 const colors = {
   primary: {
     dark: "#0D2A4D",
@@ -108,6 +111,46 @@ const colors = {
     secondary: "#3A6EA5",
     light: "#6C5CE7",
   },
+};
+
+// ============================================================
+// HELPER: color y label para tipo de programa
+// ============================================================
+const getTipoConfig = (tipo) => {
+  const map = {
+    VIDEO: {
+      bg: "#e8eaf6",
+      color: "#283593",
+      icon: <OndemandVideoIcon sx={{ fontSize: "0.75rem" }} />,
+      label: "Video",
+    },
+    PRESENCIAL: {
+      bg: "#e8f5e9",
+      color: "#1b5e20",
+      icon: <PeopleIcon sx={{ fontSize: "0.75rem" }} />,
+      label: "Presencial",
+    },
+    EN_LINEA: {
+      bg: "#fff3e0",
+      color: "#e65100",
+      icon: <LaptopIcon sx={{ fontSize: "0.75rem" }} />,
+      label: "En línea",
+    },
+    HIBRIDO: {
+      bg: "#fce4ec",
+      color: "#880e4f",
+      icon: <SchoolIcon sx={{ fontSize: "0.75rem" }} />,
+      label: "Híbrido",
+    },
+  };
+  return (
+    map[tipo?.toUpperCase()] || {
+      bg: "#f3e5f5",
+      color: colors.accents.purple,
+      icon: <SchoolIcon sx={{ fontSize: "0.75rem" }} />,
+      label: tipo,
+    }
+  );
 };
 
 // ============================================================
@@ -376,8 +419,8 @@ const CertificacionProgramaItem = ({
     </Box>
   );
 };
+
 const Expediente = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   // Estados principales
@@ -394,7 +437,9 @@ const Expediente = () => {
 
   // Estados para certificaciones de programas
   const [documentosProgramas, setDocumentosProgramas] = useState({});
-  const [estadosValidacionProgramas, setEstadosValidacionProgramas] = useState({});
+  const [estadosValidacionProgramas, setEstadosValidacionProgramas] = useState(
+    {},
+  );
   const [certModalOpen, setCertModalOpen] = useState(false);
   const [progSeleccionado, setProgSeleccionado] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -468,49 +513,62 @@ const Expediente = () => {
     cargarExpediente();
   }, [user?.id, user?.instanciaId]);
 
-  // ✅ EFECTO PRINCIPAL MODIFICADO - USA getApartadosPorRol
   useEffect(() => {
     const cargarApartados = async () => {
       if (!user?.instanciaId || !user?.rol) return;
-      
-      setLoadingApartados(true);
-      
-      try {
-        // ✅ USAR EL NUEVO MÉTODO: OBTENER APARTADOS POR ROL
-        // El backend ya filtra: activos, instancia específica y globales
-        const rolMap = {
-          'asociacion': 'ASOCIACION',
-          'admin': 'ADMIN',
-          'comite': 'COMITE',
-          'agente': 'AGENTE',
-          'profesionista': 'PROFESIONISTA',
-          'empresario': 'EMPRESARIO',
-          'supera': 'SUPERADMIN'
-        };
-        
-        const rolBackend = rolMap[user.rol] || user.rol.toUpperCase();
-        
-        console.log(`📡 Cargando apartados para rol: ${rolBackend}, instancia: ${user.instanciaId}`);
-        
-        // ✅ LLAMADA AL NUEVO ENDPOINT
-        const apartadosData = await getApartadosPorRol(rolBackend, user.instanciaId);
-        
-        console.log(`✅ Apartados recibidos: ${apartadosData.length}`, apartadosData);
 
-        // Transformar los datos al formato que espera el componente
+      setLoadingApartados(true);
+
+      try {
+        const rolMap = {
+          asociacion: "ASOCIACION",
+          admin: "ADMIN",
+          comite: "COMITE",
+          agente: "AGENTE",
+          profesionista: "PROFESIONISTA",
+          empresario: "EMPRESARIO",
+          supera: "SUPERADMIN",
+        };
+
+        const rolBackend = rolMap[user.rol] || user.rol.toUpperCase();
+
+        console.log(
+          `📡 Cargando apartados para rol: ${rolBackend}, instancia: ${user.instanciaId}`,
+        );
+
+        const apartadosData = await getApartadosPorRol(
+          rolBackend,
+          user.instanciaId,
+        );
+
+        console.log(
+          `✅ Apartados recibidos: ${apartadosData.length}`,
+          apartadosData,
+        );
+
+        // ✅ Transformar preservando TODOS los campos del backend
         const apartadosTransformados = await Promise.all(
           apartadosData.map(async (apartado) => {
             let programas = [];
             let documentos = [];
-            
+
             try {
-              // Cargar programas y documentos asociados al apartado
-              programas = await getProgramasPorApartadoActivos(apartado.idApartado).catch(() => []);
-              documentos = await getDocumentosPorApartadoActivos(apartado.idApartado).catch(() => []);
+              // ✅ Los arrays se pasan directo sin transformar para preservar etiquetas, formatoEsperado, tipo, etc.
+              programas = await getProgramasPorApartadoActivos(
+                apartado.idApartado,
+              ).catch(() => []);
+              documentos = await getDocumentosPorApartadoActivos(
+                apartado.idApartado,
+              ).catch(() => []);
+              console.log(programas);
+              console.log(documentos);
             } catch (error) {
-              console.error(`Error cargando contenido del apartado ${apartado.idApartado}:`, error);
+              console.error(
+                `Error cargando contenido del apartado ${apartado.idApartado}:`,
+                error,
+              );
             }
-            
+
             return {
               id: `apartado_${apartado.idApartado}`,
               idApartado: apartado.idApartado,
@@ -520,22 +578,20 @@ const Expediente = () => {
               icono: apartado.icono || "description",
               orden: apartado.orden || 0,
               obligatorio: apartado.obligatorio || false,
-              esGlobal: apartado.esGlobal || false, // ✅ EL BACKEND YA INDICA SI ES GLOBAL
-              documentos: documentos || [],
-              programas: programas || [],
+              esGlobal: apartado.esGlobal || false,
+              documentos: documentos || [],  // ✅ Sin transformar — trae etiquetas, formatoEsperado, etc.
+              programas: programas || [],    // ✅ Sin transformar — trae tipo, horasRequeridas, etc.
             };
-          })
+          }),
         );
 
-        // Ordenar por orden
         apartadosTransformados.sort((a, b) => (a.orden || 0) - (b.orden || 0));
-        
+
         setApartadosDinamicos(apartadosTransformados);
 
-        // Si hay expediente, cargar documentos subidos
         if (expediente?.id) {
           const subidosPorApartado = {};
-          
+
           await Promise.all(
             apartadosData.map(async (apartado) => {
               try {
@@ -543,27 +599,33 @@ const Expediente = () => {
                   expediente.id,
                   apartado.idApartado,
                 );
-                
+
                 if (docs?.length > 0) {
                   subidosPorApartado[apartado.idApartado] = {};
                   docs.forEach((doc) => {
                     if (doc.idDocumentoPlantilla) {
-                      subidosPorApartado[apartado.idApartado][doc.idDocumentoPlantilla] = {
+                      subidosPorApartado[apartado.idApartado][
+                        doc.idDocumentoPlantilla
+                      ] = {
                         ...doc,
-                        fechaSubida: new Date(doc.fechaSubida || Date.now()).toLocaleDateString("es-MX")
+                        fechaSubida: new Date(
+                          doc.fechaSubida || Date.now(),
+                        ).toLocaleDateString("es-MX"),
                       };
                     }
                   });
                 }
               } catch (error) {
-                console.error(`Error cargando docs subidos del apartado ${apartado.idApartado}:`, error);
+                console.error(
+                  `Error cargando docs subidos del apartado ${apartado.idApartado}:`,
+                  error,
+                );
               }
             }),
           );
-          
+
           setArchivosSubidos(subidosPorApartado);
 
-          // Cargar certificaciones
           try {
             const certs = await getCertificacionesPorExpediente(expediente.id);
             const docsPrograma = {};
@@ -572,7 +634,10 @@ const Expediente = () => {
                 docsPrograma[cert.idPrograma] = {
                   id: cert.idCertExp,
                   idCertificacion: cert.idCertificacion,
-                  nombreArchivo: cert.nombreArchivo || cert.nombreCertificacion || "documento",
+                  nombreArchivo:
+                    cert.nombreArchivo ||
+                    cert.nombreCertificacion ||
+                    "documento",
                   nombre: cert.nombreCertificacion,
                   institucion: cert.institucion,
                   horas: cert.horasAcreditadas,
@@ -591,77 +656,75 @@ const Expediente = () => {
         console.error("❌ Error cargando apartados:", error);
         setSnackbar({
           open: true,
-          message: error.response?.data?.message || "Error al cargar los apartados",
+          message:
+            error.response?.data?.message || "Error al cargar los apartados",
           severity: "error",
         });
       } finally {
         setLoadingApartados(false);
       }
     };
-    
+
     cargarApartados();
-  }, [user?.instanciaId, user?.rol, expediente?.id]); // ✅ DEPENDENCIAS ACTUALIZA
+  }, [user?.instanciaId, user?.rol, expediente?.id]);
 
   // ============================================================
   // HELPERS
   // ============================================================
 
   const getIconForApartado = (icono) => {
-  // Mapa de emojis a íconos de Material-UI
-  const emojiToIconMap = {
-    '📁': <FolderIcon />,
-    '📄': <DescriptionIcon />,
-    '👤': <PersonIcon />,
-    '💼': <WorkIcon />,
-    '🎓': <SchoolIcon />,
-    '🏢': <BusinessIcon />,
-    '📋': <AssignmentIcon />,
-    '⚖️': <GavelIcon />,
-    '💰': <AttachMoneyIcon />,
-    '🛡️': <SecurityIcon />,
-    '📊': <AssessmentIcon />,
-    '🔧': <BuildIcon />,
-    '📈': <TimelineIcon />,
-    '📃': <DescriptionIcon />,
-    '📑': <ArticleIcon />,
-    '🧾': <ReceiptIcon />,
-  };
+    const emojiToIconMap = {
+      "📁": <FolderIcon />,
+      "📄": <DescriptionIcon />,
+      "👤": <PersonIcon />,
+      "💼": <WorkIcon />,
+      "🎓": <SchoolIcon />,
+      "🏢": <BusinessIcon />,
+      "📋": <AssignmentIcon />,
+      "⚖️": <GavelIcon />,
+      "💰": <AttachMoneyIcon />,
+      "🛡️": <SecurityIcon />,
+      "📊": <AssessmentIcon />,
+      "🔧": <BuildIcon />,
+      "📈": <TimelineIcon />,
+      "📃": <DescriptionIcon />,
+      "📑": <ArticleIcon />,
+      "🧾": <ReceiptIcon />,
+    };
 
-  // Si es un emoji conocido, usar su ícono correspondiente
-  if (emojiToIconMap[icono]) {
-    return emojiToIconMap[icono];
-  }
+    if (emojiToIconMap[icono]) {
+      return emojiToIconMap[icono];
+    }
 
-  // Mapa de íconos de texto de Material-UI
-  const iconMap = {
-    description: <DescriptionIcon />,
-    folder: <FolderIcon />,
-    security: <SecurityIcon />,
-    work: <WorkIcon />,
-    business: <BusinessIcon />,
-    cloud: <CloudUploadIcon />,
-    verified: <VerifiedIcon />,
-    person: <PersonIcon />,
-    gavel: <GavelIcon />,
-    school: <SchoolIcon />,
-    file: <DescriptionIcon />,
-    document: <DescriptionIcon />,
-    certificate: <VerifiedIcon />,
-    assignment: <AssignmentIcon />,
-    article: <DescriptionIcon />,
-    book: <SchoolIcon />,
-    menu_book: <SchoolIcon />,
-    fact_check: <VerifiedIcon />,
-    check_circle: <CheckCircleIcon />,
-    warning: <WarningIcon />,
-    info: <InfoIcon />,
-    timeline: <TimelineIcon />,
-    assessment: <AssessmentIcon />,
-    shield: <ShieldIcon />,
+    const iconMap = {
+      description: <DescriptionIcon />,
+      folder: <FolderIcon />,
+      security: <SecurityIcon />,
+      work: <WorkIcon />,
+      business: <BusinessIcon />,
+      cloud: <CloudUploadIcon />,
+      verified: <VerifiedIcon />,
+      person: <PersonIcon />,
+      gavel: <GavelIcon />,
+      school: <SchoolIcon />,
+      file: <DescriptionIcon />,
+      document: <DescriptionIcon />,
+      certificate: <VerifiedIcon />,
+      assignment: <AssignmentIcon />,
+      article: <DescriptionIcon />,
+      book: <SchoolIcon />,
+      menu_book: <SchoolIcon />,
+      fact_check: <VerifiedIcon />,
+      check_circle: <CheckCircleIcon />,
+      warning: <WarningIcon />,
+      info: <InfoIcon />,
+      timeline: <TimelineIcon />,
+      assessment: <AssessmentIcon />,
+      shield: <ShieldIcon />,
+    };
+
+    return iconMap[icono?.toLowerCase()] || <DescriptionIcon />;
   };
-  
-  return iconMap[icono?.toLowerCase()] || <DescriptionIcon />;
-};
 
   const handleAccordionChange = (panel) => (event, isExpanded) => {
     setExpanded(isExpanded ? panel : false);
@@ -1498,7 +1561,7 @@ const Expediente = () => {
                               mb: 1,
                             }}
                           >
-                            <Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
                               <Typography
                                 variant="body2"
                                 sx={{
@@ -1508,6 +1571,8 @@ const Expediente = () => {
                               >
                                 {doc.nombreArchivo}
                               </Typography>
+
+                              {/* Descripción */}
                               {doc.descripcion && (
                                 <Typography
                                   variant="caption"
@@ -1520,7 +1585,95 @@ const Expediente = () => {
                                   {doc.descripcion}
                                 </Typography>
                               )}
+
+                              {/* ✅ FORMATOS ESPERADOS */}
+                              {doc.formatoEsperado && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    flexWrap: "wrap",
+                                    mt: 0.75,
+                                  }}
+                                >
+                                  <InsertDriveFileIcon
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      color: colors.primary.light,
+                                    }}
+                                  />
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: colors.primary.light,
+                                      fontWeight: 600,
+                                      fontSize: "0.65rem",
+                                    }}
+                                  >
+                                    Formatos:
+                                  </Typography>
+                                  {doc.formatoEsperado
+                                    .split(",")
+                                    .map((fmt) => fmt.trim())
+                                    .filter(Boolean)
+                                    .map((fmt) => (
+                                      <Chip
+                                        key={fmt}
+                                        label={fmt}
+                                        size="small"
+                                        sx={{
+                                          height: "18px",
+                                          fontSize: "0.6rem",
+                                          fontWeight: 700,
+                                          backgroundColor: "#dbeafe",
+                                          color: "#1e40af",
+                                          border: "1px solid #93c5fd",
+                                        }}
+                                      />
+                                    ))}
+                                </Box>
+                              )}
+
+                              {/* ✅ ETIQUETAS */}
+                              {doc.etiquetas && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    flexWrap: "wrap",
+                                    mt: 0.5,
+                                  }}
+                                >
+                                  <LabelIcon
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      color: colors.accents.purple,
+                                    }}
+                                  />
+                                  {doc.etiquetas
+                                    .split(",")
+                                    .map((tag) => tag.trim())
+                                    .filter(Boolean)
+                                    .map((tag) => (
+                                      <Chip
+                                        key={tag}
+                                        label={tag}
+                                        size="small"
+                                        sx={{
+                                          height: "18px",
+                                          fontSize: "0.6rem",
+                                          backgroundColor: `${colors.accents.purple}12`,
+                                          color: colors.accents.purple,
+                                          border: `1px solid ${colors.accents.purple}30`,
+                                        }}
+                                      />
+                                    ))}
+                                </Box>
+                              )}
                             </Box>
+
                             {doc.obligatorio && (
                               <Chip
                                 label="Obligatorio"
@@ -1530,6 +1683,7 @@ const Expediente = () => {
                                   height: "20px",
                                   fontSize: "0.65rem",
                                   flexShrink: 0,
+                                  ml: 1,
                                 }}
                               />
                             )}
@@ -1642,6 +1796,8 @@ const Expediente = () => {
                 {apartado.programas.map((prog) => {
                   const docPrograma = documentosProgramas[prog.id];
                   const estadoValidacion = estadosValidacionProgramas[prog.id];
+                  const tipoConfig = getTipoConfig(prog.tipo);
+
                   return (
                     <Paper
                       key={prog.id}
@@ -1702,7 +1858,7 @@ const Expediente = () => {
                               mb: 1,
                             }}
                           >
-                            <Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
                               <Typography
                                 variant="body2"
                                 sx={{
@@ -1712,6 +1868,8 @@ const Expediente = () => {
                               >
                                 {prog.nombre}
                               </Typography>
+
+                              {/* Descripción */}
                               {prog.descripcion && (
                                 <Typography
                                   variant="caption"
@@ -1724,7 +1882,41 @@ const Expediente = () => {
                                   {prog.descripcion}
                                 </Typography>
                               )}
+
+                              {/* ✅ TIPO DE PROGRAMA */}
+                              {prog.tipo && (
+                                <Box sx={{ mt: 0.75 }}>
+                                  <Chip
+                                    icon={
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          color: tipoConfig.color,
+                                        }}
+                                      >
+                                        {tipoConfig.icon}
+                                      </Box>
+                                    }
+                                    label={tipoConfig.label}
+                                    size="small"
+                                    sx={{
+                                      height: "20px",
+                                      fontSize: "0.65rem",
+                                      fontWeight: 700,
+                                      backgroundColor: tipoConfig.bg,
+                                      color: tipoConfig.color,
+                                      border: `1px solid ${tipoConfig.color}30`,
+                                      "& .MuiChip-icon": {
+                                        color: tipoConfig.color,
+                                        marginLeft: "6px",
+                                      },
+                                    }}
+                                  />
+                                </Box>
+                              )}
                             </Box>
+
                             {prog.horasRequeridas && (
                               <Box
                                 sx={{
@@ -1732,10 +1924,12 @@ const Expediente = () => {
                                   flexDirection: "column",
                                   gap: 0.5,
                                   alignItems: "flex-end",
+                                  flexShrink: 0,
+                                  ml: 1,
                                 }}
                               >
                                 <Chip
-                                  label={`Horas requeridas: ${prog.horasRequeridas} hrs`}
+                                  label={`${prog.horasRequeridas} hrs requeridas`}
                                   size="small"
                                   sx={{
                                     height: "20px",
@@ -1750,8 +1944,8 @@ const Expediente = () => {
                                       ? docPrograma.horas >=
                                         prog.horasRequeridas
                                         ? "✓ Horas completas"
-                                        : `Horas faltantes: ${prog.horasRequeridas - docPrograma.horas} hrs`
-                                      : `Horas faltantes: ${prog.horasRequeridas} hrs`
+                                        : `Faltan: ${prog.horasRequeridas - docPrograma.horas} hrs`
+                                      : `Faltan: ${prog.horasRequeridas} hrs`
                                   }
                                   size="small"
                                   sx={{
@@ -2163,8 +2357,6 @@ const Expediente = () => {
               </Grid>
             </Grid>
           </Grid>
-          
-         
         </CardContent>
       </Card>
 

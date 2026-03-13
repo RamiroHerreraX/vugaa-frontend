@@ -45,7 +45,6 @@ import {
   Schedule as ScheduleIcon,
   Category as CategoryIcon,
   Code as CodeIcon,
-  Computer as ComputerIcon,
   PowerSettingsNew as PowerIcon,
   Restore as RestoreIcon,
   Warning as WarningIcon,
