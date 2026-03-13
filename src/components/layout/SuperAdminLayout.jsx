@@ -64,14 +64,11 @@ const SuperAdminLayout = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [open, setOpen] = useState(!isMobile);
-  const [anchorEl, setAnchorEl] = useState(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState(null);
 
   // COLORES AZULES PROFESIONALES - Usando institucionales
   const primaryColor = institutionalColors.primary;
-  const secondaryColor = institutionalColors.secondary;
   const accentColor = institutionalColors.accent;
-  const notificationColor = institutionalColors.notification;
   const background = institutionalColors.background;
 
   // MENÚ PRINCIPAL para Super Administrador - Solo acceso multi-sistema
@@ -554,19 +551,8 @@ const SuperAdminLayout = () => {
                   },
                 }}
               >
-                <Badge
-                  badgeContent={12}
-                  color="error"
-                  sx={{
-                    "& .MuiBadge-badge": {
-                      fontSize: "0.6rem",
-                      height: 18,
-                      minWidth: 18,
-                    },
-                  }}
-                >
                   <NotificationsIcon />
-                </Badge>
+                
               </IconButton>
             </Tooltip>
 
