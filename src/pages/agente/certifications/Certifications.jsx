@@ -12,7 +12,7 @@ import usuarioService from '../../../services/usuarioService';
 import { useAuth } from "../../../context/AuthContext";
 import AddCertificationModal from '../../../components/subirCertificacion/AddCertificationModal';
 import { getMiExpediente } from '../../../services/expediente';
-import { getTodosApartados } from '../../../services/apartado';
+import { getApartadosPorInstanciaConGlobales } from '../../../services/apartado';
 import { getProgramasPorApartadoActivos } from '../../../services/programas';
 import {
   Box,
@@ -305,23 +305,11 @@ const Certifications = () => {
         console.log('🔍 ===== INICIO CARGA DE APARTADOS Y PROGRAMAS =====');
         console.log('🔍 user.instanciaId:', user.instanciaId);
         
-        const todos = await getTodosApartados();
-        console.log('📋 TODOS LOS APARTADOS:', todos);
-        
-        setApartados(todos);
-        
-        // Crear mapa de apartados activos
+       const globalesYDeInstancia = await getApartadosPorInstanciaConGlobales(user.instanciaId);
+        setApartados(globalesYDeInstancia);
         const apartadosMap = {};
-        todos.forEach(ap => {
-          apartadosMap[ap.idApartado] = ap.activo === true;
-        });
+        globalesYDeInstancia.forEach(ap => { apartadosMap[ap.idApartado] = ap.activo === true; });
         setApartadosActivos(apartadosMap);
-        console.log('🗺️ MAPA DE APARTADOS ACTIVOS:', apartadosMap);
-        
-        // Continuar con la carga de programas
-        const globalesYDeInstancia = todos.filter(
-          a => !a.idInstancia || a.idInstancia === user.instanciaId
-        );
 
         const programas = [];
         const programasMap = {}; // Mapa de programas activos

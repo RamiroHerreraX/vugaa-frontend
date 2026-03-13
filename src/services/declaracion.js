@@ -205,6 +205,61 @@ class DeclaracionesService {
     const lista = await this.findByInstancia(idInstancia);
     return lista.filter(d => d.activa === true);
   }
+
+
+  // ── DeclaracionUsuario ──────────────────────────────────────────────────────
+
+async guardarRespuesta({ idDeclaracion, idExpediente, checks, declaracionBuenaFe = true }) {
+  try {
+    const checksMarcados = checks.filter(c => c.respuesta === 'si').length;
+    const totalChecks    = checks.length;
+    const porcentaje     = totalChecks > 0 ? Math.round((checksMarcados / totalChecks) * 100) : 0;
+    const estado         = porcentaje >= 80 ? 'cumple_totalmente'
+                         : porcentaje >= 60 ? 'cumple_parcialmente'
+                         : 'no_cumple';
+
+    const respuestaJson = JSON.stringify({
+      declaracionBuenaFe,
+      fechaDeclaracion: new Date().toISOString(),
+      checks: checks.map(c => ({
+        id:        c.id,
+        texto:     c.texto,
+        marcado:   c.respuesta === 'si',
+        respuesta: c.respuesta,           // 'si' | 'no'
+        motivo:    c.motivo || null,      // texto del motivo si no cumple
+        fundamento: c.fundamento || null,
+      })),
+      totalChecks,
+      checksMarcados,
+      porcentajeCumplimiento: porcentaje,
+      estado,
+    });
+
+    const payload = {
+      idDeclaracion:  Number(idDeclaracion),
+      idExpediente:   Number(idExpediente),
+      respuestaJson,
+      estado:         'PRESENTADA',
+      vigenciaInicio: new Date().toISOString().split('T')[0],
+    };
+
+    const response = await API.post('/declaraciones-usuario', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error en guardarRespuesta:', error);
+    throw error.response?.data || { error: 'Error al guardar la respuesta de declaración' };
+  }
+}
+
+async findRespuestasPorExpediente(idExpediente) {
+  try {
+    const response = await API.get(`/declaraciones-usuario/expediente/${Number(idExpediente)}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error en findRespuestasPorExpediente:', error);
+    throw error.response?.data || { error: 'Error al obtener respuestas' };
+  }
+}
 }
 
 export default new DeclaracionesService();
