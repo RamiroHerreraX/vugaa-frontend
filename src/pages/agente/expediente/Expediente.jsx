@@ -1,7 +1,7 @@
   import React, { useState, useEffect, useRef } from 'react';
   import { useNavigate, Link } from 'react-router-dom';
   import { useAuth } from "../../../context/AuthContext"; 
-  import { getTodosApartados } from '../../../services/apartado';
+  import { getApartadosPorInstanciaConGlobales } from '../../../services/apartado';
   import { subirDocumento, getDocumentosSubidosPorApartado, eliminarDocumentoSubido, descargarArchivo , obtenerArchivoBlob} from '../../../services/documentoSubido';
   import { getDocumentosPorApartadoActivos,  getDocumentosPorApartado } from '../../../services/documentoExpediente';
   import { getMiExpediente } from '../../../services/expediente';
@@ -1248,8 +1248,7 @@
         if (!user?.instanciaId) return;
         setLoadingApartados(true);
         try {
-          const todos = await getTodosApartados();
-          const globales = todos.filter(a => !a.idInstancia || a.idInstancia === user.instanciaId);
+          const globales = await getApartadosPorInstanciaConGlobales(user.instanciaId);
 
           const apartadosTransformados = await Promise.all(
             globales.map(async (apartado) => {
